@@ -876,6 +876,30 @@ class MemberSidebar {
 		});
 	}
 
+	pauseMemberListSubscription(guildId: string, channelId: string, ownerId: string): void {
+		if (!this.isActiveMemberListSubscriptionOwner(guildId, channelId, ownerId)) {
+			return;
+		}
+		this.activeMemberListSubscription = null;
+		const storageKey = this.resolveListKey(guildId, channelId);
+		const currentSubscribedChannelId = this.listSubscribedChannelIds[guildId]?.[storageKey];
+		if (currentSubscribedChannelId && currentSubscribedChannelId !== channelId) {
+			return;
+		}
+		GatewayConnection.socket?.updateGuildSubscriptions({
+			subscriptions: {
+				[guildId]: {
+					member_list_channels: {[channelId]: []},
+				},
+			},
+		});
+		this.clearPendingListUpdateBatch(guildId, storageKey);
+		const existingList = this.lists[guildId]?.[storageKey];
+		if (existingList) {
+			this.touchList(guildId, storageKey);
+		}
+	}
+
 	isActiveMemberListSubscriptionOwner(guildId: string, channelId: string, ownerId: string | null): boolean {
 		const active = this.activeMemberListSubscription;
 		return (

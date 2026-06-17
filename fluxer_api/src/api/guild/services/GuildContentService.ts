@@ -6,12 +6,17 @@ import type {
 	GuildStickerResponse,
 	GuildStickerWithUserResponse,
 } from '@fluxer/schema/src/domains/guild/GuildEmojiSchemas';
+import type {
+	GuildSoundboardListResponse,
+	GuildSoundboardSoundResponse,
+} from '@fluxer/schema/src/domains/guild/GuildSoundboardSchemas';
 import type {UserPartialResponse} from '@fluxer/schema/src/domains/user/UserResponseSchemas';
 import type {EmojiID, GuildID, StickerID, UserID} from '../../BrandedTypes';
 import type {AvatarService} from '../../infrastructure/AvatarService';
 import type {IAssetDeletionQueue} from '../../infrastructure/IAssetDeletionQueue';
 import type {IGatewayService} from '../../infrastructure/IGatewayService';
 import type {ISnowflakeService} from '../../infrastructure/ISnowflakeService';
+import type {IStorageService} from '../../infrastructure/IStorageService';
 import type {UserCacheService} from '../../infrastructure/UserCacheService';
 import type {LimitConfigService} from '../../limits/LimitConfigService';
 import type {RequestCache} from '../../middleware/RequestCacheMiddleware';
@@ -21,12 +26,14 @@ import type {IGuildRepositoryAggregate} from '../repositories/IGuildRepositoryAg
 import {ContentHelpers} from './content/ContentHelpers';
 import {EmojiService} from './content/EmojiService';
 import {ExpressionAssetPurger} from './content/ExpressionAssetPurger';
+import {SoundboardService} from './content/SoundboardService';
 import {StickerService} from './content/StickerService';
 
 export class GuildContentService {
 	private readonly contentHelpers: ContentHelpers;
 	private readonly emojiService: EmojiService;
 	private readonly stickerService: StickerService;
+	private readonly soundboardService: SoundboardService;
 
 	constructor(
 		guildRepository: IGuildRepositoryAggregate,
@@ -37,6 +44,7 @@ export class GuildContentService {
 		guildAuditLogService: GuildAuditLogService,
 		assetDeletionQueue: IAssetDeletionQueue,
 		limitConfigService: LimitConfigService,
+		storageService: IStorageService,
 	) {
 		this.contentHelpers = new ContentHelpers(gatewayService, guildAuditLogService);
 		const expressionAssetPurger = new ExpressionAssetPurger(assetDeletionQueue);
@@ -58,6 +66,12 @@ export class GuildContentService {
 			snowflakeService,
 			this.contentHelpers,
 			expressionAssetPurger,
+			limitConfigService,
+		);
+		this.soundboardService = new SoundboardService(
+			storageService,
+			snowflakeService,
+			this.contentHelpers,
 			limitConfigService,
 		);
 	}
@@ -234,5 +248,32 @@ export class GuildContentService {
 		auditLogReason?: string | null,
 	): Promise<void> {
 		return this.stickerService.deleteSticker(params, auditLogReason);
+	}
+
+	async listSoundboardSounds(params: {userId: UserID; guildId: GuildID}): Promise<GuildSoundboardListResponse> {
+		return this.soundboardService.listSounds(params);
+	}
+
+	async createSoundboardSound(params: {
+		user: User;
+		guildId: GuildID;
+		name: string;
+		audioBase64: string;
+		emoji?: string;
+	}): Promise<GuildSoundboardSoundResponse> {
+		return this.soundboardService.createSound(params);
+	}
+
+	async updateSoundboardSound(params: {
+		userId: UserID;
+		guildId: GuildID;
+		soundId: string;
+		name: string;
+	}): Promise<GuildSoundboardSoundResponse> {
+		return this.soundboardService.updateSound(params);
+	}
+
+	async deleteSoundboardSound(params: {userId: UserID; guildId: GuildID; soundId: string}): Promise<void> {
+		return this.soundboardService.deleteSound(params);
 	}
 }

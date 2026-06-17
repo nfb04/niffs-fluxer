@@ -28,6 +28,7 @@ import type {AvatarService} from '../../infrastructure/AvatarService';
 import type {EntityAssetService} from '../../infrastructure/EntityAssetService';
 import type {IAssetDeletionQueue} from '../../infrastructure/IAssetDeletionQueue';
 import type {IGatewayService} from '../../infrastructure/IGatewayService';
+import type {IStorageService} from '../../infrastructure/IStorageService';
 import type {UserCacheService} from '../../infrastructure/UserCacheService';
 import type {InviteRepository} from '../../invite/InviteRepository';
 import type {LimitConfigService} from '../../limits/LimitConfigService';
@@ -135,6 +136,7 @@ export class GuildService {
 		guildAuditLogService: GuildAuditLogService,
 		limitConfigService: LimitConfigService,
 		ipInfoService: IpInfoService,
+		storageService: IStorageService,
 	) {
 		const {
 			cache: cacheService,
@@ -201,6 +203,7 @@ export class GuildService {
 			guildAuditLogService,
 			assetDeletionQueue,
 			limitConfigService,
+			storageService,
 		);
 		this.channels = new GuildChannelService(
 			channelRepository,

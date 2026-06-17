@@ -7,7 +7,7 @@ import {LARGE_GUILD_THRESHOLD} from '@fluxer/constants/src/GatewayConstants';
 import type {GuildSplashCardAlignmentValue} from '@fluxer/constants/src/GuildConstants';
 import {GuildFeatures, GuildNSFWLevel, GuildSplashCardAlignment} from '@fluxer/constants/src/GuildConstants';
 import type {LimitKey} from '@fluxer/constants/src/LimitConfigMetadata';
-import {MAX_GUILD_EMOJIS, MAX_GUILD_STICKERS} from '@fluxer/constants/src/LimitConstants';
+import {MAX_GUILD_EMOJIS, MAX_GUILD_SOUNDBOARD_SOUNDS, MAX_GUILD_STICKERS} from '@fluxer/constants/src/LimitConstants';
 import {MessageNotifications} from '@fluxer/constants/src/NotificationConstants';
 import {resolveLimit} from '@fluxer/limits/src/LimitResolver';
 import type {Guild as WireGuild} from '@fluxer/schema/src/domains/guild/GuildResponseSchemas';
@@ -430,6 +430,10 @@ export class Guild {
 			return Number.POSITIVE_INFINITY;
 		}
 		return this.resolveGuildLimit('max_guild_stickers', MAX_GUILD_STICKERS);
+	}
+
+	get maxSoundboardSounds(): number {
+		return this.resolveGuildLimit('max_guild_soundboard_sounds', MAX_GUILD_SOUNDBOARD_SOUNDS);
 	}
 
 	private resolveGuildLimit(key: LimitKey, fallback: number): number {

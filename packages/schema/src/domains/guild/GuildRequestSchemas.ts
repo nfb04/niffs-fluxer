@@ -13,6 +13,7 @@ import {
 	MAX_TEMP_BAN_DURATION_SECONDS,
 	MIN_TEMP_BAN_DURATION_SECONDS,
 	STICKER_MAX_SIZE,
+	SOUNDBOARD_MAX_SIZE,
 } from '@fluxer/constants/src/LimitConstants';
 import {SudoVerificationSchema} from '@fluxer/schema/src/domains/auth/AuthSchemas';
 import {GuildFeatureSchema} from '@fluxer/schema/src/domains/guild/GuildResponseSchemas';
@@ -277,6 +278,22 @@ export const GuildStickerCloneRequest = z.object({
 });
 
 export type GuildStickerCloneRequest = z.infer<typeof GuildStickerCloneRequest>;
+
+export const GuildSoundboardCreateRequest = z.object({
+	name: createStringType(1, 32).describe('The display name of the sound (1-32 characters)'),
+	audio: createBase64StringType(1, Math.ceil(SOUNDBOARD_MAX_SIZE * (4 / 3))).describe(
+		'Base64-encoded audio data (MP3 or WAV, max 2MB)',
+	),
+	emoji: createStringType(0, 64).optional().describe('Related emoji shortcode (e.g. smiley)'),
+});
+
+export type GuildSoundboardCreateRequest = z.infer<typeof GuildSoundboardCreateRequest>;
+
+export const GuildSoundboardUpdateRequest = z.object({
+	name: createStringType(1, 32).describe('The display name of the sound (1-32 characters)'),
+});
+
+export type GuildSoundboardUpdateRequest = z.infer<typeof GuildSoundboardUpdateRequest>;
 
 export const GuildTransferOwnershipRequest = z.object({
 	new_owner_id: SnowflakeType.describe('The ID of the user to transfer ownership to'),

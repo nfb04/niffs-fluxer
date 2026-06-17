@@ -365,7 +365,14 @@ export function getUnfurlerService(): IUnfurlerService {
 }
 
 export const getEmbedService = singleton(
-	() => new EmbedService(getChannelRepository(), getUnfurlerService(), getMediaService(), getWorkerService()),
+	() =>
+		new EmbedService(
+			getChannelRepository(),
+			getUnfurlerService(),
+			getMediaService(),
+			getWorkerService(),
+			getGifService(),
+		),
 );
 export const getReadStateService = singleton(() => new ReadStateService(getReadStateRepository(), getGatewayService()));
 export const getDiscriminatorService = singleton(

@@ -6,8 +6,8 @@ import GuildMembers from '@app/features/member/state/GuildMembers';
 import {SoundType} from '@app/features/notification/utils/SoundUtils';
 import {Logger} from '@app/features/platform/utils/AppLogger';
 import * as SoundCommands from '@app/features/ui/commands/SoundCommands';
+import Users from '@app/features/user/state/Users';
 import MediaEngine from '@app/features/voice/engine/MediaEngineFacade';
-import {playSelfJoinChimeOnce} from '@app/features/voice/engine/VoiceSelfJoinChime';
 import VoiceRegionTeleport from '@app/features/voice/state/VoiceRegionTeleport';
 import type {GuildMemberData} from '@fluxer/schema/src/domains/guild/GuildMemberSchemas';
 
@@ -102,8 +102,9 @@ function shouldPlayJoinChime(data: VoiceStateUpdatePayload): boolean {
 	return true;
 }
 
-function shouldBypassSelfDeafenedForJoinChime(data: VoiceStateUpdatePayload): boolean {
-	return data.connection_id === MediaEngine.connectionId;
+function isLocalJoinChime(data: VoiceStateUpdatePayload): boolean {
+	const currentUserId = Users.getCurrentUser()?.id;
+	return currentUserId != null && data.user_id === currentUserId;
 }
 
 function shouldPlayLeaveChime(data: VoiceStateUpdatePayload): boolean {
@@ -131,8 +132,8 @@ export function handleVoiceStateUpdate(data: VoiceStateUpdatePayload, _context: 
 	MediaEngine.handleGatewayVoiceStateUpdate(guildId, voiceState);
 	if (playJoinChime) {
 		rememberJoinChime(data, now);
-		if (shouldBypassSelfDeafenedForJoinChime(data)) {
-			playSelfJoinChimeOnce(data.connection_id, 'gateway');
+		if (isLocalJoinChime(data)) {
+			// Local join chime is played once from the voice engine connect path (LiveKit / native).
 		} else {
 			SoundCommands.playSoundBypassingSelfDeafened(SoundType.UserJoin);
 		}

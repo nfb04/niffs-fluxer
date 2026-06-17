@@ -8,6 +8,7 @@ import {SoundType} from '@app/features/notification/utils/SoundUtils';
 import Permission from '@app/features/permissions/state/Permission';
 import NativePermission from '@app/features/permissions/system/state/NativePermission';
 import {Logger} from '@app/features/platform/utils/AppLogger';
+import {ComponentDispatch} from '@app/features/platform/utils/ComponentBus';
 import {MenuGroup} from '@app/features/ui/action_menu/MenuGroup';
 import {MenuItem} from '@app/features/ui/action_menu/MenuItem';
 import * as ContextMenuCommands from '@app/features/ui/commands/ContextMenuCommands';
@@ -24,6 +25,9 @@ import {
 	VoiceCameraSettingsBottomSheet,
 	VoiceMoreOptionsBottomSheet,
 } from '@app/features/voice/components/bottomsheets/VoiceSettingsBottomSheets';
+import {VoiceSoundboardBottomSheet} from '@app/features/voice/components/VoiceSoundboardBottomSheet';
+import {VoiceSoundboardGrid} from '@app/features/voice/components/VoiceSoundboardGrid';
+import popoverStyles from '@app/features/voice/components/VoiceSoundboardPopover.module.css';
 import {
 	CameraPreviewModalInRoom,
 	CameraPreviewModalStandalone,
@@ -84,6 +88,17 @@ import {Permissions} from '@fluxer/constants/src/ChannelConstants';
 import {VOICE_CHANNEL_CAMERA_USER_LIMIT} from '@fluxer/constants/src/LimitConstants';
 import {msg} from '@lingui/core/macro';
 import {useLingui} from '@lingui/react/macro';
+import {
+	FloatingFocusManager,
+	flip,
+	offset,
+	shift,
+	useClick,
+	useDismiss,
+	useFloating,
+	useInteractions,
+	useRole,
+} from '@floating-ui/react';
 import {useMaybeRoomContext} from '@livekit/components-react';
 import {
 	CameraIcon,
@@ -95,6 +110,7 @@ import {
 	MicrophoneIcon,
 	MicrophoneSlashIcon,
 	MonitorPlayIcon,
+	MusicNotesIcon,
 	PhoneXIcon,
 	SpeakerHighIcon,
 	SpeakerSlashIcon,
@@ -226,7 +242,7 @@ function useVoiceControlLocalMediaState(): VoiceControlLocalMediaState {
 }
 
 const VoiceControlBarInner = observer(function VoiceControlBarInner() {
-	const {i18n} = useLingui();
+	const {i18n, t} = useLingui();
 	useMediaEngineVersion();
 	const {localParticipant, isCameraEnabled, isScreenShareEnabled, isConnected} = useVoiceControlLocalMediaState();
 	const voiceState = MediaEngine.getCurrentUserVoiceState();
@@ -241,6 +257,24 @@ const VoiceControlBarInner = observer(function VoiceControlBarInner() {
 	const [audioSettingsOpen, setAudioSettingsOpen] = useState(false);
 	const [cameraSettingsOpen, setCameraSettingsOpen] = useState(false);
 	const [moreOptionsOpen, setMoreOptionsOpen] = useState(false);
+	const [soundboardOpen, setSoundboardOpen] = useState(false);
+	const room = MediaEngine.room;
+	const {refs: soundboardRefs, context: soundboardContext, floatingStyles: soundboardFloatingStyles} = useFloating({
+		open: soundboardOpen,
+		onOpenChange: setSoundboardOpen,
+		placement: 'top',
+		middleware: [offset(8), flip(), shift({padding: 8})],
+	});
+	const {getReferenceProps: getSoundboardReferenceProps, getFloatingProps: getSoundboardFloatingProps} = useInteractions([
+		useClick(soundboardContext),
+		useDismiss(soundboardContext),
+		useRole(soundboardContext),
+	]);
+	useEffect(() => {
+		return ComponentDispatch.subscribe('SOUNDBOARD_TOGGLE', () => {
+			setSoundboardOpen((open) => !open);
+		});
+	}, []);
 	const isMuted = localSelfMute;
 	const isDeafened = localSelfDeaf;
 	const isGuildMuted = voiceState?.mute ?? false;
@@ -921,6 +955,24 @@ const VoiceControlBarInner = observer(function VoiceControlBarInner() {
 					</FocusRing>
 				</Tooltip>
 			</div>
+			<Tooltip text={t`Soundboard`} data-flx="voice.voice-control-bar.voice-control-bar-inner.tooltip.soundboard">
+				<FocusRing offset={-2} data-flx="voice.voice-control-bar.voice-control-bar-inner.focus-ring.soundboard">
+					<button
+						ref={soundboardRefs.setReference}
+						type="button"
+						className={clsx(styles.button, styles.buttonSoundboard)}
+						{...getSoundboardReferenceProps()}
+						aria-label={t`Soundboard`}
+						data-flx="voice.voice-control-bar.voice-control-bar-inner.button.soundboard"
+					>
+						<MusicNotesIcon
+							weight="fill"
+							className={styles.icon}
+							data-flx="voice.voice-control-bar.voice-control-bar-inner.icon.soundboard"
+						/>
+					</button>
+				</FocusRing>
+			</Tooltip>
 			<Tooltip
 				text={i18n._(MORE_OPTIONS_DESCRIPTOR)}
 				data-flx="voice.voice-control-bar.voice-control-bar-inner.tooltip--7"
@@ -986,6 +1038,18 @@ const VoiceControlBarInner = observer(function VoiceControlBarInner() {
 					</FocusRing>
 				</Tooltip>
 			)}
+			{soundboardOpen && !isMobile && (
+				<FloatingFocusManager context={soundboardContext} modal={false}>
+					<div
+						ref={soundboardRefs.setFloating}
+						className={popoverStyles.popover}
+						style={{...soundboardFloatingStyles, zIndex: 30}}
+						{...getSoundboardFloatingProps()}
+					>
+						<VoiceSoundboardGrid room={room} guildId={guildId ?? null} />
+					</div>
+				</FloatingFocusManager>
+			)}
 			{isMobile && (
 				<>
 					<VoiceAudioSettingsBottomSheet
@@ -1003,6 +1067,7 @@ const VoiceControlBarInner = observer(function VoiceControlBarInner() {
 						onClose={() => setMoreOptionsOpen(false)}
 						data-flx="voice.voice-control-bar.voice-control-bar-inner.voice-more-options-bottom-sheet"
 					/>
+					<VoiceSoundboardBottomSheet isOpen={soundboardOpen} onClose={() => setSoundboardOpen(false)} />
 				</>
 			)}
 		</div>

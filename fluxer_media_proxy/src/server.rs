@@ -758,6 +758,9 @@ async fn catch_all(
     if let Some(key) = parse_entrance_sound_path(&path) {
         return serve_stored_raw(&app, method, &app.cfg.bucket_cdn, &key, request.headers()).await;
     }
+    if let Some((guild_id, sound_id)) = parse_soundboard_path(&path) {
+        return serve_soundboard_audio(&app, method, &guild_id, &sound_id, request.headers()).await;
+    }
     if let Some(asset) = parse_guild_member_asset_path(&path) {
         return serve_asset_image(&app, method, asset, &params, request.headers()).await;
     }
@@ -893,6 +896,54 @@ fn parse_entrance_sound_path(path: &str) -> Option<String> {
         return None;
     }
     Some(format!("entrance-sounds/{user_id}/{filename}"))
+}
+
+fn parse_soundboard_path(path: &str) -> Option<(String, String)> {
+    let mut parts = path.trim_start_matches('/').split('/');
+    if parts.next()? != "soundboard" {
+        return None;
+    }
+    let guild_id = parts.next()?;
+    let sound_id = parts.next()?;
+    if parts.next().is_some() {
+        return None;
+    }
+    if guild_id.is_empty()
+        || sound_id.is_empty()
+        || !guild_id.bytes().all(|b| b.is_ascii_digit())
+        || !sound_id.bytes().all(|b| b.is_ascii_digit())
+    {
+        return None;
+    }
+    Some((guild_id.to_owned(), sound_id.to_owned()))
+}
+
+async fn serve_soundboard_audio(
+    app: &Arc<AppState>,
+    method: Method,
+    guild_id: &str,
+    sound_id: &str,
+    headers: &HeaderMap,
+) -> Response {
+    for ext in ["wav", "mp3"] {
+        let key = format!("soundboard/{guild_id}/{sound_id}.{ext}");
+        if app.store.head_object(&app.cfg.bucket_cdn, &key).await.is_ok() {
+            return serve_stored_with_override(
+                app,
+                method,
+                &app.cfg.bucket_cdn,
+                &key,
+                if ext == "wav" {
+                    "audio/wav"
+                } else {
+                    "audio/mpeg"
+                },
+                headers,
+            )
+            .await;
+        }
+    }
+    text(StatusCode::NOT_FOUND, "Not Found")
 }
 
 struct ParsedAssetFilename<'a> {
@@ -3000,6 +3051,27 @@ mod tests {
         assert_eq!(parse_entrance_sound_path("/entrance-sounds/42"), None);
         assert_eq!(parse_entrance_sound_path("/entrance-sounds//abc.wav"), None);
         assert_eq!(parse_entrance_sound_path("/avatars/42/abc.wav"), None);
+    }
+
+    #[test]
+    fn soundboard_path_parses_valid_keys() {
+        assert_eq!(
+            parse_soundboard_path("/soundboard/1130650140672000000/1501314428688998182"),
+            Some((
+                "1130650140672000000".to_owned(),
+                "1501314428688998182".to_owned()
+            ))
+        );
+    }
+
+    #[test]
+    fn soundboard_path_rejects_invalid_keys() {
+        assert_eq!(parse_soundboard_path("/soundboard/abc/1501314428688998182"), None);
+        assert_eq!(parse_soundboard_path("/soundboard/1130650140672000000"), None);
+        assert_eq!(
+            parse_soundboard_path("/soundboard/1130650140672000000/1501314428688998182/extra"),
+            None
+        );
     }
 
     #[test]

@@ -144,7 +144,9 @@ function getFormattedEmbedTimestamp(timestamp?: string): string {
 }
 
 function isMediaOnlyEmbed(embed: MessageEmbed): boolean {
-	const hasProviderText = Boolean(embed.provider && embed.type !== MessageEmbedTypes.GIFV);
+	const hasProviderText = Boolean(
+		embed.provider && embed.type !== MessageEmbedTypes.GIFV && embed.type !== MessageEmbedTypes.IMAGE,
+	);
 	return Boolean(
 		!embed.title &&
 			!embed.description &&

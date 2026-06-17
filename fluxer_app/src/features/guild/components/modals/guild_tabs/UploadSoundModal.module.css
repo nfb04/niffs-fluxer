@@ -1,0 +1,264 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+.content {
+	display: flex;
+	flex-direction: column;
+	gap: 1.25rem;
+}
+
+.sectionLabel {
+	font-size: 0.75rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.02em;
+	color: var(--text-primary-muted);
+	margin-bottom: 0.25rem;
+}
+
+.previewSection {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.waveformRow {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+}
+
+.playButton {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 2rem;
+	height: 2rem;
+	border: none;
+	border-radius: 0.375rem;
+	background-color: var(--background-tertiary);
+	color: var(--text-primary);
+	cursor: pointer;
+	flex-shrink: 0;
+	transition: background-color 0.12s ease;
+}
+
+.playButton:hover {
+	background-color: var(--background-floating);
+}
+
+.duration {
+	font-size: 0.8125rem;
+	color: var(--text-primary-muted);
+	min-width: 3rem;
+}
+
+.durationOverLimit {
+	color: var(--status-danger);
+	font-weight: 600;
+}
+
+.waveformContainer {
+	position: relative;
+	flex: 1;
+	height: 5rem;
+	min-height: 5rem;
+	background-color: var(--background-secondary);
+	border-radius: 0.375rem;
+	overflow: hidden;
+}
+
+.playhead {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	width: 2px;
+	background: var(--brand-primary);
+	pointer-events: none;
+	z-index: 2;
+}
+
+.waveformCanvas {
+	display: block;
+	width: 100%;
+	height: 100%;
+	cursor: pointer;
+}
+
+.trimOverlay {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+}
+
+.trimHandle {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	width: 5px;
+	margin-left: -2.5px;
+	background: var(--brand-primary);
+	border: 2px solid var(--background-primary);
+	border-radius: 1px;
+	cursor: ew-resize;
+	pointer-events: auto;
+	z-index: 3;
+	box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
+.trimHandle:hover {
+	filter: brightness(1.15);
+}
+
+.trimHandle:focus-visible {
+	outline: 2px solid var(--brand-primary);
+	outline-offset: 2px;
+}
+
+.trimMask {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.68);
+	pointer-events: none;
+	z-index: 1;
+}
+
+.trimClipHighlight {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	background: rgba(255, 255, 255, 0.06);
+	pointer-events: none;
+	z-index: 0;
+}
+
+.fileSection {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.fileInput {
+	flex: 1;
+	min-width: 0;
+	padding: 0.5rem 0.75rem;
+	font-size: 0.875rem;
+	border: 1px solid var(--background-modifier-accent);
+	border-radius: 0.375rem;
+	background-color: var(--background-primary);
+	color: var(--text-primary);
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.browseButton {
+	padding: 0.5rem 1rem;
+	font-size: 0.875rem;
+	font-weight: 500;
+	border: none;
+	border-radius: 0.375rem;
+	background-color: var(--background-tertiary);
+	color: var(--text-primary);
+	cursor: pointer;
+	white-space: nowrap;
+	transition: background-color 0.12s ease;
+}
+
+.browseButton:hover {
+	background-color: var(--background-floating);
+}
+
+.nameSection {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+}
+
+.nameInput {
+	width: 100%;
+	padding: 0.5rem 0.75rem;
+	font-size: 0.9375rem;
+	border: 1px solid var(--background-modifier-accent);
+	border-radius: 0.375rem;
+	background-color: var(--background-primary);
+	color: var(--text-primary);
+}
+
+.nameInput:focus {
+	outline: none;
+	border-color: var(--brand-primary);
+}
+
+.emojiSection {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+}
+
+.emojiRow {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.emojiTrigger {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	min-width: 2.5rem;
+	height: 2.5rem;
+	padding: 0 0.75rem;
+	font-size: 1.25rem;
+	border: 1px solid var(--background-modifier-accent);
+	border-radius: 0.375rem;
+	background-color: var(--background-primary);
+	color: var(--text-primary);
+	cursor: pointer;
+	transition:
+		border-color 0.12s ease,
+		background-color 0.12s ease;
+}
+
+.emojiTrigger:hover {
+	background-color: var(--background-secondary);
+	border-color: var(--background-floating);
+}
+
+.emojiTriggerActive {
+	border-color: var(--brand-primary);
+}
+
+.emojiInput {
+	flex: 1;
+	min-width: 0;
+	padding: 0.5rem 0.75rem;
+	font-size: 0.875rem;
+	border: none;
+	background: transparent;
+	color: var(--text-primary);
+}
+
+.emojiPlaceholder {
+	flex: 1;
+	min-width: 0;
+	padding: 0.5rem 0.75rem;
+	font-size: 0.875rem;
+	color: var(--text-primary-muted);
+}
+
+.volumeSection {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.error {
+	font-size: 0.875rem;
+	color: var(--status-danger);
+	margin: 0;
+}
+
+.hiddenInput {
+	display: none;
+}

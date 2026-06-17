@@ -112,6 +112,7 @@ export function createGuildStackServices(dependencies: GuildStackServiceFactoryD
 		dependencies.guildAuditLogService,
 		dependencies.limitConfigService,
 		dependencies.ipInfoService,
+		dependencies.storageService,
 	);
 	const inviteService = new InviteService(
 		dependencies.apiContext,

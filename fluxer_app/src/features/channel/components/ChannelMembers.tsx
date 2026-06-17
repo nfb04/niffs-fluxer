@@ -357,7 +357,7 @@ const LazyMemberList = observer(function LazyMemberList({guild, channel}: LazyMe
 		() => createInitialFrozenMemberListSnapshot(memberListIdentityKey),
 		[memberListIdentityKey],
 	);
-	const memberListState = isSubscriptionPaused ? undefined : MemberSidebar.getList(guild.id, channel.id);
+	const memberListState = MemberSidebar.getList(guild.id, channel.id);
 	const memberCount = memberListState?.memberCount ?? 0;
 	const groups = memberListState?.groups ?? [];
 	const layouts = useMemo(() => buildMemberListLayout(groups), [groups]);
@@ -586,7 +586,7 @@ const LazyMemberList = observer(function LazyMemberList({guild, channel}: LazyMe
 	}
 	const currentFrozenSnapshot =
 		frozenSnapshotRef.current?.channelId === memberListIdentityKey ? frozenSnapshotRef.current : initialFrozenSnapshot;
-	if (isSubscriptionPaused) {
+	if (isSubscriptionPaused && (!memberListState || !memberListState.hasReceivedInitialPayload)) {
 		return (
 			<FrozenMemberList
 				snapshot={currentFrozenSnapshot}

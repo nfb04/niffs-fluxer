@@ -201,6 +201,16 @@
 	background-color: var(--vc-neutral-bg-hover);
 }
 
+.buttonSoundboard {
+	background-color: var(--vc-neutral-bg);
+	color: var(--vc-neutral-color);
+}
+
+:global(:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard))
+	.buttonSoundboard:hover {
+	background-color: var(--vc-neutral-bg-hover);
+}
+
 .buttonDisconnect {
 	position: relative;
 	background-color: var(--vc-danger-solid);

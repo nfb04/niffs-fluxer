@@ -31,6 +31,8 @@ import {USER_SETTINGS_LABEL_DESCRIPTOR} from '@app/features/user/components/sett
 import type {User} from '@app/features/user/models/User';
 import * as NicknameUtils from '@app/features/user/utils/NicknameUtils';
 import {VoiceConnectionStatus} from '@app/features/voice/components/VoiceConnectionStatus';
+import {VoiceSoundboardGrid} from '@app/features/voice/components/VoiceSoundboardGrid';
+import popoverStyles from '@app/features/voice/components/VoiceSoundboardPopover.module.css';
 import {VoiceAudioSettingsMenu} from '@app/features/voice/components/VoiceSettingsMenus';
 import MediaEngine from '@app/features/voice/engine/MediaEngineFacade';
 import {getEffectiveAudioState} from '@app/features/voice/engine/VoiceEffectiveAudioState';
@@ -45,7 +47,7 @@ import {
 } from '@app/features/voice/utils/VoiceMessageDescriptors';
 import {msg} from '@lingui/core/macro';
 import {useLingui} from '@lingui/react/macro';
-import {GearIcon, MicrophoneIcon, MicrophoneSlashIcon, SpeakerHighIcon, SpeakerSlashIcon} from '@phosphor-icons/react';
+import {GearIcon, MicrophoneIcon, MicrophoneSlashIcon, MusicNotesIcon, SpeakerHighIcon, SpeakerSlashIcon} from '@phosphor-icons/react';
 import {clsx} from 'clsx';
 import {observer} from 'mobx-react-lite';
 import {useEffect, useRef} from 'react';
@@ -99,8 +101,9 @@ const UserAreaInner = observer(
 		isPermissionMuted = false,
 		muteReason = null,
 	}: UserAreaInnerProps) => {
-		const {i18n} = useLingui();
+		const {i18n, t} = useLingui();
 		const {isOpen, openProps} = usePopout('user-area');
+		const {openProps: soundboardPopoutProps} = usePopout('user-area-soundboard');
 		const status = Presence.getStatus(user.id);
 		const customStatus = Presence.getCustomStatus(user.id);
 		const {inputDevices, outputDevices} = useMediaDevices();
@@ -145,6 +148,8 @@ const UserAreaInner = observer(
 			);
 		};
 		const storeConnectedChannelId = MediaEngine.channelId;
+		const connectedGuildId = MediaEngine.guildId;
+		const room = MediaEngine.room;
 		const forceShowVoiceConnection = DeveloperOptions.forceShowVoiceConnection;
 		const hasVoiceConnection = !MobileLayout.enabled && (forceShowVoiceConnection || !!storeConnectedChannelId);
 		useEffect(() => {
@@ -419,6 +424,36 @@ const UserAreaInner = observer(
 								</div>
 							</FocusRing>
 						</Tooltip>
+						{hasVoiceConnection && (
+							<Tooltip text={t`Soundboard`} data-flx="app.user-area.user-area-inner.tooltip.soundboard">
+								<Popout
+									{...soundboardPopoutProps}
+									position="top"
+									offsetMainAxis={8}
+									render={() => (
+										<div className={popoverStyles.popover}>
+											<VoiceSoundboardGrid room={room} guildId={connectedGuildId ?? null} />
+										</div>
+									)}
+									data-flx="app.user-area.user-area-inner.popout.soundboard"
+								>
+									<FocusRing offset={-2} data-flx="app.user-area.user-area-inner.focus-ring.soundboard">
+										<button
+											type="button"
+											aria-label={t`Soundboard`}
+											className={styles.controlButton}
+											data-flx="app.user-area.user-area-inner.control-button.soundboard"
+										>
+											<MusicNotesIcon
+												weight="fill"
+												className={styles.controlIcon}
+												data-flx="app.user-area.user-area-inner.control-icon.soundboard"
+											/>
+										</button>
+									</FocusRing>
+								</Popout>
+							</Tooltip>
+						)}
 						<Tooltip
 							text={() => (
 								<TooltipWithKeybind

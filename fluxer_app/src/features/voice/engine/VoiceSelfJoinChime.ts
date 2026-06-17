@@ -37,16 +37,13 @@ export function playSelfJoinChimeOnce(connectionId: string | null | undefined, s
 	if (VoiceRegionTeleport.shouldSuppressRejoinSounds()) {
 		return;
 	}
-	if (!connectionId) {
-		SoundCommands.playSoundBypassingSelfDeafened(SoundType.UserJoin);
-		return;
-	}
 
+	const dedupeKey = connectionId ?? 'self';
 	const now = Date.now();
 	pruneRecentSelfJoinChimes(now);
-	const recent = recentSelfJoinChimesByConnectionId.get(connectionId);
+	const recent = recentSelfJoinChimesByConnectionId.get(dedupeKey);
 	if (recent && now - recent.playedAt < SELF_JOIN_CHIME_DEDUPE_WINDOW_MS) return;
 
-	recentSelfJoinChimesByConnectionId.set(connectionId, {playedAt: now, source});
+	recentSelfJoinChimesByConnectionId.set(dedupeKey, {playedAt: now, source});
 	SoundCommands.playSoundBypassingSelfDeafened(SoundType.UserJoin);
 }

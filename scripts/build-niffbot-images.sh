@@ -33,7 +33,6 @@ declare -A DOCKERFILE_BY_SERVICE=(
   [unfurl]="fluxer_unfurl/Dockerfile"
   [static]="fluxer_static/Dockerfile"
 )
-)
 
 for service in "$@"; do
   dockerfile="${DOCKERFILE_BY_SERVICE[$service]:-}"

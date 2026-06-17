@@ -34,6 +34,7 @@ export const LIMIT_KEYS = [
 	'max_guild_roles',
 	'max_guild_stickers_more',
 	'max_guild_stickers',
+	'max_guild_soundboard_sounds',
 	'max_guilds',
 	'max_installed_packs',
 	'max_attachment_file_size',
@@ -47,6 +48,8 @@ export const LIMIT_KEYS = [
 	'max_webhooks_per_channel',
 	'max_webhooks_per_guild',
 	'sticker_max_size',
+	'soundboard_max_size',
+	'soundboard_max_duration_sec',
 ] as const;
 
 export type LimitKey = (typeof LIMIT_KEYS)[number];
@@ -86,6 +89,7 @@ export const LIMIT_KEY_SCOPES: Record<LimitKey, LimitScope> = {
 	max_guild_roles: 'guild',
 	max_guild_stickers_more: 'guild',
 	max_guild_stickers: 'guild',
+	max_guild_soundboard_sounds: 'guild',
 	max_guilds: 'user',
 	max_installed_packs: 'user',
 	max_attachment_file_size: 'both',
@@ -99,6 +103,8 @@ export const LIMIT_KEY_SCOPES: Record<LimitKey, LimitScope> = {
 	max_webhooks_per_channel: 'guild',
 	max_webhooks_per_guild: 'guild',
 	sticker_max_size: 'guild',
+	soundboard_max_size: 'guild',
+	soundboard_max_duration_sec: 'guild',
 };
 
 type LimitCategory = 'messages' | 'guilds' | 'channels' | 'expressions' | 'files' | 'social' | 'features';
@@ -314,6 +320,15 @@ export const LIMIT_KEY_METADATA: Record<LimitKey, LimitKeyMetadata> = {
 		isToggle: false,
 		unit: 'count',
 	},
+	max_guild_soundboard_sounds: {
+		key: 'max_guild_soundboard_sounds',
+		label: 'Max Soundboard Sounds',
+		description: 'Maximum custom soundboard sounds per guild',
+		category: 'expressions',
+		scope: 'guild',
+		isToggle: false,
+		unit: 'count',
+	},
 	emoji_max_size: {
 		key: 'emoji_max_size',
 		label: 'Emoji Max Size',
@@ -331,6 +346,24 @@ export const LIMIT_KEY_METADATA: Record<LimitKey, LimitKeyMetadata> = {
 		scope: 'guild',
 		isToggle: false,
 		unit: 'bytes',
+	},
+	soundboard_max_size: {
+		key: 'soundboard_max_size',
+		label: 'Soundboard Max Size',
+		description: 'Maximum file size for soundboard sound uploads',
+		category: 'expressions',
+		scope: 'guild',
+		isToggle: false,
+		unit: 'bytes',
+	},
+	soundboard_max_duration_sec: {
+		key: 'soundboard_max_duration_sec',
+		label: 'Soundboard Max Duration',
+		description: 'Maximum trimmed duration for soundboard sounds in seconds',
+		category: 'expressions',
+		scope: 'guild',
+		isToggle: false,
+		unit: 'count',
 	},
 	max_pack_expressions: {
 		key: 'max_pack_expressions',

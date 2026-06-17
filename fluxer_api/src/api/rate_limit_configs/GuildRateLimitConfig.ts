@@ -160,4 +160,20 @@ export const GuildRateLimitConfigs = {
 		bucket: 'guild:sticker:metadata::user_id',
 		config: {limit: 60, windowMs: ms('10 seconds')},
 	} as RouteRateLimitConfig,
+	GUILD_SOUNDBOARD_LIST: {
+		bucket: 'guild:soundboard:list::guild_id',
+		config: {limit: 60, windowMs: ms('1 minute')},
+	} as RouteRateLimitConfig,
+	GUILD_SOUNDBOARD_CREATE: {
+		bucket: 'guild:soundboard:create::guild_id',
+		config: {limit: 10, windowMs: ms('1 minute')},
+	} as RouteRateLimitConfig,
+	GUILD_SOUNDBOARD_UPDATE: {
+		bucket: 'guild:soundboard:update::guild_id',
+		config: {limit: 30, windowMs: ms('1 minute')},
+	} as RouteRateLimitConfig,
+	GUILD_SOUNDBOARD_DELETE: {
+		bucket: 'guild:soundboard:delete::guild_id',
+		config: {limit: 30, windowMs: ms('1 minute')},
+	} as RouteRateLimitConfig,
 } as const;
