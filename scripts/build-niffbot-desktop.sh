@@ -111,16 +111,15 @@ package_windows_portable_zip() {
 	local zip_name="niffs-fluxer-windows-${DESKTOP_ARCH}-portable.zip"
 	local zip_path="$dist_dir/$zip_name"
 	rm -f "$zip_path"
-	if command -v zip >/dev/null 2>&1; then
+	if [[ -n "${WINDIR:-}" ]] || [[ "$(uname -s 2>/dev/null)" == MINGW* ]]; then
+		local win_unpacked win_zip_path
+		win_unpacked="$(cd "$unpacked" && pwd -W)"
+		win_zip_path="$(cd "$dist_dir" && pwd -W)\\${zip_name}"
+		powershell.exe -NoProfile -Command "\$ErrorActionPreference = 'Stop'; if (Test-Path -LiteralPath '${win_zip_path}') { Remove-Item -LiteralPath '${win_zip_path}' -Force }; Compress-Archive -Path (Join-Path -Path '${win_unpacked}' -ChildPath '*') -DestinationPath '${win_zip_path}' -CompressionLevel Optimal -Force"
+	elif command -v zip >/dev/null 2>&1; then
 		(
 			cd "$unpacked"
 			zip -r -q "$zip_path" .
-		)
-	elif command -v tar >/dev/null 2>&1; then
-		# Git Bash on Windows: tar -a writes zip from the .zip extension (avoids PowerShell path issues).
-		(
-			cd "$unpacked"
-			tar -a -cf "$zip_path" .
 		)
 	elif command -v powershell.exe >/dev/null 2>&1; then
 		local win_unpacked="$unpacked"
@@ -131,7 +130,7 @@ package_windows_portable_zip() {
 		fi
 		powershell.exe -NoProfile -Command "Compress-Archive -Path '${win_unpacked}\\*' -DestinationPath '${win_zip_path}' -Force"
 	else
-		echo "Need zip, tar, or PowerShell to create the portable archive." >&2
+		echo "Need zip or PowerShell to create the portable archive." >&2
 		exit 1
 	fi
 	echo "==> Created $zip_path"
