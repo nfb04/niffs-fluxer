@@ -4,6 +4,7 @@ import * as Modal from '@app/features/app/components/dialogs/Modal';
 import {EXAMPLE_DOMAIN, EXAMPLE_URL, PRODUCT_NAME} from '@app/features/app/config/I18nDisplayConstants';
 import RuntimeConfig from '@app/features/app/state/RuntimeConfig';
 import * as AuthenticationCommands from '@app/features/auth/commands/AuthenticationCommands';
+import AccountManager from '@app/features/auth/state/AccountManager';
 import styles from '@app/features/auth/flow/BrowserLoginHandoffModal.module.css';
 import {HandoffCodeDisplay} from '@app/features/auth/flow/HandoffCodeDisplay';
 import type {LoginSuccessPayload} from '@app/features/auth/state/AuthFlow';
@@ -149,6 +150,7 @@ const BrowserLoginHandoffModal = observer(
 				}
 				if (baseUrl !== window.location.origin) {
 					try {
+						await AccountManager.stashCurrentAccount();
 						await switchInstanceUrl({
 							instanceUrl: baseUrl,
 						});

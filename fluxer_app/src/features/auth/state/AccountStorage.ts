@@ -110,27 +110,41 @@ class AccountStorage {
 	private openState: IdbOpenState = 'idle';
 	private memoryCache = new Map<string, StoredAccount>();
 	private storageSwapTail: Promise<void> = Promise.resolve();
-	private desktopMigrationComplete = false;
 
 	private usesDesktopAccountStore(): boolean {
 		return canUseDesktopAccountStore();
 	}
 
-	private async migrateOriginAccountsToDesktopStoreIfNeeded(): Promise<void> {
-		if (!this.usesDesktopAccountStore() || this.desktopMigrationComplete) {
-			return;
+	private mergeStoredAccountRecords(existing: StoredAccount | null, incoming: StoredAccount): StoredAccount {
+		if (!existing) {
+			return this.sanitizeRecord(incoming);
 		}
-		this.desktopMigrationComplete = true;
-		const desktopAccounts = await listDesktopStoredAccounts();
-		if (desktopAccounts.length > 0) {
-			return;
+		const preferIncoming = incoming.lastActive >= existing.lastActive;
+		const primary = preferIncoming ? incoming : existing;
+		const secondary = preferIncoming ? existing : incoming;
+		return this.sanitizeRecord({
+			...secondary,
+			...primary,
+			token: primary.token ?? secondary.token,
+			userData: primary.userData ?? secondary.userData,
+			presenceIntent: primary.presenceIntent ?? secondary.presenceIntent,
+			instance: primary.instance ?? secondary.instance,
+			managedStorageData: primary.managedStorageData ?? secondary.managedStorageData,
+			lastActive: Math.max(existing.lastActive, incoming.lastActive),
+			isValid: (primary.isValid ?? true) && (secondary.isValid ?? true),
+		});
+	}
+
+	private async readOriginIndexedDbAccounts(): Promise<Array<StoredAccount>> {
+		if (!browserIndexedDB) {
+			return [];
 		}
-		await this.ensureDb();
+		await this.ensureOriginDatabaseOpen();
 		if (!this.db) {
-			return;
+			return [];
 		}
 		try {
-			const originAccounts = await withTimeout(
+			return await withTimeout(
 				new Promise<Array<StoredAccount>>((resolve, reject) => {
 					const tx = this.db!.transaction([STORE_NAME], 'readonly');
 					const store = tx.objectStore(STORE_NAME);
@@ -139,37 +153,39 @@ class AccountStorage {
 					req.onerror = () => reject(req.error ?? new Error('IndexedDB getAll failed'));
 				}),
 				5000,
-				'IndexedDB migrate accounts',
+				'IndexedDB read origin accounts',
 			);
-			for (const account of originAccounts) {
-				await putDesktopStoredAccount(this.sanitizeRecord(account));
-			}
 		} catch (error) {
-			logger.warn('Failed to migrate origin accounts into desktop account store', error);
+			logger.warn('Failed to read origin IndexedDB accounts for desktop sync', error);
+			return [];
 		}
 	}
 
-	private enqueueStorageSwap(fn: () => Promise<void>): Promise<void> {
-		const run = async (): Promise<void> => {
-			await fn();
-		};
-		const next = this.storageSwapTail.then(run, run);
-		this.storageSwapTail = next.then(
-			() => undefined,
-			() => undefined,
-		);
-		return next;
-	}
-
-	async init(): Promise<void> {
-		if (this.usesDesktopAccountStore()) {
-			await this.migrateOriginAccountsToDesktopStoreIfNeeded();
+	private async syncOriginAccountsIntoDesktopStore(): Promise<void> {
+		if (!this.usesDesktopAccountStore()) {
 			return;
 		}
+		const originAccounts = await this.readOriginIndexedDbAccounts();
+		if (originAccounts.length === 0) {
+			return;
+		}
+		try {
+			for (const account of originAccounts) {
+				const existing = await getDesktopStoredAccount(account.userId);
+				const merged = this.mergeStoredAccountRecords(existing, account);
+				await putDesktopStoredAccount(merged);
+			}
+			logger.debug(`Synced ${originAccounts.length} origin account(s) into desktop account store`);
+		} catch (error) {
+			logger.warn('Failed to sync origin accounts into desktop account store', error);
+		}
+	}
+
+	private async ensureOriginDatabaseOpen(): Promise<void> {
 		if (!browserIndexedDB) {
 			return;
 		}
-		if (this.openState === 'open') {
+		if (this.openState === 'open' && this.db) {
 			return;
 		}
 		if (this.openState === 'opening' && this.openPromise) {
@@ -199,22 +215,38 @@ class AccountStorage {
 		});
 		try {
 			await withTimeout(this.openPromise, 5000, 'IndexedDB open');
+		} catch (err) {
+			logger.warn('IndexedDB open failed; using in-memory fallback', err);
 		} finally {
 			this.openPromise = null;
 		}
 	}
 
-	private async ensureDb(): Promise<void> {
-		if (!browserIndexedDB) {
+	private enqueueStorageSwap(fn: () => Promise<void>): Promise<void> {
+		const run = async (): Promise<void> => {
+			await fn();
+		};
+		const next = this.storageSwapTail.then(run, run);
+		this.storageSwapTail = next.then(
+			() => undefined,
+			() => undefined,
+		);
+		return next;
+	}
+
+	async init(): Promise<void> {
+		if (this.usesDesktopAccountStore()) {
+			await this.syncOriginAccountsIntoDesktopStore();
 			return;
 		}
-		if (!this.db) {
-			try {
-				await this.init();
-			} catch (err) {
-				logger.warn('IndexedDB init failed; using in-memory fallback', err);
-			}
+		await this.ensureOriginDatabaseOpen();
+	}
+
+	private async ensureDb(): Promise<void> {
+		if (this.usesDesktopAccountStore()) {
+			return;
 		}
+		await this.ensureOriginDatabaseOpen();
 	}
 
 	private captureManagedStorageSnapshot(): Record<string, string> {
@@ -471,7 +503,7 @@ class AccountStorage {
 
 	async getAllAccounts(): Promise<Array<StoredAccount>> {
 		if (this.usesDesktopAccountStore()) {
-			await this.migrateOriginAccountsToDesktopStoreIfNeeded();
+			await this.syncOriginAccountsIntoDesktopStore();
 			const records = await listDesktopStoredAccounts();
 			return records.map((record) => this.normalizeRecord(record));
 		}
