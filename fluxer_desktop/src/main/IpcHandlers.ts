@@ -244,6 +244,15 @@ async function assertValidFluxerInstance(instanceOrigin: string): Promise<void> 
 	throw new Error(`Not a valid Fluxer instance (${errors.join('; ')})`);
 }
 
+function buildInstanceLoadUrl(instanceOrigin: string, options: SwitchInstanceUrlOptions): string {
+	if (options.accountSwitchUserId) {
+		return instanceOrigin;
+	}
+	const loginUrl = new URL('/login', instanceOrigin);
+	loginUrl.searchParams.set('handoff', '1');
+	return loginUrl.toString();
+}
+
 export function registerIpcHandlers(): void {
 	registerVoiceDebugEventSinkPopoutIpcHandlers();
 	registerVoiceBackgroundMediaCacheHandlers();
@@ -257,8 +266,9 @@ export function registerIpcHandlers(): void {
 		pendingDesktopHandoffCode = options.desktopHandoffCode ?? null;
 		pendingDesktopAccountSwitchUserId = options.accountSwitchUserId ?? null;
 		setCustomAppUrl(instanceOrigin);
+		const loadUrl = buildInstanceLoadUrl(instanceOrigin, options);
 		try {
-			await mainWindow.loadURL(instanceOrigin);
+			await mainWindow.loadURL(loadUrl);
 		} catch (error) {
 			setCustomAppUrl(null);
 			pendingDesktopHandoffCode = null;

@@ -147,12 +147,12 @@ const BrowserLoginHandoffModal = observer(
 					);
 					return;
 				}
-				if (baseUrl !== window.location.origin && handoffCode) {
+				if (baseUrl !== window.location.origin) {
 					try {
 						await switchInstanceUrl({
 							instanceUrl: baseUrl,
-							desktopHandoffCode: handoffCode,
 						});
+						ModalCommands.pop();
 					} catch (switchError) {
 						const detail = switchError instanceof Error ? switchError.message : String(switchError);
 						setInstanceUrlError(detail);
