@@ -59,6 +59,11 @@ jobs:
           name: niffbot-desktop-windows-x64
           path: artifacts/niffs-fluxer-windows-x64-portable.zip
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: niffbot-desktop-windows-unpacked
+          path: fluxer_desktop/dist-electron/win-unpacked/
+
   build-linux:
     if: inputs.target == 'linux'
     runs-on: ubuntu-24.04
