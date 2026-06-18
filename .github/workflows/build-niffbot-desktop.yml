@@ -16,6 +16,11 @@ on:
         required: false
         default: https://chat.niffbot.com
         type: string
+      ref:
+        description: Git branch to build from
+        required: false
+        default: niffbot
+        type: string
 
 permissions:
   contents: read
@@ -27,6 +32,8 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
 
       - uses: pnpm/action-setup@v4
         with:
@@ -58,6 +65,8 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
 
       - uses: pnpm/action-setup@v4
         with:
