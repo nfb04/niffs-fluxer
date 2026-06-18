@@ -116,10 +116,22 @@ package_windows_portable_zip() {
 			cd "$unpacked"
 			zip -r -q "$zip_path" .
 		)
+	elif command -v tar >/dev/null 2>&1; then
+		# Git Bash on Windows: tar -a writes zip from the .zip extension (avoids PowerShell path issues).
+		(
+			cd "$unpacked"
+			tar -a -cf "$zip_path" .
+		)
 	elif command -v powershell.exe >/dev/null 2>&1; then
-		powershell.exe -NoProfile -Command "Compress-Archive -Path '${unpacked}\\*' -DestinationPath '${zip_path}' -Force"
+		local win_unpacked="$unpacked"
+		local win_zip_path="$zip_path"
+		if command -v cygpath >/dev/null 2>&1; then
+			win_unpacked="$(cygpath -w "$unpacked")"
+			win_zip_path="$(cygpath -w "$zip_path")"
+		fi
+		powershell.exe -NoProfile -Command "Compress-Archive -Path '${win_unpacked}\\*' -DestinationPath '${win_zip_path}' -Force"
 	else
-		echo "Need zip or PowerShell to create the portable archive." >&2
+		echo "Need zip, tar, or PowerShell to create the portable archive." >&2
 		exit 1
 	fi
 	echo "==> Created $zip_path"
