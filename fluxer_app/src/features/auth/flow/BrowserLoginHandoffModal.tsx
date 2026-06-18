@@ -4,7 +4,6 @@ import * as Modal from '@app/features/app/components/dialogs/Modal';
 import {EXAMPLE_DOMAIN, EXAMPLE_URL, PRODUCT_NAME} from '@app/features/app/config/I18nDisplayConstants';
 import RuntimeConfig from '@app/features/app/state/RuntimeConfig';
 import * as AuthenticationCommands from '@app/features/auth/commands/AuthenticationCommands';
-import AccountManager from '@app/features/auth/state/AccountManager';
 import styles from '@app/features/auth/flow/BrowserLoginHandoffModal.module.css';
 import {HandoffCodeDisplay} from '@app/features/auth/flow/HandoffCodeDisplay';
 import type {LoginSuccessPayload} from '@app/features/auth/state/AuthFlow';
@@ -12,7 +11,7 @@ import {Button} from '@app/features/ui/button/Button';
 import * as ModalCommands from '@app/features/ui/commands/ModalCommands';
 import {modal} from '@app/features/ui/commands/ModalCommands';
 import {Input} from '@app/features/ui/components/form/FormInput';
-import {getElectronAPI, openExternalUrl} from '@app/features/ui/utils/NativeUtils';
+import {isDesktop, openExternalUrl} from '@app/features/ui/utils/NativeUtils';
 import * as FormUtils from '@app/lib/forms';
 import {msg} from '@lingui/core/macro';
 import {Trans, useLingui} from '@lingui/react/macro';
@@ -63,9 +62,7 @@ function normalizeInstanceOrigin(raw: string): string {
 const BrowserLoginHandoffModal = observer(
 	({onSuccess, targetWebAppUrl, prefillEmail}: BrowserLoginHandoffModalProps) => {
 		const {i18n} = useLingui();
-		const electronApi = getElectronAPI();
-		const switchInstanceUrl = electronApi?.switchInstanceUrl;
-		const canSwitchInstanceUrl = typeof switchInstanceUrl === 'function';
+		const showInstanceUrlField = isDesktop();
 		const currentWebAppUrl = RuntimeConfig.webAppBaseUrl;
 		const [instanceUrl, setInstanceUrl] = useState(() => targetWebAppUrl ?? '');
 		const [instanceUrlError, setInstanceUrlError] = useState<string | null>(null);
@@ -77,10 +74,10 @@ const BrowserLoginHandoffModal = observer(
 		const completedRef = useRef(false);
 		const instanceUrlHelper = useMemo(
 			() =>
-				canSwitchInstanceUrl
+				showInstanceUrlField
 					? i18n._(THE_URL_OF_THE_INSTANCE_YOU_WANT_TO_DESCRIPTOR, {productName: PRODUCT_NAME})
 					: null,
-			[canSwitchInstanceUrl, i18n.locale],
+			[showInstanceUrlField, i18n.locale],
 		);
 		const generateCode = useCallback(async () => {
 			setIsGenerating(true);
@@ -136,7 +133,7 @@ const BrowserLoginHandoffModal = observer(
 		const handleOpenBrowser = useCallback(async () => {
 			const fallbackUrl = targetWebAppUrl || currentWebAppUrl;
 			let baseUrl = fallbackUrl;
-			if (canSwitchInstanceUrl && instanceUrl.trim()) {
+			if (showInstanceUrlField && instanceUrl.trim()) {
 				try {
 					baseUrl = normalizeInstanceOrigin(instanceUrl);
 				} catch {
@@ -148,19 +145,6 @@ const BrowserLoginHandoffModal = observer(
 					);
 					return;
 				}
-				if (baseUrl !== window.location.origin) {
-					try {
-						await AccountManager.stashCurrentAccount();
-						await switchInstanceUrl({
-							instanceUrl: baseUrl,
-						});
-						ModalCommands.pop();
-					} catch (switchError) {
-						const detail = switchError instanceof Error ? switchError.message : String(switchError);
-						setInstanceUrlError(detail);
-					}
-					return;
-				}
 			}
 			const loginUrl = new URL('/login', baseUrl);
 			loginUrl.searchParams.set('handoff', '1');
@@ -168,16 +152,7 @@ const BrowserLoginHandoffModal = observer(
 				loginUrl.searchParams.set('email', prefillEmail);
 			}
 			await openExternalUrl(loginUrl.toString());
-		}, [
-			canSwitchInstanceUrl,
-			currentWebAppUrl,
-			handoffCode,
-			i18n,
-			instanceUrl,
-			prefillEmail,
-			switchInstanceUrl,
-			targetWebAppUrl,
-		]);
+		}, [currentWebAppUrl, i18n, instanceUrl, prefillEmail, showInstanceUrlField, targetWebAppUrl]);
 		return (
 			<Modal.Root
 				size="small"
@@ -194,7 +169,7 @@ const BrowserLoginHandoffModal = observer(
 						<Modal.Description data-flx="auth.flow.browser-login-handoff-modal.description">
 							<Trans>Open your browser, sign in, then enter the code below to link your account.</Trans>
 						</Modal.Description>
-						{canSwitchInstanceUrl ? (
+						{showInstanceUrlField ? (
 							<div
 								className={styles.codeInputSection}
 								data-flx="auth.flow.browser-login-handoff-modal.code-input-section"

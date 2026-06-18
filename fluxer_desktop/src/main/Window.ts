@@ -11,7 +11,7 @@ import {
 	MIN_WINDOW_WIDTH,
 	STABLE_APP_URL,
 } from '@electron/common/Constants';
-import {getAppUrl, getCustomAppUrl, getDesktopWindowBehaviorSettings} from '@electron/common/DesktopConfig';
+import {getAllInstanceOrigins, getAppUrl, getDesktopWindowBehaviorSettings} from '@electron/common/DesktopConfig';
 import {createChildLogger} from '@electron/common/Logger';
 import type {DesktopWindowBehaviorSettings} from '@electron/common/Types';
 import {
@@ -26,6 +26,12 @@ import {shouldDisableV8CodeCache} from '@electron/main/LaunchOptions';
 import {openExternalDeduped} from '@electron/main/OpenExternal';
 import {registerSpellcheck} from '@electron/main/Spellcheck';
 import {resetStreamingPriority} from '@electron/main/StreamingPriority';
+import {
+	destroyInstanceTabs,
+	getActiveTabWebContents,
+	initializeInstanceTabShell,
+	setTabViewBounds,
+} from '@electron/main/InstanceTabs';
 import {getMainWindowRendererGoneAction} from '@electron/main/WindowRendererLifecycle';
 import {refreshWindowsBadgeOverlay} from '@electron/main/WindowsBadge';
 import {app, BrowserWindow, screen} from 'electron';
@@ -34,8 +40,6 @@ import log from 'electron-log';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const logger = createChildLogger('Window');
 const VISIBILITY_MARGIN = 32;
-const INITIAL_APP_LOAD_RETRY_DELAY_MS = 1000;
-const MAX_APP_LOAD_RETRY_DELAY_MS = 30000;
 const RENDERER_GONE_REPEAT_WINDOW_MS = 30000;
 const OPAQUE_WINDOW_BACKGROUND_COLOR = '#1a1a1a';
 const TRANSPARENT_WINDOW_BACKGROUND_COLOR = '#00000000';
@@ -85,18 +89,6 @@ const trustedRendererPermissionTypes = new Set([
 ]);
 const POPOUT_NAMESPACE = 'fluxer_';
 
-function shouldRetryAppLoadFailure(errorCode: number): boolean {
-	return errorCode < 0 && errorCode !== -3;
-}
-
-function getElectronLoadErrorCode(error: unknown): number | null {
-	const message = error instanceof Error ? error.message : String(error);
-	const match = /\(([-\d]+)\)/.exec(message);
-	if (!match) return null;
-	const value = Number.parseInt(match[1], 10);
-	return Number.isFinite(value) ? value : null;
-}
-
 function getOrigin(url?: string): string | null {
 	if (!url) return null;
 	try {
@@ -111,15 +103,7 @@ function isTrustedOrigin(url?: string): boolean {
 	const origin = getOrigin(url);
 	if (!origin) return false;
 	if (trustedWebOrigins.has(origin)) return true;
-	const customUrl = getCustomAppUrl();
-	if (customUrl) {
-		try {
-			return new URL(customUrl).origin === origin;
-		} catch {
-			return false;
-		}
-	}
-	return false;
+	return getAllInstanceOrigins().includes(origin);
 }
 
 function getSanitizedPath(rawUrl: string): string | null {
@@ -328,6 +312,10 @@ function shouldHideMainWindowOnMinimize(): boolean {
 
 export function getMainWindow(): BrowserWindow | null {
 	return mainWindow;
+}
+
+export function getActiveWebContents(): Electron.WebContents | null {
+	return getActiveTabWebContents() ?? mainWindow?.webContents ?? null;
 }
 
 export function desktopFirstClickPassThroughPendingRestart(): boolean {
@@ -810,12 +798,15 @@ export function createWindow(options: CreateWindowOptions = {}): BrowserWindow {
 			saveWindowBounds();
 		}, 500);
 	};
-	mainWindow.on('resize', debouncedSave);
+	mainWindow.on('resize', () => {
+		setTabViewBounds();
+		debouncedSave();
+	});
 	mainWindow.on('move', debouncedSave);
 	mainWindow.on('maximize', () => {
 		lastRestorableMainWindowMaximized = true;
 		saveWindowBounds();
-		mainWindow?.webContents.send('window-maximize-change', true);
+		getActiveWebContents()?.send('window-maximize-change', true);
 	});
 	mainWindow.on('unmaximize', () => {
 		const window = mainWindow;
@@ -827,7 +818,7 @@ export function createWindow(options: CreateWindowOptions = {}): BrowserWindow {
 			}
 			saveWindowBounds();
 		}, 0);
-		mainWindow?.webContents.send('window-maximize-change', false);
+		getActiveWebContents()?.send('window-maximize-change', false);
 	});
 	mainWindow.on('minimize', () => {
 		if (!isQuitting && shouldHideMainWindowOnMinimize()) {
@@ -849,6 +840,7 @@ export function createWindow(options: CreateWindowOptions = {}): BrowserWindow {
 		}
 	});
 	mainWindow.on('closed', () => {
+		destroyInstanceTabs();
 		mainWindow = null;
 	});
 	mainWindow.setMenuBarVisibility(false);
@@ -995,64 +987,19 @@ export function createWindow(options: CreateWindowOptions = {}): BrowserWindow {
 	});
 	registerDisplayMediaRequestHandler(session, webContents);
 	logPhase('handlers');
-	let appLoadRetryAttempt = 0;
-	let appLoadRetryTimer: NodeJS.Timeout | null = null;
-	const clearAppLoadRetry = () => {
-		rendererGoneReloaded = false;
-		mainWindowRendererGone = false;
-		if (appLoadRetryTimer) {
-			clearTimeout(appLoadRetryTimer);
-			appLoadRetryTimer = null;
-		}
-		appLoadRetryAttempt = 0;
+	const instanceTabOptions = {
+		isTrustedOrigin,
+		getSanitizedPath,
+		getSharedWebPreferences: (tabAppUrl: string) =>
+			getSharedWebPreferences(allowTransparency, getActiveUseNativeTitleBar(), tabAppUrl),
+		getVoicePopoutWindowOptions,
+		isVoicePopoutWindowName,
 	};
-	const scheduleAppLoadRetry = (reason: string, detail?: Record<string, unknown>) => {
+	void clearStartupRenderingCaches(session).then(() => {
 		if (!mainWindow || mainWindow.isDestroyed()) return;
-		if (appLoadRetryTimer) return;
-		const delay = Math.min(INITIAL_APP_LOAD_RETRY_DELAY_MS * 2 ** appLoadRetryAttempt, MAX_APP_LOAD_RETRY_DELAY_MS);
-		appLoadRetryAttempt += 1;
-		logger.warn('Scheduling app load retry', {reason, delay, attempt: appLoadRetryAttempt, ...detail});
-		appLoadRetryTimer = setTimeout(() => {
-			appLoadRetryTimer = null;
-			if (!mainWindow || mainWindow.isDestroyed()) return;
-			if (mainWindow.webContents.isLoadingMainFrame()) {
-				scheduleAppLoadRetry('main-frame-still-loading');
-				return;
-			}
-			mainWindow.loadURL(appUrl).catch((error) => {
-				scheduleAppLoadRetry('load-url-rejected', {error});
-			});
-		}, delay);
-	};
-	webContents.on('did-finish-load', clearAppLoadRetry);
-	webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
-		if (isMainFrame) {
-			logger.error('App main-frame load failed', {errorCode, errorDescription, validatedURL});
-		}
-		if (!isMainFrame || !isTrustedOrigin(validatedURL) || !shouldRetryAppLoadFailure(errorCode)) {
-			return;
-		}
-		scheduleAppLoadRetry('did-fail-load', {errorCode, errorDescription, validatedURL});
-	});
-	const loadAppUrl = (): void => {
-		if (!mainWindow || mainWindow.isDestroyed()) return;
-		logger.info('Loading app URL', {appUrl});
-		mainWindow.loadURL(appUrl).catch((error) => {
-			const errorCode = getElectronLoadErrorCode(error);
-			if (errorCode !== null && !shouldRetryAppLoadFailure(errorCode)) {
-				logger.info('Ignoring non-retryable initial app load rejection', {errorCode});
-				return;
-			}
-			logger.error('Failed to load app URL:', error);
-			scheduleAppLoadRetry('initial-load-url-rejected', {error});
-		});
-		logPhase('load-url-dispatched');
-	};
-	void clearStartupRenderingCaches(session).then(loadAppUrl);
-	webContents.on('will-navigate', (event, url) => {
-		if (!isTrustedOrigin(url)) {
-			event.preventDefault();
-		}
+		logger.info('Initializing native instance tab shell');
+		initializeInstanceTabShell(mainWindow, instanceTabOptions);
+		logPhase('instance-tab-shell-initialized');
 	});
 	webContents.on('did-create-window', (window, details) => {
 		if (

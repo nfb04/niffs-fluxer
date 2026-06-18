@@ -5,7 +5,7 @@ import {
 	type DesktopWindowBehaviorSettings,
 	getDesktopTroubleshootingSettings,
 	getDesktopWindowBehaviorSettings,
-	setCustomAppUrl,
+	getInstanceTabsList,
 	setDesktopWindowBehaviorSettings,
 } from '@electron/common/DesktopConfig';
 import {CANARY_APP_URL, STABLE_APP_URL} from '@electron/common/Constants';
@@ -41,6 +41,13 @@ import {getTccStatus, registerMacTccIpcHandlers} from '@electron/main/MacTcc';
 import {setNativeStrings} from '@electron/main/MainI18n';
 import {copyRemoteFileToClipboard, parseClipboardWriteFileOptions} from '@electron/main/MediaClipboard';
 import {registerNotificationIpcHandlers} from '@electron/main/NotificationsIpc';
+import {
+	getInstanceTabsState,
+	notifyInstanceTabsUpdated,
+	removeInstanceTabAt,
+	switchActiveTab,
+	switchOrAddInstanceTab,
+} from '@electron/main/InstanceTabs';
 import {openExternalDeduped} from '@electron/main/OpenExternal';
 import {getStatus as getOpenH264Status, setEnabled as setOpenH264Enabled} from '@electron/main/OpenH264Manager';
 import {registerPasskeyHandlers} from '@electron/main/Passkeys';
@@ -244,14 +251,6 @@ async function assertValidFluxerInstance(instanceOrigin: string): Promise<void> 
 	throw new Error(`Not a valid Fluxer instance (${errors.join('; ')})`);
 }
 
-function buildInstanceLoadUrl(instanceOrigin: string, options: SwitchInstanceUrlOptions): string {
-	if (options.accountSwitchUserId) {
-		return instanceOrigin;
-	}
-	const loginUrl = new URL('/login', instanceOrigin);
-	loginUrl.searchParams.set('handoff', '1');
-	return loginUrl.toString();
-}
 
 export function registerIpcHandlers(): void {
 	registerVoiceDebugEventSinkPopoutIpcHandlers();
@@ -265,17 +264,36 @@ export function registerIpcHandlers(): void {
 		}
 		pendingDesktopHandoffCode = options.desktopHandoffCode ?? null;
 		pendingDesktopAccountSwitchUserId = options.accountSwitchUserId ?? null;
-		setCustomAppUrl(instanceOrigin);
-		const loadUrl = buildInstanceLoadUrl(instanceOrigin, options);
-		try {
-			await mainWindow.loadURL(loadUrl);
-		} catch (error) {
-			setCustomAppUrl(null);
-			pendingDesktopHandoffCode = null;
-			pendingDesktopAccountSwitchUserId = null;
-			const detail = error instanceof Error ? error.message : String(error);
-			throw new Error(`Failed to load instance: ${detail}`);
+		let initialPath = '/';
+		if (options.accountSwitchUserId) {
+			initialPath = '/';
+		} else if (options.desktopHandoffCode != null) {
+			initialPath = '/login?handoff=1';
+		} else {
+			const tabs = getInstanceTabsList();
+			const normalized = instanceOrigin.replace(/\/+$/, '');
+			const existingIndex = tabs.findIndex((tab) => tab.url.replace(/\/+$/, '') === normalized);
+			if (existingIndex < 0) {
+				initialPath = '/login?handoff=1';
+			}
 		}
+		switchOrAddInstanceTab(instanceOrigin, initialPath);
+	});
+	ipcMain.handle('get-instance-tabs', () => getInstanceTabsState());
+	ipcMain.handle('switch-tab', (_event, index: number): void => {
+		switchActiveTab(index);
+	});
+	ipcMain.handle('remove-instance-tab', (_event, globalTabIndex: number): void => {
+		removeInstanceTabAt(globalTabIndex);
+	});
+	ipcMain.handle('add-instance-tab', async (_event, rawUrl: unknown): Promise<void> => {
+		if (typeof rawUrl !== 'string' || !rawUrl.trim()) {
+			throw new Error('Instance URL is required');
+		}
+		const instanceOrigin = normalizeInstanceOrigin(rawUrl);
+		await assertValidFluxerInstance(instanceOrigin);
+		switchOrAddInstanceTab(instanceOrigin, '/');
+		notifyInstanceTabsUpdated();
 	});
 	ipcMain.handle('consume-desktop-handoff-code', (): string | null => {
 		const code = pendingDesktopHandoffCode;

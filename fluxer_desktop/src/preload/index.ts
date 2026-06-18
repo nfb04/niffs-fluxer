@@ -16,6 +16,7 @@ import type {
 	DownloadFileResult,
 	ElectronAPI,
 	GetDesktopSourcesOptions,
+	InstanceTabInfo,
 	GlobalKeybindTriggeredEvent,
 	GlobalKeyEvent,
 	GlobalKeyHookRegisterOptions,
@@ -78,7 +79,6 @@ import type {
 	PublicKeyCredentialRequestOptionsJSON,
 	RegistrationResponseJSON,
 } from '@simplewebauthn/browser';
-import {installDesktopAccountTabsShell} from '@electron/preload/DesktopAccountTabsShell';
 import {contextBridge, ipcRenderer, webFrame} from 'electron';
 
 const ACCESSIBILITY_STORE_STORAGE_KEY = 'AccessibilityStore';
@@ -351,7 +351,6 @@ function applyStartupAccessibilitySettings(): void {
 }
 
 applyStartupDesktopWindowClasses();
-installDesktopAccountTabsShell();
 
 applyStartupAccessibilitySettings();
 
@@ -492,6 +491,21 @@ const api: ElectronAPI = {
 	consumeDesktopHandoffCode: (): Promise<string | null> => ipcRenderer.invoke('consume-desktop-handoff-code'),
 	consumeDesktopAccountSwitchUserId: (): Promise<string | null> =>
 		ipcRenderer.invoke('consume-desktop-account-switch-user-id'),
+	addInstanceTab: (instanceUrl: string): Promise<void> => ipcRenderer.invoke('add-instance-tab', instanceUrl),
+	getInstanceTabs: (): Promise<{tabs: Array<InstanceTabInfo>; activeIndex: number}> =>
+		ipcRenderer.invoke('get-instance-tabs'),
+	switchTab: (index: number): Promise<void> => ipcRenderer.invoke('switch-tab', index),
+	removeInstanceTab: (globalTabIndex: number): Promise<void> =>
+		ipcRenderer.invoke('remove-instance-tab', globalTabIndex),
+	onInstanceTabsUpdated: (callback: () => void): (() => void) => {
+		const handler = (): void => {
+			callback();
+		};
+		ipcRenderer.on('instance-tabs-updated', handler);
+		return () => {
+			ipcRenderer.removeListener('instance-tabs-updated', handler);
+		};
+	},
 	desktopAccountsList: (): Promise<Array<Record<string, unknown>>> => ipcRenderer.invoke('desktop-accounts-list'),
 	desktopAccountsGet: (userId: string): Promise<Record<string, unknown> | null> =>
 		ipcRenderer.invoke('desktop-accounts-get', userId),

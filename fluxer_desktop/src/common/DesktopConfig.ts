@@ -4,10 +4,58 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {BUILD_CHANNEL} from '@electron/common/BuildChannel';
 import {CANARY_APP_URL, DEFAULT_SELF_HOSTED_APP_URL, STABLE_APP_URL} from '@electron/common/Constants';
-import type {DesktopTroubleshootingSettings, DesktopWindowBehaviorSettings} from '@electron/common/Types';
+import type {DesktopTroubleshootingSettings, DesktopWindowBehaviorSettings, InstanceTabInfo} from '@electron/common/Types';
 import log from 'electron-log';
 
-export type {DesktopTroubleshootingSettings, DesktopWindowBehaviorSettings} from '@electron/common/Types';
+export type {DesktopTroubleshootingSettings, DesktopWindowBehaviorSettings, InstanceTabInfo} from '@electron/common/Types';
+
+function getOfficialAppUrl(): string {
+	return BUILD_CHANNEL === 'canary' ? CANARY_APP_URL : STABLE_APP_URL;
+}
+
+function dedupeInstanceTabs(): void {
+	const seen = new Set<string>();
+	config.instance_tabs = (config.instance_tabs ?? []).filter((url) => {
+		const normalized = url.replace(/\/+$/, '');
+		if (seen.has(normalized)) {
+			return false;
+		}
+		seen.add(normalized);
+		return true;
+	});
+}
+
+function migrateToInstanceTabs(): void {
+	if (config.instance_tabs != null && Array.isArray(config.instance_tabs)) {
+		return;
+	}
+	const custom = config.app_url ?? null;
+	if (custom) {
+		config.instance_tabs = [custom];
+		config.active_tab_index = 1;
+	} else if (DEFAULT_SELF_HOSTED_APP_URL) {
+		config.instance_tabs = [DEFAULT_SELF_HOSTED_APP_URL];
+		config.active_tab_index = 0;
+	} else {
+		config.active_tab_index = 0;
+	}
+	delete config.app_url;
+	dedupeInstanceTabs();
+	saveDesktopConfig();
+}
+
+function ensureDefaultSelfHostedTab(): void {
+	if (!DEFAULT_SELF_HOSTED_APP_URL) {
+		return;
+	}
+	const normalized = DEFAULT_SELF_HOSTED_APP_URL.replace(/\/+$/, '');
+	const tabs = config.instance_tabs ?? [];
+	if (!tabs.includes(normalized)) {
+		config.instance_tabs = [...tabs, normalized];
+		dedupeInstanceTabs();
+		saveDesktopConfig();
+	}
+}
 
 const CONFIG_FILE_NAME = 'settings.json';
 const MINIMIZE_TO_TRAY_STORAGE_KEY_V2 = 'minimizeToTrayV2';
@@ -15,6 +63,8 @@ const CLOSE_TO_TRAY_STORAGE_KEY_V2 = 'closeToTrayV2';
 
 interface DesktopConfig extends Record<string, unknown> {
 	app_url?: string;
+	instance_tabs?: Array<string>;
+	active_tab_index?: number;
 	chromiumSwitches?: ChromiumSwitchesSetting;
 	window_behavior?: PersistedDesktopWindowBehaviorSettings;
 	troubleshooting?: PersistedDesktopTroubleshootingSettings;
@@ -315,7 +365,15 @@ export function loadDesktopConfig(userDataPath: string): void {
 		if (fs.existsSync(configPath)) {
 			const data = fs.readFileSync(configPath, 'utf-8');
 			config = sanitizeDesktopConfig(JSON.parse(data));
-			log.info('Loaded desktop config from', configPath, {app_url: config.app_url ?? '(default)'});
+			migrateToInstanceTabs();
+			ensureDefaultSelfHostedTab();
+			log.info('Loaded desktop config from', configPath, {
+				instance_tabs: config.instance_tabs?.length ?? 0,
+				active_tab_index: config.active_tab_index ?? 0,
+			});
+		} else {
+			migrateToInstanceTabs();
+			ensureDefaultSelfHostedTab();
 		}
 	} catch (error) {
 		log.error('Failed to load desktop config:', error);
@@ -326,17 +384,86 @@ export function getAppUrl(): string {
 	if (runtimeAppUrlOverride) {
 		return runtimeAppUrlOverride;
 	}
-	if (config.app_url) {
-		return config.app_url;
+	const tabs = getInstanceTabsList();
+	const idx = Math.max(0, Math.min(config.active_tab_index ?? 0, tabs.length - 1));
+	return tabs[idx]?.url ?? getOfficialAppUrl();
+}
+
+export function getAllInstanceOrigins(): Array<string> {
+	const origins: Array<string> = [];
+	try {
+		origins.push(new URL(getOfficialAppUrl()).origin);
+	} catch {
+		// ignore
 	}
-	if (DEFAULT_SELF_HOSTED_APP_URL) {
-		return DEFAULT_SELF_HOSTED_APP_URL;
+	for (const url of config.instance_tabs ?? []) {
+		try {
+			origins.push(new URL(url).origin);
+		} catch {
+			// skip invalid
+		}
 	}
-	return BUILD_CHANNEL === 'canary' ? CANARY_APP_URL : STABLE_APP_URL;
+	return origins;
+}
+
+export function getInstanceTabsList(): Array<InstanceTabInfo> {
+	const official = getOfficialAppUrl();
+	const list: Array<InstanceTabInfo> = [
+		{id: 'official', url: official, label: 'Official', isOfficial: true},
+	];
+	for (let i = 0; i < (config.instance_tabs ?? []).length; i++) {
+		const url = config.instance_tabs?.[i];
+		if (!url) continue;
+		let label: string;
+		try {
+			label = new URL(url).hostname;
+		} catch {
+			label = url;
+		}
+		list.push({id: `custom-${i}`, url, label, isOfficial: false});
+	}
+	return list;
+}
+
+export function getActiveTabIndex(): number {
+	const tabs = getInstanceTabsList();
+	const idx = config.active_tab_index ?? 0;
+	return Math.max(0, Math.min(idx, tabs.length - 1));
+}
+
+export function setActiveTabIndex(index: number): void {
+	const tabs = getInstanceTabsList();
+	config.active_tab_index = Math.max(0, Math.min(index, tabs.length - 1));
+	saveDesktopConfig();
+}
+
+export function addInstanceUrl(instanceOrigin: string): void {
+	const normalized = instanceOrigin.replace(/\/+$/, '');
+	const existing = config.instance_tabs ?? [];
+	if (existing.includes(normalized)) return;
+	config.instance_tabs = [...existing, normalized];
+	saveDesktopConfig();
+}
+
+export function removeInstanceAtIndex(globalTabIndex: number): void {
+	if (globalTabIndex <= 0) return;
+	const custom = config.instance_tabs ?? [];
+	const customIndex = globalTabIndex - 1;
+	if (customIndex < 0 || customIndex >= custom.length) return;
+	config.instance_tabs = custom.filter((_, i) => i !== customIndex);
+	const current = config.active_tab_index ?? 0;
+	if (current >= globalTabIndex) {
+		config.active_tab_index = Math.max(0, current - 1);
+	}
+	saveDesktopConfig();
 }
 
 export function getCustomAppUrl(): string | null {
-	return runtimeAppUrlOverride ?? config.app_url ?? null;
+	if (runtimeAppUrlOverride) {
+		return runtimeAppUrlOverride;
+	}
+	const custom = config.instance_tabs ?? [];
+	return custom[0] ?? null;
 }
 
 export function setRuntimeAppUrlOverride(appUrl: string | null): void {
@@ -345,10 +472,13 @@ export function setRuntimeAppUrlOverride(appUrl: string | null): void {
 
 export function setCustomAppUrl(appUrl: string | null): void {
 	if (appUrl) {
-		config.app_url = appUrl;
+		config.instance_tabs = [appUrl.replace(/\/+$/, '')];
+		config.active_tab_index = 1;
 	} else {
-		delete config.app_url;
+		config.instance_tabs = [];
+		config.active_tab_index = 0;
 	}
+	runtimeAppUrlOverride = null;
 	saveDesktopConfig();
 }
 

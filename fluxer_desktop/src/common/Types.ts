@@ -254,6 +254,13 @@ export interface DownloadFileResult {
 	error?: string;
 }
 
+export interface InstanceTabInfo {
+	id: string;
+	url: string;
+	label: string;
+	isOfficial: boolean;
+}
+
 export interface SwitchInstanceUrlOptions {
 	instanceUrl: string;
 	desktopHandoffCode?: string | null;
@@ -788,6 +795,11 @@ export interface ElectronAPI {
 	switchInstanceUrl: (options: SwitchInstanceUrlOptions) => Promise<void>;
 	consumeDesktopHandoffCode: () => Promise<string | null>;
 	consumeDesktopAccountSwitchUserId: () => Promise<string | null>;
+	getInstanceTabs: () => Promise<{tabs: Array<InstanceTabInfo>; activeIndex: number}>;
+	switchTab: (index: number) => Promise<void>;
+	removeInstanceTab: (globalTabIndex: number) => Promise<void>;
+	addInstanceTab: (instanceUrl: string) => Promise<void>;
+	onInstanceTabsUpdated: (callback: () => void) => () => void;
 	desktopAccountsList: () => Promise<Array<Record<string, unknown>>>;
 	desktopAccountsGet: (userId: string) => Promise<Record<string, unknown> | null>;
 	desktopAccountsPut: (account: Record<string, unknown>) => Promise<void>;
