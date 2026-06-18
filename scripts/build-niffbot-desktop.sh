@@ -111,10 +111,17 @@ package_windows_portable_zip() {
 	local zip_name="niffs-fluxer-windows-${DESKTOP_ARCH}-portable.zip"
 	local zip_path="$dist_dir/$zip_name"
 	rm -f "$zip_path"
-	(
-		cd "$unpacked"
-		zip -r -q "$zip_path" .
-	)
+	if command -v zip >/dev/null 2>&1; then
+		(
+			cd "$unpacked"
+			zip -r -q "$zip_path" .
+		)
+	elif command -v powershell.exe >/dev/null 2>&1; then
+		powershell.exe -NoProfile -Command "Compress-Archive -Path '${unpacked}\\*' -DestinationPath '${zip_path}' -Force"
+	else
+		echo "Need zip or PowerShell to create the portable archive." >&2
+		exit 1
+	fi
 	echo "==> Created $zip_path"
 }
 
@@ -160,22 +167,22 @@ case "$TARGET" in
 esac
 
 echo "==> Installing dependencies"
-pnpm install --filter fluxer_desktop... --filter @fluxer/voice_engine_v2...
+pnpm install --frozen-lockfile
 
 echo "==> Bundling desktop main/preload (+ native modules)"
 pnpm --dir fluxer_desktop build
 
-case "$TARGET" in
+	case "$TARGET" in
 	win)
 		echo "==> Packaging Windows ${DESKTOP_ARCH} portable build"
-		pnpm --dir fluxer_desktop exec electron-builder --win --"${DESKTOP_ARCH}" -c.win.target=dir
+		pnpm --dir fluxer_desktop exec electron-builder --config electron-builder.config.cjs --win --"${DESKTOP_ARCH}"
 		package_windows_portable_zip
 		;;
 	linux)
 		echo "==> Packaging Linux ${DESKTOP_ARCH} AppImage"
-		pnpm --dir fluxer_desktop exec electron-builder --linux --"${DESKTOP_ARCH}" -c.linux.target=AppImage
+		pnpm --dir fluxer_desktop exec electron-builder --config electron-builder.config.cjs --linux --"${DESKTOP_ARCH}"
 		;;
-esac
+	esac
 
 copy_artifacts_to_downloads
 echo "==> Done."
