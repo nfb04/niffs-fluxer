@@ -787,6 +787,11 @@ export interface ElectronAPI {
 	passkeyRegister: (options: PublicKeyCredentialCreationOptionsJSON) => Promise<RegistrationResponseJSON>;
 	switchInstanceUrl: (options: SwitchInstanceUrlOptions) => Promise<void>;
 	consumeDesktopHandoffCode: () => Promise<string | null>;
+	consumeDesktopAccountSwitchUserId: () => Promise<string | null>;
+	desktopAccountsList: () => Promise<Array<Record<string, unknown>>>;
+	desktopAccountsGet: (userId: string) => Promise<Record<string, unknown> | null>;
+	desktopAccountsPut: (account: Record<string, unknown>) => Promise<void>;
+	desktopAccountsDelete: (userId: string) => Promise<void>;
 	virtmic: VirtmicApi;
 	nativeAudio: NativeAudioApi;
 	nativeScreenCapture: NativeScreenCaptureApi;

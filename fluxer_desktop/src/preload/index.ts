@@ -78,6 +78,7 @@ import type {
 	PublicKeyCredentialRequestOptionsJSON,
 	RegistrationResponseJSON,
 } from '@simplewebauthn/browser';
+import {installDesktopAccountTabsShell} from '@electron/preload/DesktopAccountTabsShell';
 import {contextBridge, ipcRenderer, webFrame} from 'electron';
 
 const ACCESSIBILITY_STORE_STORAGE_KEY = 'AccessibilityStore';
@@ -350,6 +351,7 @@ function applyStartupAccessibilitySettings(): void {
 }
 
 applyStartupDesktopWindowClasses();
+installDesktopAccountTabsShell();
 
 applyStartupAccessibilitySettings();
 
