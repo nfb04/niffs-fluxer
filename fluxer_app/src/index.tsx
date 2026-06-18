@@ -114,6 +114,31 @@ async function resumePendingDesktopHandoffLogin(
 	}
 }
 
+async function resumePendingDesktopAccountSwitch(
+	getElectronAPI: NativeUtilsModule['getElectronAPI'],
+	accountManager: typeof import('@app/features/auth/state/AccountManager').default,
+): Promise<void> {
+	const electronApi = getElectronAPI();
+	if (!electronApi || typeof electronApi.consumeDesktopAccountSwitchUserId !== 'function') {
+		return;
+	}
+	let userId: string | null = null;
+	try {
+		userId = await electronApi.consumeDesktopAccountSwitchUserId();
+	} catch (error) {
+		logger.warn('Failed to consume pending desktop account switch user id:', error);
+		return;
+	}
+	if (!userId) {
+		return;
+	}
+	try {
+		await accountManager.switchToAccount(userId);
+	} catch (error) {
+		logger.warn('Failed to resume pending desktop account switch:', error);
+	}
+}
+
 async function bootstrapThemeStudio(): Promise<void> {
 	const {ThemeStudioStandaloneApp} = await loadLazyModule(
 		() => import('@app/features/theme_studio/ThemeStudioStandaloneApp'),
@@ -176,6 +201,7 @@ async function bootstrapApp(): Promise<void> {
 	setupHttp();
 	initializeEmojiParser();
 	await resumePendingDesktopHandoffLogin(getElectronAPI, authenticationCommands);
+	await resumePendingDesktopAccountSwitch(getElectronAPI, AccountManager);
 	mountRoot(<App data-flx="index.bootstrap.app" />, 'index.bootstrap');
 	QuickSwitcher.preloadModal();
 	registerServiceWorker();

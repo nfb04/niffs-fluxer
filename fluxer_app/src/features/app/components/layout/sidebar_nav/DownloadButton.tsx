@@ -3,7 +3,7 @@
 import Accessibility from '@app/features/accessibility/state/Accessibility';
 import guildStyles from '@app/features/app/components/layout/GuildsLayout.module.css';
 import styles from '@app/features/app/components/layout/sidebar_nav/DownloadButton.module.css';
-import {DESKTOP_DOWNLOAD_URL, PRODUCT_NAME} from '@app/features/app/config/I18nDisplayConstants';
+import {resolveDesktopDownloadUrl} from '@app/features/app/utils/DesktopDownloadUrl';
 import {useContextMenuHoverState} from '@app/features/app/hooks/useContextMenuHoverState';
 import {useHover} from '@app/features/app/hooks/useHover';
 import {useMergeRefs} from '@app/features/app/hooks/useMergeRefs';
@@ -39,7 +39,7 @@ export const DownloadButton = observer(() => {
 		return null;
 	}
 	const handleDownload = () => {
-		openExternalUrlWithWarning(DESKTOP_DOWNLOAD_URL);
+		openExternalUrlWithWarning(resolveDesktopDownloadUrl());
 	};
 	const handleContextMenu = (e: React.MouseEvent) => {
 		e.preventDefault();

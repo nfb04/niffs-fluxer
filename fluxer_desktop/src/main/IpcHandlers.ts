@@ -24,6 +24,13 @@ import {
 } from '@electron/main/DesktopTray';
 import {downloadFile} from '@electron/main/FileDownloads';
 import {
+	deleteDesktopAccount,
+	getDesktopAccount,
+	listDesktopAccounts,
+	putDesktopAccount,
+	type DesktopStoredAccount,
+} from '@electron/main/DesktopAccountStore';
+import {
 	type LinuxAppearanceSnapshot,
 	type LinuxAppearanceSubscription,
 	readLinuxAppearance,
@@ -93,6 +100,7 @@ interface TrayRuntimeStateUpdate {
 }
 
 let pendingDesktopHandoffCode: string | null = null;
+let pendingDesktopAccountSwitchUserId: string | null = null;
 
 function normalizeInstanceOrigin(rawUrl: string): string {
 	const trimmed = rawUrl.trim();
@@ -228,12 +236,14 @@ export function registerIpcHandlers(): void {
 			throw new Error('Main window not available');
 		}
 		pendingDesktopHandoffCode = options.desktopHandoffCode ?? null;
+		pendingDesktopAccountSwitchUserId = options.accountSwitchUserId ?? null;
 		setCustomAppUrl(instanceOrigin);
 		try {
 			await mainWindow.loadURL(instanceOrigin);
 		} catch (error) {
 			setCustomAppUrl(null);
 			pendingDesktopHandoffCode = null;
+			pendingDesktopAccountSwitchUserId = null;
 			const detail = error instanceof Error ? error.message : String(error);
 			throw new Error(`Failed to load instance: ${detail}`);
 		}
@@ -242,6 +252,27 @@ export function registerIpcHandlers(): void {
 		const code = pendingDesktopHandoffCode;
 		pendingDesktopHandoffCode = null;
 		return code;
+	});
+	ipcMain.handle('consume-desktop-account-switch-user-id', (): string | null => {
+		const userId = pendingDesktopAccountSwitchUserId;
+		pendingDesktopAccountSwitchUserId = null;
+		return userId;
+	});
+	ipcMain.handle('desktop-accounts-list', (): Array<DesktopStoredAccount> => listDesktopAccounts());
+	ipcMain.handle('desktop-accounts-get', (_event, userId: string): DesktopStoredAccount | null => {
+		return typeof userId === 'string' ? getDesktopAccount(userId) : null;
+	});
+	ipcMain.handle('desktop-accounts-put', (_event, account: DesktopStoredAccount): void => {
+		if (!account || typeof account !== 'object' || typeof account.userId !== 'string') {
+			throw new Error('Invalid desktop account payload');
+		}
+		putDesktopAccount(account);
+	});
+	ipcMain.handle('desktop-accounts-delete', (_event, userId: string): void => {
+		if (typeof userId !== 'string') {
+			return;
+		}
+		deleteDesktopAccount(userId);
 	});
 	ipcMain.handle('get-desktop-info', () => getDesktopInfo());
 	ipcMain.handle('get-gpu-info', () => getGpuInfo());

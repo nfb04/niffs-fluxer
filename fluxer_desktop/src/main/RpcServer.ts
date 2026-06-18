@@ -3,25 +3,34 @@
 import http from 'node:http';
 import {BUILD_CHANNEL} from '@electron/common/BuildChannel';
 import {DESKTOP_BUILD_VARIANT} from '@electron/common/BuildVariant';
-import {CANARY_APP_URL, STABLE_APP_URL} from '@electron/common/Constants';
+import {CANARY_APP_URL, DEFAULT_SELF_HOSTED_APP_URL, STABLE_APP_URL} from '@electron/common/Constants';
 import {getCustomAppUrl} from '@electron/common/DesktopConfig';
 import {getMainWindow, showWindow} from '@electron/main/Window';
 import {app} from 'electron';
 import log from 'electron-log';
 
 const RPC_PORT = BUILD_CHANNEL === 'canary' ? 21864 : 21863;
-const ALLOWED_ORIGINS = [STABLE_APP_URL, CANARY_APP_URL];
+const OFFICIAL_ORIGINS = [STABLE_APP_URL, CANARY_APP_URL];
+
+function listAllowedOrigins(): Array<string> {
+	const origins = [...OFFICIAL_ORIGINS];
+	const customUrl = getCustomAppUrl();
+	if (customUrl && !origins.includes(customUrl)) {
+		origins.push(customUrl);
+	}
+	if (DEFAULT_SELF_HOSTED_APP_URL && !origins.includes(DEFAULT_SELF_HOSTED_APP_URL)) {
+		origins.push(DEFAULT_SELF_HOSTED_APP_URL);
+	}
+	return origins;
+}
+
 const isAllowedOrigin = (origin?: string): boolean => {
 	if (!origin) return false;
-	if (ALLOWED_ORIGINS.includes(origin)) return true;
-	const customUrl = getCustomAppUrl();
-	return customUrl != null && origin === customUrl;
+	return listAllowedOrigins().includes(origin);
 };
 const refererMatchesAllowedOrigin = (referer?: string): boolean => {
 	if (!referer) return false;
-	if (ALLOWED_ORIGINS.some((allowed) => referer.startsWith(allowed))) return true;
-	const customUrl = getCustomAppUrl();
-	return customUrl != null && referer.startsWith(customUrl);
+	return listAllowedOrigins().some((allowed) => referer.startsWith(allowed));
 };
 
 let server: http.Server | null = null;

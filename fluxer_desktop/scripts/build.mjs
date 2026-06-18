@@ -7,6 +7,9 @@ import * as path from 'node:path';
 import * as esbuild from 'esbuild';
 
 const ROOT_DIR = path.resolve(import.meta.dirname, '..');
+const REPO_ROOT = path.join(ROOT_DIR, '..');
+const CARGO_TARGET_DIR = path.join(REPO_ROOT, '.cargo-target');
+fs.mkdirSync(CARGO_TARGET_DIR, {recursive: true});
 const SRC_DIR = path.join(ROOT_DIR, 'src');
 const DIST_DIR = path.join(ROOT_DIR, 'dist');
 const NATIVE_DIR = path.join(ROOT_DIR, 'native');
@@ -16,6 +19,9 @@ const isProduction =
 	process.env.FLUXER_DESKTOP_PRODUCTION === 'true' ||
 	process.env.GITHUB_ACTIONS === 'true';
 const skipNative = process.env.FLUXER_SKIP_NATIVE === 'true';
+const targetNativePlatform = process.env.FLUXER_NATIVE_PACKAGE_PLATFORM || process.platform;
+const targetNativeArch = process.env.ELECTRON_ARCH || process.arch;
+const isCrossNativeBuild = targetNativePlatform !== process.platform;
 const embeddedBuildVersion = process.env.PUBLIC_BUILD_VERSION || process.env.BUILD_VERSION || '';
 const embeddedReleaseChannel = process.env.PUBLIC_RELEASE_CHANNEL || process.env.RELEASE_CHANNEL || '';
 const requestedDesktopBuildVariant = process.env.FLUXER_DESKTOP_BUILD_VARIANT || process.env.DESKTOP_VARIANT || '';
@@ -32,6 +38,7 @@ const publicBuildDefines = {
 	'process.env.FLUXER_WINDOWS_GAME_CAPTURE_MODULE_ENABLED': JSON.stringify(
 		windowsGameCaptureModuleEnabled ? 'true' : 'false',
 	),
+	'process.env.FLUXER_DEFAULT_APP_URL': JSON.stringify(process.env.FLUXER_DEFAULT_APP_URL || ''),
 };
 const electronExternals = [
 	'electron',
@@ -337,7 +344,7 @@ function expectedNativeRuntimeArtifacts(platform = process.platform, arch = proc
 function verifyInstalledNativeArtifacts() {
 	if (skipNative) return;
 	const missing = [];
-	for (const artifact of expectedNativeRuntimeArtifacts()) {
+	for (const artifact of expectedNativeRuntimeArtifacts(targetNativePlatform, targetNativeArch)) {
 		const packageDirs = findInstalledPackageDirs(artifact.label);
 		if (packageDirs.length === 0) {
 			missing.push(`${artifact.label}: package is not installed`);
@@ -366,11 +373,16 @@ function runNativeCommand(packageDir, command) {
 	console.log(`  $ ${command.join(' ')}`);
 	const env = {
 		...process.env,
+		CARGO_TARGET_DIR,
 		PATH: `${ROOT_BIN_DIR}${path.delimiter}${process.env.PATH || ''}`,
 	};
 	if (isProduction) {
 		env.NODE_ENV = 'production';
 		env.FLUXER_DESKTOP_PRODUCTION = 'true';
+	}
+	if (isCrossNativeBuild) {
+		env.FLUXER_NATIVE_TARGET_PLATFORM = targetNativePlatform;
+		env.CARGO = 'cargo-xwin';
 	}
 	execFileSync(bin, args, {
 		cwd: packageDir,
@@ -380,6 +392,26 @@ function runNativeCommand(packageDir, command) {
 	});
 }
 
+function ensureFluxerCiBuilt() {
+	const ciManifest = path.join(REPO_ROOT, 'tools', 'ci', 'Cargo.toml');
+	const cargo = isCrossNativeBuild && targetNativePlatform === 'win32' ? 'cargo-xwin' : 'cargo';
+	execFileSync(cargo, ['build', '--locked', '--quiet', '--manifest-path', ciManifest], {
+		stdio: 'inherit',
+		env: {
+			...process.env,
+			CARGO_TARGET_DIR,
+		},
+	});
+}
+
+function nativeBuildCommands() {
+	if (isCrossNativeBuild && targetNativePlatform === 'win32') {
+		const ciBin = path.join(CARGO_TARGET_DIR, 'debug', 'fluxer-ci');
+		return [[ciBin, 'build-desktop-native-addon']];
+	}
+	return [['pnpm', 'build']];
+}
+
 function buildNativeAddon({label, dirName, commands, jsEntry = 'lib/index.js'}) {
 	const packageDir = path.join(NATIVE_DIR, dirName);
 	if (!fs.existsSync(packageDir)) {
@@ -387,7 +419,8 @@ function buildNativeAddon({label, dirName, commands, jsEntry = 'lib/index.js'}) 
 	}
 	const startedAt = Date.now();
 	console.log(`Building native addon ${label}...`);
-	for (const command of commands) {
+	const buildCommands = commands ?? nativeBuildCommands();
+	for (const command of buildCommands) {
 		runNativeCommand(packageDir, command);
 	}
 	const jsEntryPath = path.join(packageDir, jsEntry);
@@ -412,162 +445,138 @@ function buildNativeAddons() {
 	buildNativeAddon({
 		label: '@fluxer/webauthn',
 		dirName: 'webauthn',
-		commands: [['pnpm', 'build']],
 		jsEntry: 'index.js',
 	});
 	buildNativeAddon({
 		label: '@fluxer/webrtc-sender',
 		dirName: 'webrtc-sender',
-		commands: [['pnpm', 'build']],
 		jsEntry: 'index.js',
 	});
-	if (process.platform === 'darwin') {
+	if (targetNativePlatform === 'darwin') {
 		buildNativeAddon({
 			label: '@fluxer/mac-app-audio',
 			dirName: 'mac-app-audio',
-			commands: [['pnpm', 'build']],
 			jsEntry: 'index.js',
 		});
 		buildNativeAddon({
 			label: '@fluxer/mac-screen-capture',
 			dirName: 'mac-screen-capture',
-			commands: [['pnpm', 'build']],
 			jsEntry: 'index.js',
 		});
 		buildNativeAddon({
 			label: '@fluxer/mac-clipboard',
 			dirName: 'mac-clipboard',
-			commands: [['pnpm', 'build']],
 			jsEntry: 'index.js',
 		});
 		buildNativeAddon({
 			label: '@fluxer/mac-sysctl',
 			dirName: 'mac-sysctl',
-			commands: [['pnpm', 'build']],
 			jsEntry: 'index.js',
 		});
 		buildNativeAddon({
 			label: '@fluxer/mac-tcc',
 			dirName: 'mac-tcc',
-			commands: [['pnpm', 'build']],
 			jsEntry: 'index.js',
 		});
 		buildNativeAddon({
 			label: '@fluxer/macos-input-hook',
 			dirName: 'macos-input-hook',
-			commands: [['pnpm', 'build']],
 			jsEntry: 'index.js',
 		});
 		buildNativeAddon({
 			label: '@fluxer/platform-info',
 			dirName: 'platform-info',
-			commands: [['pnpm', 'build']],
 			jsEntry: 'index.js',
 		});
 		verifyInstalledNativeArtifacts();
 		return;
 	}
-	if (process.platform === 'win32') {
+	if (targetNativePlatform === 'win32') {
 		buildNativeAddon({
 			label: '@fluxer/win-process-loopback',
 			dirName: 'win-process-loopback',
-			commands: [['pnpm', 'build']],
 			jsEntry: 'index.js',
 		});
 		buildNativeAddon({
 			label: '@fluxer/win-clipboard',
 			dirName: 'win-clipboard',
-			commands: [['pnpm', 'build']],
 			jsEntry: 'index.js',
 		});
 		buildNativeAddon({
 			label: '@fluxer/win-shell',
 			dirName: 'win-shell',
-			commands: [['pnpm', 'build']],
 			jsEntry: 'index.js',
 		});
 		buildNativeAddon({
 			label: '@fluxer/win-toast',
 			dirName: 'win-toast',
-			commands: [['pnpm', 'build']],
 			jsEntry: 'index.js',
 		});
 		buildNativeAddon({
 			label: '@fluxer/windows-input-hook',
 			dirName: 'windows-input-hook',
-			commands: [['pnpm', 'build']],
 			jsEntry: 'index.js',
 		});
 		if (windowsGameCaptureModuleEnabled) {
 			buildNativeAddon({
 				label: '@fluxer/win-game-capture',
 				dirName: 'win-game-capture',
-				commands: [['pnpm', 'build']],
 				jsEntry: 'index.js',
 			});
 		}
 		buildNativeAddon({
 			label: '@fluxer/platform-info',
 			dirName: 'platform-info',
-			commands: [['pnpm', 'build']],
 			jsEntry: 'index.js',
 		});
 		verifyInstalledNativeArtifacts();
 		return;
 	}
-	if (process.platform === 'linux') {
+	if (targetNativePlatform === 'linux') {
 		buildNativeAddon({
 			label: '@fluxer/linux-audio-capture',
 			dirName: 'linux-audio-capture',
-			commands: [['pnpm', 'build']],
 			jsEntry: 'index.js',
 		});
 		buildNativeAddon({
 			label: '@fluxer/linux-screen-capture',
 			dirName: 'linux-screen-capture',
-			commands: [['pnpm', 'build']],
 			jsEntry: 'index.js',
 		});
 		buildNativeAddon({
 			label: '@fluxer/linux-portals',
 			dirName: 'linux-portals',
-			commands: [['pnpm', 'build']],
 			jsEntry: 'index.js',
 		});
 		buildNativeAddon({
 			label: '@fluxer/linux-notifications',
 			dirName: 'linux-notifications',
-			commands: [['pnpm', 'build']],
 			jsEntry: 'index.js',
 		});
 		buildNativeAddon({
 			label: '@fluxer/linux-evdev',
 			dirName: 'linux-evdev',
-			commands: [['pnpm', 'build']],
 			jsEntry: 'index.js',
 		});
 		buildNativeAddon({
 			label: '@fluxer/system-hunspell',
 			dirName: 'system-hunspell',
-			commands: [['pnpm', 'build']],
 			jsEntry: 'index.js',
 		});
 		buildNativeAddon({
 			label: '@fluxer/linux-input-hook',
 			dirName: 'linux-input-hook',
-			commands: [['pnpm', 'build']],
 			jsEntry: 'index.js',
 		});
 		buildNativeAddon({
 			label: '@fluxer/platform-info',
 			dirName: 'platform-info',
-			commands: [['pnpm', 'build']],
 			jsEntry: 'index.js',
 		});
 		verifyInstalledNativeArtifacts();
 		return;
 	}
-	console.log(`No native audio addon for platform ${process.platform}; skipping.`);
+	console.log(`No native audio addon for platform ${targetNativePlatform}; skipping.`);
 }
 
 async function buildMain() {
@@ -650,13 +659,17 @@ function ensureBuildChannelFile() {
 		],
 		{
 			stdio: 'inherit',
-			env: process.env,
+			env: {
+				...process.env,
+				CARGO_TARGET_DIR,
+			},
 		},
 	);
 }
 
 async function build() {
 	console.log(`Building Electron app (${isProduction ? 'production' : 'development'})...`);
+	ensureFluxerCiBuilt();
 	ensureBuildChannelFile();
 	if (fs.existsSync(DIST_DIR)) {
 		fs.rmSync(DIST_DIR, {recursive: true});

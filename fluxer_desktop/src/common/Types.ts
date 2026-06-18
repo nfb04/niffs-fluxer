@@ -257,6 +257,7 @@ export interface DownloadFileResult {
 export interface SwitchInstanceUrlOptions {
 	instanceUrl: string;
 	desktopHandoffCode?: string | null;
+	accountSwitchUserId?: string | null;
 }
 
 export type MediaAccessType = 'microphone' | 'camera' | 'screen' | 'audio-capture';

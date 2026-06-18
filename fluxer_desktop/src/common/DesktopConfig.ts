@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {BUILD_CHANNEL} from '@electron/common/BuildChannel';
-import {CANARY_APP_URL, STABLE_APP_URL} from '@electron/common/Constants';
+import {CANARY_APP_URL, DEFAULT_SELF_HOSTED_APP_URL, STABLE_APP_URL} from '@electron/common/Constants';
 import type {DesktopTroubleshootingSettings, DesktopWindowBehaviorSettings} from '@electron/common/Types';
 import log from 'electron-log';
 
@@ -328,6 +328,9 @@ export function getAppUrl(): string {
 	}
 	if (config.app_url) {
 		return config.app_url;
+	}
+	if (DEFAULT_SELF_HOSTED_APP_URL) {
+		return DEFAULT_SELF_HOSTED_APP_URL;
 	}
 	return BUILD_CHANNEL === 'canary' ? CANARY_APP_URL : STABLE_APP_URL;
 }

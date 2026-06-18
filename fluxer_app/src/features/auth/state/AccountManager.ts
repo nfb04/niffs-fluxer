@@ -10,6 +10,7 @@ import SessionManager, {type Account, SessionExpiredError} from '@app/features/p
 import {Logger} from '@app/features/platform/utils/AppLogger';
 import {isInstalledPwa} from '@app/features/ui/utils/PwaUtils';
 import MediaEngine from '@app/features/voice/engine/MediaEngineFacade';
+import {accountRequiresInstanceReload, reloadDesktopToAccountInstance} from '@app/features/auth/utils/DesktopInstanceSwitch';
 import {computed, makeAutoObservable} from 'mobx';
 
 const logger = new Logger('AccountManager');
@@ -104,6 +105,22 @@ class AccountManager {
 	}
 
 	async switchToAccount(userId: string, redirectPath: string | null = Routes.ME): Promise<void> {
+		const targetAccount = this.accounts.get(userId);
+		if (
+			targetAccount &&
+			userId !== SessionManager.userId &&
+			SessionManager.canSwitchAccount() &&
+			accountRequiresInstanceReload(targetAccount)
+		) {
+			SessionManager.prepareForAccountTransition('account-switch');
+			if (this.shouldManagePushSubscriptions()) {
+				await PushSubscriptionService.unregisterAllPushSubscriptions();
+			}
+			await this.leaveActiveVoiceChannel('account switch');
+			await SessionManager.stashCurrentAccount();
+			await reloadDesktopToAccountInstance(targetAccount);
+			return;
+		}
 		if (userId !== SessionManager.userId && SessionManager.canSwitchAccount() && this.accounts.has(userId)) {
 			SessionManager.prepareForAccountTransition('account-switch');
 		}

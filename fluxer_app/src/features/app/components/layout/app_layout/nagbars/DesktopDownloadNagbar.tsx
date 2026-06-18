@@ -4,7 +4,8 @@ import styles from '@app/features/app/components/layout/app_layout/nagbars/Deskt
 import {Nagbar} from '@app/features/app/components/layout/Nagbar';
 import {NagbarButton} from '@app/features/app/components/layout/NagbarButton';
 import {NagbarContent} from '@app/features/app/components/layout/NagbarContent';
-import {DESKTOP_DOWNLOAD_URL, PRODUCT_NAME} from '@app/features/app/config/I18nDisplayConstants';
+import {PRODUCT_NAME} from '@app/features/app/config/I18nDisplayConstants';
+import {resolveDesktopDownloadUrl} from '@app/features/app/utils/DesktopDownloadUrl';
 import {DOWNLOAD_DESCRIPTOR} from '@app/features/i18n/utils/CommonMessageDescriptors';
 import * as NagbarCommands from '@app/features/ui/commands/NagbarCommands';
 import {openExternalUrl} from '@app/features/ui/utils/NativeUtils';
@@ -20,7 +21,7 @@ const DESKTOP_APP_DOWNLOAD_MESSAGE_DESCRIPTOR = msg({
 export const DesktopDownloadNagbar = observer(({isMobile}: {isMobile: boolean}) => {
 	const {i18n} = useLingui();
 	const handleDownload = () => {
-		openExternalUrl(DESKTOP_DOWNLOAD_URL);
+		openExternalUrl(resolveDesktopDownloadUrl());
 	};
 	const handleDismiss = () => {
 		NagbarCommands.dismissNagbar('desktopDownloadDismissed');

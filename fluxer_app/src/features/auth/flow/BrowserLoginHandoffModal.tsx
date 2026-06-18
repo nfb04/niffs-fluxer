@@ -66,7 +66,7 @@ const BrowserLoginHandoffModal = observer(
 		const switchInstanceUrl = electronApi?.switchInstanceUrl;
 		const canSwitchInstanceUrl = typeof switchInstanceUrl === 'function';
 		const currentWebAppUrl = RuntimeConfig.webAppBaseUrl;
-		const [instanceUrl, setInstanceUrl] = useState(() => targetWebAppUrl ?? currentWebAppUrl);
+		const [instanceUrl, setInstanceUrl] = useState(() => targetWebAppUrl ?? '');
 		const [instanceUrlError, setInstanceUrlError] = useState<string | null>(null);
 		const [handoffCode, setHandoffCode] = useState<string | null>(null);
 		const [handoffExpiresAt, setHandoffExpiresAt] = useState<string | null>(null);
@@ -204,7 +204,7 @@ const BrowserLoginHandoffModal = observer(
 									error={instanceUrlError ?? undefined}
 									disabled={isGenerating}
 									autoComplete="url"
-									placeholder={EXAMPLE_DOMAIN}
+									placeholder={targetWebAppUrl ?? currentWebAppUrl}
 									footer={
 										instanceUrlHelper && !instanceUrlError ? (
 											<p className={styles.inputHelper} data-flx="auth.flow.browser-login-handoff-modal.input-helper">

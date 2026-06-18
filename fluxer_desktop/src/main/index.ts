@@ -67,6 +67,7 @@ import {cleanupNativeVoiceEngine, registerNativeVoiceEngineHandlers} from '@elec
 import {appendOpenH264Switches} from '@electron/main/OpenH264Manager';
 import {startRpcServer, stopRpcServer} from '@electron/main/RpcServer';
 import {cleanupLinuxChromiumSpellcheckDictionaries} from '@electron/main/Spellcheck';
+import {initDesktopAccountStore} from '@electron/main/DesktopAccountStore';
 import {registerUpdater} from '@electron/main/Updater';
 import {
 	clearSavedWindowBounds,
@@ -117,6 +118,7 @@ log.info('Configured user data storage', {
 cleanupLinuxChromiumSpellcheckDictionaries(userDataConfig.base);
 
 loadDesktopConfig(userDataConfig.base);
+initDesktopAccountStore(userDataConfig.base);
 
 function exitCli(code: number): void {
 	process.exitCode = code;

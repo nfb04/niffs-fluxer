@@ -19,6 +19,7 @@ import AuthLoginPasskeyActions, {
 } from '@app/features/auth/flow/auth_login_core/AuthLoginPasskeyActions';
 import {isApprovalFlowMode, useDesktopHandoffFlow} from '@app/features/auth/flow/auth_login_core/useDesktopHandoffFlow';
 import DesktopHandoffAccountSelector from '@app/features/auth/flow/DesktopHandoffAccountSelector';
+import {showBrowserLoginHandoffModal} from '@app/features/auth/flow/BrowserLoginHandoffModal';
 import {ConnectedHandoffApprovalFlow} from '@app/features/auth/flow/HandoffApprovalFlow';
 import IpAuthorizationScreen from '@app/features/auth/flow/IpAuthorizationScreen';
 import {useAuthCardPresentation} from '@app/features/auth/flow/useAuthCardPresentation';
@@ -216,10 +217,16 @@ export const AuthLoginLayout = observer(function AuthLoginLayout({
 		[i18n, showLoginFormForAccount],
 	);
 	const handleAddAnotherAccount = useCallback(() => {
+		if (isDesktop()) {
+			showBrowserLoginHandoffModal(async (payload) => {
+				await handleLoginSuccess(payload);
+			});
+			return;
+		}
 		setShowAccountSelector(false);
 		setSwitchError(null);
 		setPrefillEmail(null);
-	}, []);
+	}, [handleLoginSuccess]);
 	const handleStartSso = useCallback(async () => {
 		if (!ssoConfig?.enabled) return;
 		try {

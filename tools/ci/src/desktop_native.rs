@@ -305,7 +305,7 @@ pub fn run_test_webrtc_sender_rust(args: TestWebrtcSenderRustArgs) -> Result<()>
 }
 
 fn build_desktop_native_addon(addon_root: &Path, addon: &DesktopNativeAddon) -> Result<()> {
-    let platform = current_platform();
+    let platform = effective_platform();
     if let Some(required) = addon.required_platform {
         ensure!(
             platform == required,
@@ -323,7 +323,9 @@ fn build_desktop_native_addon(addon_root: &Path, addon: &DesktopNativeAddon) -> 
     match addon.special {
         DesktopNativeSpecialBuild::None => {}
         DesktopNativeSpecialBuild::Webauthn => {
-            copy_webauthn_linux_shared_libraries(&built.out_file, addon_root)?
+            if platform == "linux" {
+                copy_webauthn_linux_shared_libraries(&built.out_file, addon_root)?;
+            }
         }
         DesktopNativeSpecialBuild::WinGameCapture => build_win_game_capture_artifacts(addon_root)?,
     }
@@ -354,7 +356,7 @@ fn ensure_pkg_config(requirement: &PkgConfigRequirement) -> Result<()> {
 }
 
 fn build_rust_node_addon(addon_root: &Path, addon: &DesktopNativeAddon) -> Result<BuiltNodeAddon> {
-    let platform = current_platform();
+    let platform = effective_platform();
     let arch = electron_arch();
     let tag = platform_tag(&platform, &arch)?;
     let target = rust_target_for_platform(&platform, &arch)?;
@@ -469,6 +471,13 @@ fn current_platform() -> String {
     .to_string()
 }
 
+fn effective_platform() -> String {
+    env::var("FLUXER_NATIVE_TARGET_PLATFORM")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(current_platform)
+}
+
 fn platform_display_name(platform: &str) -> &'static str {
     match platform {
         "darwin" => "macOS",
@@ -532,6 +541,9 @@ fn cargo_dynamic_library_file_name(crate_name: &str, platform: &str) -> Result<S
 fn resolve_cargo_bin() -> OsString {
     if let Some(cargo) = env::var_os("CARGO").filter(|value| !value.is_empty()) {
         return cargo;
+    }
+    if effective_platform() == "win32" && current_platform() == "linux" {
+        return OsString::from("cargo-xwin");
     }
     if current_platform() != "win32" {
         return OsString::from("cargo");

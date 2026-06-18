@@ -488,6 +488,14 @@ const api: ElectronAPI = {
 	switchInstanceUrl: (options: SwitchInstanceUrlOptions): Promise<void> =>
 		ipcRenderer.invoke('switch-instance-url', options),
 	consumeDesktopHandoffCode: (): Promise<string | null> => ipcRenderer.invoke('consume-desktop-handoff-code'),
+	consumeDesktopAccountSwitchUserId: (): Promise<string | null> =>
+		ipcRenderer.invoke('consume-desktop-account-switch-user-id'),
+	desktopAccountsList: (): Promise<Array<Record<string, unknown>>> => ipcRenderer.invoke('desktop-accounts-list'),
+	desktopAccountsGet: (userId: string): Promise<Record<string, unknown> | null> =>
+		ipcRenderer.invoke('desktop-accounts-get', userId),
+	desktopAccountsPut: (account: Record<string, unknown>): Promise<void> =>
+		ipcRenderer.invoke('desktop-accounts-put', account),
+	desktopAccountsDelete: (userId: string): Promise<void> => ipcRenderer.invoke('desktop-accounts-delete', userId),
 	toggleDevTools: (): void => {
 		ipcRenderer.send('toggle-devtools');
 	},

@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import styles from '@app/features/app/components/layout/NativeTitlebar.module.css';
+import {DesktopAccountTabs} from '@app/features/app/components/layout/DesktopAccountTabs';
 import {FluxerWordmark} from '@app/features/ui/components/icons/FluxerWordmark';
-import {getElectronAPI, type NativePlatform} from '@app/features/ui/utils/NativeUtils';
+import {getElectronAPI, isDesktop, type NativePlatform} from '@app/features/ui/utils/NativeUtils';
 import type React from 'react';
 import {NativeWindowControls} from './NativeWindowControls';
 
@@ -28,6 +29,7 @@ export const NativeTitlebar: React.FC<NativeTitlebarProps> = ({platform}) => {
 			<div className={styles.left} data-flx="app.native-titlebar.left">
 				<FluxerWordmark className={styles.wordmark} data-flx="app.native-titlebar.wordmark" />
 			</div>
+			{isDesktop() ? <DesktopAccountTabs data-flx="app.native-titlebar.desktop-account-tabs" /> : null}
 			<div className={styles.spacer} data-flx="app.native-titlebar.spacer" />
 			<NativeWindowControls data-flx="app.native-titlebar.controls" />
 		</div>

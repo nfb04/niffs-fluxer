@@ -10,6 +10,13 @@ import {Logger} from '@app/features/platform/utils/AppLogger';
 import type {CustomStatus} from '@app/features/user/state/CustomStatus';
 import type {StatusType} from '@fluxer/constants/src/StatusConstants';
 import type {LimitConfigSnapshot} from '@fluxer/limits/src/LimitTypes';
+import {
+	canUseDesktopAccountStore,
+	deleteDesktopStoredAccount,
+	getDesktopStoredAccount,
+	listDesktopStoredAccounts,
+	putDesktopStoredAccount,
+} from '@app/features/auth/state/DesktopAccountStorageBridge';
 
 function createEmptyLimitConfig(): LimitConfigSnapshot {
 	return {
@@ -103,6 +110,44 @@ class AccountStorage {
 	private openState: IdbOpenState = 'idle';
 	private memoryCache = new Map<string, StoredAccount>();
 	private storageSwapTail: Promise<void> = Promise.resolve();
+	private desktopMigrationComplete = false;
+
+	private usesDesktopAccountStore(): boolean {
+		return canUseDesktopAccountStore();
+	}
+
+	private async migrateOriginAccountsToDesktopStoreIfNeeded(): Promise<void> {
+		if (!this.usesDesktopAccountStore() || this.desktopMigrationComplete) {
+			return;
+		}
+		this.desktopMigrationComplete = true;
+		const desktopAccounts = await listDesktopStoredAccounts();
+		if (desktopAccounts.length > 0) {
+			return;
+		}
+		await this.ensureDb();
+		if (!this.db) {
+			return;
+		}
+		try {
+			const originAccounts = await withTimeout(
+				new Promise<Array<StoredAccount>>((resolve, reject) => {
+					const tx = this.db!.transaction([STORE_NAME], 'readonly');
+					const store = tx.objectStore(STORE_NAME);
+					const req = store.getAll();
+					req.onsuccess = () => resolve((req.result as Array<StoredAccount>) ?? []);
+					req.onerror = () => reject(req.error ?? new Error('IndexedDB getAll failed'));
+				}),
+				5000,
+				'IndexedDB migrate accounts',
+			);
+			for (const account of originAccounts) {
+				await putDesktopStoredAccount(this.sanitizeRecord(account));
+			}
+		} catch (error) {
+			logger.warn('Failed to migrate origin accounts into desktop account store', error);
+		}
+	}
 
 	private enqueueStorageSwap(fn: () => Promise<void>): Promise<void> {
 		const run = async (): Promise<void> => {
@@ -117,6 +162,10 @@ class AccountStorage {
 	}
 
 	async init(): Promise<void> {
+		if (this.usesDesktopAccountStore()) {
+			await this.migrateOriginAccountsToDesktopStoreIfNeeded();
+			return;
+		}
 		if (!browserIndexedDB) {
 			return;
 		}
@@ -361,6 +410,12 @@ class AccountStorage {
 		};
 		const safeRecord = this.sanitizeRecord(record);
 		try {
+			if (this.usesDesktopAccountStore()) {
+				await putDesktopStoredAccount(safeRecord);
+				this.memoryCache.set(userId, safeRecord);
+				logger.debug(`Stashed account data for ${userId} (desktop store)`);
+				return;
+			}
 			if (!this.db) {
 				this.memoryCache.set(userId, safeRecord);
 				logger.debug(`Stashed account data for ${userId} (memory fallback)`);
@@ -415,6 +470,11 @@ class AccountStorage {
 	}
 
 	async getAllAccounts(): Promise<Array<StoredAccount>> {
+		if (this.usesDesktopAccountStore()) {
+			await this.migrateOriginAccountsToDesktopStoreIfNeeded();
+			const records = await listDesktopStoredAccounts();
+			return records.map((record) => this.normalizeRecord(record));
+		}
 		await this.ensureDb();
 		try {
 			if (!this.db) {
@@ -439,10 +499,15 @@ class AccountStorage {
 	}
 
 	async deleteAccount(userId: string): Promise<void> {
-		await this.ensureDb();
 		if (!userId) {
 			return;
 		}
+		if (this.usesDesktopAccountStore()) {
+			await deleteDesktopStoredAccount(userId);
+			this.memoryCache.delete(userId);
+			return;
+		}
+		await this.ensureDb();
 		try {
 			if (!this.db) {
 				this.memoryCache.delete(userId);
@@ -502,6 +567,10 @@ class AccountStorage {
 		if (!userId) {
 			return null;
 		}
+		if (this.usesDesktopAccountStore()) {
+			const record = await getDesktopStoredAccount(userId);
+			return record ? this.normalizeRecord(record) : null;
+		}
 		if (!this.db) {
 			return this.memoryCache.get(userId) ?? null;
 		}
@@ -528,6 +597,11 @@ class AccountStorage {
 
 	private async putRecord(record: StoredAccount): Promise<void> {
 		const normalized = this.normalizeRecord(record);
+		if (this.usesDesktopAccountStore()) {
+			await putDesktopStoredAccount(normalized);
+			this.memoryCache.set(record.userId, normalized);
+			return;
+		}
 		if (!this.db) {
 			this.memoryCache.set(record.userId, normalized);
 			return;
