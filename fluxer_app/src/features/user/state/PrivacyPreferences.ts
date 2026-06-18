@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import SessionManager from '@app/features/platform/state/AuthSession';
 import {makeSyncedField} from '@app/features/user/state/SyncedField';
-import Users from '@app/features/user/state/Users';
 import {PrivacyPreferencesSchema} from '@fluxer/schema/src/gen/fluxer/user/preferences/v1/preferences_pb';
 import {extractTimestampFromSnowflake} from '@fluxer/snowflake/src/SnowflakeUtils';
 import {makeAutoObservable} from 'mobx';
@@ -18,8 +18,8 @@ export function getPreuploadMessageAttachmentsDefaultForUserId(userId: string | 
 	return Number.isFinite(createdAtMs) && createdAtMs >= PREUPLOAD_MESSAGE_ATTACHMENTS_DEFAULT_ON_AFTER_MS;
 }
 
-function currentUserIdSafe(): string | null | undefined {
-	return (Users as typeof Users | undefined)?.currentUserId;
+function currentUserIdSafe(): string | null {
+	return SessionManager.userId;
 }
 
 class PrivacyPreferences {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {openClaimAccountModal} from '@app/features/auth/components/modals/ClaimAccountModal';
-import Authentication from '@app/features/auth/state/Authentication';
+import SessionManager from '@app/features/platform/state/AuthSession';
 import {User} from '@app/features/user/models/User';
 import type {UserPrivate, User as WireUser} from '@fluxer/schema/src/domains/user/UserResponseSchemas';
 import {action, makeAutoObservable, reaction, runInAction} from 'mobx';
@@ -61,7 +61,7 @@ class Users {
 	}
 
 	get currentUser(): User | null {
-		const currentUserId = Authentication.userId;
+		const currentUserId = SessionManager.userId;
 		if (!currentUserId) {
 			return null;
 		}
@@ -69,7 +69,7 @@ class Users {
 	}
 
 	get currentUserId(): string | null {
-		return Authentication.userId;
+		return SessionManager.userId;
 	}
 
 	get usersList(): ReadonlyArray<User> {
