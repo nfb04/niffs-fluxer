@@ -8,6 +8,7 @@ import {
 	setCustomAppUrl,
 	setDesktopWindowBehaviorSettings,
 } from '@electron/common/DesktopConfig';
+import {CANARY_APP_URL, STABLE_APP_URL} from '@electron/common/Constants';
 import type {
 	ClipboardWriteFileResult,
 	DownloadFileResult,
@@ -198,31 +199,49 @@ function getActiveMiddleClickAutoscroll(): boolean {
 	return process.platform === 'linux' && hasEnabledBlinkFeature(MIDDLE_CLICK_AUTOSCROLL_BLINK_FEATURE);
 }
 
+const OFFICIAL_WELL_KNOWN_URLS: Record<string, string> = {
+	[STABLE_APP_URL]: 'https://api.fluxer.app/.well-known/fluxer',
+	[CANARY_APP_URL]: 'https://api.canary.fluxer.app/.well-known/fluxer',
+};
+
+function wellKnownUrlsForInstance(instanceOrigin: string): Array<string> {
+	const candidates = [
+		OFFICIAL_WELL_KNOWN_URLS[instanceOrigin],
+		new URL('/api/.well-known/fluxer', instanceOrigin).toString(),
+		new URL('/.well-known/fluxer', instanceOrigin).toString(),
+	].filter((value): value is string => typeof value === 'string' && value.length > 0);
+	return [...new Set(candidates)];
+}
+
 async function assertValidFluxerInstance(instanceOrigin: string): Promise<void> {
-	const url = new URL('/.well-known/fluxer', instanceOrigin).toString();
-	const controller = new AbortController();
-	const timeout = setTimeout(() => controller.abort(), 5000);
-	try {
-		const response = await fetch(url, {
-			method: 'GET',
-			headers: {
-				Accept: 'application/json',
-			},
-			signal: controller.signal,
-		});
-		if (!response.ok) {
-			throw new Error(`HTTP ${response.status}`);
+	const errors: Array<string> = [];
+	for (const url of wellKnownUrlsForInstance(instanceOrigin)) {
+		const controller = new AbortController();
+		const timeout = setTimeout(() => controller.abort(), 5000);
+		try {
+			const response = await fetch(url, {
+				method: 'GET',
+				headers: {
+					Accept: 'application/json',
+				},
+				signal: controller.signal,
+			});
+			if (!response.ok) {
+				throw new Error(`HTTP ${response.status}`);
+			}
+			const payload = (await response.json()) as unknown;
+			if (!isValidWellKnownPayload(payload)) {
+				throw new Error('Malformed discovery document');
+			}
+			return;
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			errors.push(`${url}: ${message}`);
+		} finally {
+			clearTimeout(timeout);
 		}
-		const payload = (await response.json()) as unknown;
-		if (!isValidWellKnownPayload(payload)) {
-			throw new Error('Malformed discovery document');
-		}
-	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error);
-		throw new Error(`Not a valid Fluxer instance (${message})`);
-	} finally {
-		clearTimeout(timeout);
 	}
+	throw new Error(`Not a valid Fluxer instance (${errors.join('; ')})`);
 }
 
 export function registerIpcHandlers(): void {
