@@ -720,6 +720,17 @@ function getSharedWebPreferences(
 	};
 }
 
+function getTabWebPreferences(
+	allowTransparency: boolean,
+	useNativeTitleBar: boolean,
+	appUrl: string,
+): Electron.WebPreferences {
+	return {
+		...getSharedWebPreferences(allowTransparency, useNativeTitleBar, appUrl),
+		transparent: false,
+	};
+}
+
 export function createWindow(options: CreateWindowOptions = {}): BrowserWindow {
 	const startedAt = Date.now();
 	const logPhase = (phase: string): void => {
@@ -783,7 +794,10 @@ export function createWindow(options: CreateWindowOptions = {}): BrowserWindow {
 		}
 	};
 	if (!options.startHidden) {
-		mainWindow.once('ready-to-show', showWindowOnce);
+		mainWindow.once('ready-to-show', () => {
+			showWindowOnce();
+			setTabViewBounds();
+		});
 		setTimeout(() => {
 			if (!windowShown) {
 				log.warn('ready-to-show did not fire within 5 seconds, forcing window to show');
@@ -990,17 +1004,15 @@ export function createWindow(options: CreateWindowOptions = {}): BrowserWindow {
 	const instanceTabOptions = {
 		isTrustedOrigin,
 		getSanitizedPath,
-		getSharedWebPreferences: (tabAppUrl: string) =>
-			getSharedWebPreferences(allowTransparency, getActiveUseNativeTitleBar(), tabAppUrl),
+		getTabWebPreferences: (tabAppUrl: string) =>
+			getTabWebPreferences(allowTransparency, getActiveUseNativeTitleBar(), tabAppUrl),
 		getVoicePopoutWindowOptions,
 		isVoicePopoutWindowName,
 	};
-	void clearStartupRenderingCaches(session).then(() => {
-		if (!mainWindow || mainWindow.isDestroyed()) return;
-		logger.info('Initializing native instance tab shell');
-		initializeInstanceTabShell(mainWindow, instanceTabOptions);
-		logPhase('instance-tab-shell-initialized');
-	});
+	logger.info('Initializing native instance tab shell');
+	initializeInstanceTabShell(mainWindow, instanceTabOptions);
+	logPhase('instance-tab-shell-initialized');
+	void clearStartupRenderingCaches(session);
 	webContents.on('did-create-window', (window, details) => {
 		if (
 			details.frameName === THEME_STUDIO_POPOUT_WINDOW_NAME &&

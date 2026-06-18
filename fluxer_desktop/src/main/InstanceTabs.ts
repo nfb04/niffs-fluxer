@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {
@@ -12,23 +11,22 @@ import {
 } from '@electron/common/DesktopConfig';
 import {createChildLogger} from '@electron/common/Logger';
 import type {InstanceTabInfo} from '@electron/common/Types';
-import {registerDisplayMediaRequestHandler} from '@electron/main/DisplayMedia';
-import {registerSpellcheck} from '@electron/main/Spellcheck';
-import {BrowserView, type BrowserWindow, shell} from 'electron';
+import {type BrowserWindow, shell, WebContentsView} from 'electron';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const logger = createChildLogger('InstanceTabs');
 
 export const TAB_BAR_HEIGHT = 40;
+const TAB_VIEW_BACKGROUND = '#1a1a1a';
 const POPOUT_NAMESPACE = 'fluxer_';
 
-let tabViews: Array<BrowserView> = [];
+let tabViews: Array<WebContentsView> = [];
 let tabBarWindow: BrowserWindow | null = null;
 
 export interface InstanceTabViewOptions {
 	isTrustedOrigin(url?: string): boolean;
 	getSanitizedPath(rawUrl: string): string | null;
-	getSharedWebPreferences(appUrl: string): Electron.WebPreferences;
+	getTabWebPreferences(appUrl: string): Electron.WebPreferences;
 	getVoicePopoutWindowOptions(): Electron.BrowserWindowConstructorOptions;
 	isVoicePopoutWindowName(frameName: string | undefined): boolean;
 }
@@ -88,40 +86,67 @@ function getTabBarDataUrl(): string {
 	return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
 }
 
-function isTabViewDestroyed(view: BrowserView | null | undefined): boolean {
-	if (!view) return true;
+function isTabViewAlive(view: WebContentsView | null | undefined): boolean {
+	if (!view) return false;
 	try {
-		return typeof (view as BrowserView & {isDestroyed?: () => boolean}).isDestroyed === 'function' &&
-			(view as BrowserView & {isDestroyed: () => boolean}).isDestroyed();
+		return !view.webContents.isDestroyed();
 	} catch {
 		return false;
+	}
+}
+
+function getContentAreaBounds(): {x: number; y: number; width: number; height: number} | null {
+	if (!tabBarWindow || tabBarWindow.isDestroyed()) return null;
+	const bounds = tabBarWindow.getContentBounds();
+	const y = TAB_BAR_HEIGHT;
+	return {
+		x: 0,
+		y,
+		width: Math.max(1, bounds.width),
+		height: Math.max(1, bounds.height - y),
+	};
+}
+
+function attachTabView(view: WebContentsView, visible: boolean): void {
+	if (!tabBarWindow || tabBarWindow.isDestroyed()) return;
+	const contentView = tabBarWindow.contentView;
+	try {
+		contentView.removeChildView(view);
+	} catch {}
+	contentView.addChildView(view);
+	view.setVisible(visible);
+}
+
+function destroyTabView(view: WebContentsView): void {
+	if (tabBarWindow && !tabBarWindow.isDestroyed()) {
+		try {
+			tabBarWindow.contentView.removeChildView(view);
+		} catch {}
+	}
+	if (isTabViewAlive(view)) {
+		try {
+			view.webContents.close();
+		} catch {}
 	}
 }
 
 export function getActiveTabWebContents(): Electron.WebContents | null {
 	const idx = getActiveTabIndex();
 	const view = tabViews[idx];
-	return view?.webContents ?? null;
+	return isTabViewAlive(view) ? view.webContents : null;
 }
 
 export function setTabViewBounds(): void {
-	if (!tabBarWindow || tabBarWindow.isDestroyed()) return;
-	const bounds = tabBarWindow.getBounds();
-	const y = TAB_BAR_HEIGHT;
-	const contentHeight = Math.max(1, bounds.height - y);
+	const area = getContentAreaBounds();
+	if (!area) return;
 	const activeIdx = getActiveTabIndex();
-	const activeView = tabViews[activeIdx];
-	if (activeView && !isTabViewDestroyed(activeView)) {
-		tabBarWindow.setBrowserView(activeView);
-		activeView.setBounds({x: 0, y, width: bounds.width, height: contentHeight});
-	} else {
-		tabBarWindow.setBrowserView(null);
-	}
 	for (let i = 0; i < tabViews.length; i++) {
-		if (i === activeIdx) continue;
 		const view = tabViews[i];
-		if (!isTabViewDestroyed(view)) {
-			view.setBounds({x: 0, y, width: bounds.width, height: contentHeight});
+		if (!isTabViewAlive(view)) continue;
+		view.setBounds(area);
+		view.setVisible(i === activeIdx);
+		if (i === activeIdx) {
+			attachTabView(view, true);
 		}
 	}
 }
@@ -132,28 +157,28 @@ export function notifyInstanceTabsUpdated(): void {
 
 export function switchActiveTab(index: number): void {
 	setActiveTabIndex(index);
-	if (!tabBarWindow || tabBarWindow.isDestroyed()) return;
-	const view = tabViews[index];
-	if (view && !isTabViewDestroyed(view)) {
-		tabBarWindow.setBrowserView(view);
-	}
 	setTabViewBounds();
 	notifyInstanceTabsUpdated();
 }
 
-function loadTabUrl(view: BrowserView, url: string): void {
-	view.webContents.loadURL(url).catch((error) => {
+function loadTabUrl(view: WebContentsView, url: string): void {
+	const webContents = view.webContents;
+	webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+		if (isMainFrame) {
+			logger.error('Tab main-frame load failed', {errorCode, errorDescription, validatedURL});
+		}
+	});
+	logger.info('Loading instance tab URL', {url});
+	webContents.loadURL(url).catch((error) => {
 		logger.error('Failed to load tab URL', {url, error});
 	});
 }
 
-function createTabBrowserView(instanceUrl: string, options: InstanceTabViewOptions): BrowserView | null {
-	const preloadPath = path.join(__dirname, '../preload/index.cjs');
-	const view = new BrowserView({
-		webPreferences: options.getSharedWebPreferences(instanceUrl),
+function createTabWebContentsView(instanceUrl: string, options: InstanceTabViewOptions): WebContentsView {
+	const view = new WebContentsView({
+		webPreferences: options.getTabWebPreferences(instanceUrl),
 	});
-	registerSpellcheck(view.webContents);
-	registerDisplayMediaRequestHandler(view.webContents.session, view.webContents);
+	view.setBackgroundColor(TAB_VIEW_BACKGROUND);
 	view.webContents.on('will-navigate', (event, url) => {
 		if (!options.isTrustedOrigin(url)) {
 			event.preventDefault();
@@ -181,11 +206,11 @@ export function addTabAndSwitch(instanceOrigin: string, initialPath = '/'): void
 	const base = instanceOrigin.replace(/\/+$/, '');
 	const loadUrl = `${base}${initialPath.startsWith('/') ? initialPath : `/${initialPath}`}`;
 	if (!tabBarWindow || tabBarWindow.isDestroyed()) return;
-	const view = createTabBrowserView(loadUrl, tabBarWindowOptions);
-	if (!view) return;
+	const view = createTabWebContentsView(loadUrl, tabBarWindowOptions);
 	tabViews.push(view);
-	setActiveTabIndex(tabViews.length - 1);
-	tabBarWindow.setBrowserView(view);
+	const newIndex = tabViews.length - 1;
+	setActiveTabIndex(newIndex);
+	attachTabView(view, true);
 	setTabViewBounds();
 	loadTabUrl(view, loadUrl);
 	notifyInstanceTabsUpdated();
@@ -194,19 +219,12 @@ export function addTabAndSwitch(instanceOrigin: string, initialPath = '/'): void
 export function removeTabView(globalTabIndex: number): void {
 	if (globalTabIndex <= 0) return;
 	const view = tabViews[globalTabIndex];
-	if (view && !isTabViewDestroyed(view)) {
-		(view as BrowserView & {destroy?: () => void}).destroy?.();
+	if (view) {
+		destroyTabView(view);
 	}
 	tabViews = tabViews.filter((_, i) => i !== globalTabIndex);
-	if (tabBarWindow && !tabBarWindow.isDestroyed()) {
-		const newActive = getActiveTabIndex();
-		const nextView = tabViews[newActive];
-		if (nextView && !isTabViewDestroyed(nextView)) {
-			tabBarWindow.setBrowserView(nextView);
-		}
-		setTabViewBounds();
-		notifyInstanceTabsUpdated();
-	}
+	setTabViewBounds();
+	notifyInstanceTabsUpdated();
 }
 
 export function switchOrAddInstanceTab(instanceOrigin: string, initialPath = '/'): void {
@@ -215,7 +233,7 @@ export function switchOrAddInstanceTab(instanceOrigin: string, initialPath = '/'
 	if (existingIndex >= 0) {
 		switchActiveTab(existingIndex);
 		const view = tabViews[existingIndex];
-		if (view && !isTabViewDestroyed(view) && initialPath !== '/') {
+		if (isTabViewAlive(view) && initialPath !== '/') {
 			const base = instanceOrigin.replace(/\/+$/, '');
 			loadTabUrl(view, `${base}${initialPath.startsWith('/') ? initialPath : `/${initialPath}`}`);
 		}
@@ -241,9 +259,11 @@ export function initializeInstanceTabShell(mainWindow: BrowserWindow, options: I
 	});
 	webContents.once('did-finish-load', () => {
 		const tabs = getInstanceTabsList();
-		tabViews = tabs
-			.map((tab) => createTabBrowserView(tab.url, options))
-			.filter((view): view is BrowserView => view != null);
+		const activeIdx = getActiveTabIndex();
+		tabViews = tabs.map((tab) => createTabWebContentsView(tab.url, options));
+		for (let i = 0; i < tabViews.length; i++) {
+			attachTabView(tabViews[i], i === activeIdx);
+		}
 		setTabViewBounds();
 		for (let i = 0; i < tabViews.length && i < tabs.length; i++) {
 			loadTabUrl(tabViews[i], tabs[i].url);
@@ -254,9 +274,7 @@ export function initializeInstanceTabShell(mainWindow: BrowserWindow, options: I
 
 export function destroyInstanceTabs(): void {
 	for (const view of tabViews) {
-		if (!isTabViewDestroyed(view)) {
-			(view as BrowserView & {destroy?: () => void}).destroy?.();
-		}
+		destroyTabView(view);
 	}
 	tabViews = [];
 	tabBarWindow = null;

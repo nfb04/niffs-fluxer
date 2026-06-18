@@ -13,6 +13,18 @@ function getOfficialAppUrl(): string {
 	return BUILD_CHANNEL === 'canary' ? CANARY_APP_URL : STABLE_APP_URL;
 }
 
+function getOfficialOrigins(): Set<string> {
+	const origins = new Set<string>();
+	for (const url of [STABLE_APP_URL, CANARY_APP_URL]) {
+		try {
+			origins.add(new URL(url).origin);
+		} catch {
+			// ignore invalid official URL
+		}
+	}
+	return origins;
+}
+
 function dedupeInstanceTabs(): void {
 	const seen = new Set<string>();
 	config.instance_tabs = (config.instance_tabs ?? []).filter((url) => {
@@ -23,6 +35,23 @@ function dedupeInstanceTabs(): void {
 		seen.add(normalized);
 		return true;
 	});
+}
+
+function sanitizeInstanceTabs(): void {
+	const officialOrigins = getOfficialOrigins();
+	config.instance_tabs = (config.instance_tabs ?? []).filter((url) => {
+		try {
+			return !officialOrigins.has(new URL(url).origin);
+		} catch {
+			return false;
+		}
+	});
+	dedupeInstanceTabs();
+	const maxIndex = config.instance_tabs?.length ?? 0;
+	if ((config.active_tab_index ?? 0) > maxIndex) {
+		config.active_tab_index = maxIndex;
+	}
+	saveDesktopConfig();
 }
 
 function migrateToInstanceTabs(): void {
@@ -40,7 +69,7 @@ function migrateToInstanceTabs(): void {
 		config.active_tab_index = 0;
 	}
 	delete config.app_url;
-	dedupeInstanceTabs();
+	sanitizeInstanceTabs();
 	saveDesktopConfig();
 }
 
@@ -50,9 +79,8 @@ function ensureDefaultSelfHostedTab(): void {
 	}
 	const normalized = DEFAULT_SELF_HOSTED_APP_URL.replace(/\/+$/, '');
 	const tabs = config.instance_tabs ?? [];
-	if (!tabs.includes(normalized)) {
-		config.instance_tabs = [...tabs, normalized];
-		dedupeInstanceTabs();
+	if (tabs.length === 0) {
+		config.instance_tabs = [normalized];
 		saveDesktopConfig();
 	}
 }
@@ -366,6 +394,7 @@ export function loadDesktopConfig(userDataPath: string): void {
 			const data = fs.readFileSync(configPath, 'utf-8');
 			config = sanitizeDesktopConfig(JSON.parse(data));
 			migrateToInstanceTabs();
+			sanitizeInstanceTabs();
 			ensureDefaultSelfHostedTab();
 			log.info('Loaded desktop config from', configPath, {
 				instance_tabs: config.instance_tabs?.length ?? 0,
@@ -373,6 +402,7 @@ export function loadDesktopConfig(userDataPath: string): void {
 			});
 		} else {
 			migrateToInstanceTabs();
+			sanitizeInstanceTabs();
 			ensureDefaultSelfHostedTab();
 		}
 	} catch (error) {
