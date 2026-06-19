@@ -3,7 +3,8 @@
 import {Nagbar} from '@app/features/app/components/layout/Nagbar';
 import {NagbarButton} from '@app/features/app/components/layout/NagbarButton';
 import {NagbarContent} from '@app/features/app/components/layout/NagbarContent';
-import {DESKTOP_DOWNLOAD_URL, PRODUCT_NAME} from '@app/features/app/config/I18nDisplayConstants';
+import {PRODUCT_NAME} from '@app/features/app/config/I18nDisplayConstants';
+import {resolveDesktopDownloadUrl} from '@app/features/app/utils/DesktopDownloadUrl';
 import {openExternalUrl} from '@app/features/ui/utils/NativeUtils';
 import {msg} from '@lingui/core/macro';
 import {useLingui} from '@lingui/react/macro';
@@ -20,7 +21,7 @@ const DOWNLOAD_PRODUCT_DESCRIPTOR = msg({
 export const CorruptedInstallationNagbar = observer(({isMobile}: {isMobile: boolean}) => {
 	const {i18n} = useLingui();
 	const handleDownload = () => {
-		void openExternalUrl(DESKTOP_DOWNLOAD_URL);
+		void openExternalUrl(resolveDesktopDownloadUrl());
 	};
 	return (
 		<Nagbar

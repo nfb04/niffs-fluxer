@@ -26,6 +26,7 @@ import type {
 	VoiceEngineV2BridgePublishProcessedCameraOptions,
 	VoiceEngineV2BridgePublishProcessedCameraResult,
 	VoiceEngineV2BridgePublishScreenAudioOptions,
+	VoiceEngineV2BridgePublishSoundboardAudioOptions,
 	VoiceEngineV2BridgePublishScreenOptions,
 	VoiceEngineV2BridgeReadiness,
 	VoiceEngineV2BridgeRemoteTrackSubscriptionOptions,
@@ -50,6 +51,7 @@ import {
 	isVoiceEngineV2BridgePublishProcessedCameraOptions,
 	isVoiceEngineV2BridgePublishProcessedCameraResult,
 	isVoiceEngineV2BridgePublishScreenAudioOptions,
+	isVoiceEngineV2BridgePublishSoundboardAudioOptions,
 	isVoiceEngineV2BridgePublishScreenOptions,
 	isVoiceEngineV2BridgeRemoteTrackSubscriptionOptions,
 	isVoiceEngineV2BridgeSpeakingDetectionOptions,
@@ -121,6 +123,10 @@ interface NativeVoiceEngineInstance {
 	pushScreenShareFloat(buffer: Buffer, sampleRate: number, channels: number): Promise<boolean>;
 	unpublishScreenShareAudio(): Promise<void>;
 	isPublishingScreenAudio(): boolean;
+	publishSoundboardAudio(sampleRate: number, channels: number): Promise<void>;
+	pushSoundboardPcm(buffer: Buffer, sampleRate: number, channels: number): Promise<boolean>;
+	unpublishSoundboardAudio(): Promise<void>;
+	isPublishingSoundboardAudio(): boolean;
 	publishMicrophone(sampleRate: number, channels: number): Promise<void>;
 	publishDeviceMicrophone?(opts: NativeMicrophonePublishOptions): Promise<void>;
 	pushPcm(buffer: Buffer, sampleRate: number, channels: number): Promise<boolean>;
@@ -1150,6 +1156,27 @@ async function handleUnpublishScreenShareAudio(): Promise<void> {
 	await session.engine.unpublishScreenShareAudio();
 }
 
+async function handlePublishSoundboardAudio(args: VoiceEngineV2BridgePublishSoundboardAudioOptions): Promise<void> {
+	const session = activeSession;
+	if (!session) {
+		throw new Error('Native voice engine is not connected');
+	}
+	await session.engine.publishSoundboardAudio(args.sampleRate, args.numChannels);
+}
+
+async function handlePushSoundboardPcm(args: unknown): Promise<boolean> {
+	const session = activeSession;
+	if (!session) return false;
+	const frame = assertPcmFrameArgs(args, 'push-soundboard-pcm');
+	return session.engine.pushSoundboardPcm(Buffer.from(frame.samples), frame.sampleRate, frame.numChannels);
+}
+
+async function handleUnpublishSoundboardAudio(): Promise<void> {
+	const session = activeSession;
+	if (!session) return;
+	await session.engine.unpublishSoundboardAudio();
+}
+
 async function handleListAudioOutputDevices(): Promise<Array<VoiceEngineV2BridgeAudioOutputDevice>> {
 	if (admState.status === 'warming') {
 		startAdmWarmup();
@@ -1521,6 +1548,19 @@ export function registerNativeVoiceEngineHandlers(): void {
 	);
 	ipcMain.handle(VOICE_ENGINE_V2_IPC_CHANNELS.unpublishScreenAudio, async (): Promise<void> => {
 		await handleUnpublishScreenShareAudio();
+	});
+	ipcMain.handle(VOICE_ENGINE_V2_IPC_CHANNELS.publishSoundboardAudio, async (_event, args: unknown): Promise<void> => {
+		if (!isVoiceEngineV2BridgePublishSoundboardAudioOptions(args)) {
+			throw new Error('Invalid voice-engine publish-soundboard-audio args');
+		}
+		await handlePublishSoundboardAudio(args);
+	});
+	ipcMain.handle(
+		VOICE_ENGINE_V2_IPC_CHANNELS.pushSoundboardPcm,
+		async (_event, args: unknown): Promise<boolean> => handlePushSoundboardPcm(args),
+	);
+	ipcMain.handle(VOICE_ENGINE_V2_IPC_CHANNELS.unpublishSoundboardAudio, async (): Promise<void> => {
+		await handleUnpublishSoundboardAudio();
 	});
 	ipcMain.handle(
 		VOICE_ENGINE_V2_IPC_CHANNELS.setMicEnabled,

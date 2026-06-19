@@ -17,7 +17,7 @@ import type {
 	VoiceEngineV2VideoCodec,
 } from '../protocol';
 
-export const VOICE_ENGINE_V2_BRIDGE_VERSION = 18;
+export const VOICE_ENGINE_V2_BRIDGE_VERSION = 19;
 
 export type VoiceEngineV2BridgeMethodName =
 	| 'isSupported'
@@ -36,6 +36,9 @@ export type VoiceEngineV2BridgeMethodName =
 	| 'pushScreenAudioPcm'
 	| 'pushScreenAudioFloat'
 	| 'unpublishScreenAudio'
+	| 'publishSoundboardAudio'
+	| 'pushSoundboardPcm'
+	| 'unpublishSoundboardAudio'
 	| 'setMicEnabled'
 	| 'setSpeakingDetection'
 	| 'listAudioInputDevices'
@@ -106,6 +109,7 @@ export interface VoiceEngineV2BridgeFloatPcmFrame {
 	samples: Float32Array;
 }
 export type VoiceEngineV2BridgePublishScreenAudioOptions = VoiceEngineV2ScreenAudioOptions;
+export type VoiceEngineV2BridgePublishSoundboardAudioOptions = VoiceEngineV2ScreenAudioOptions;
 export type VoiceEngineV2BridgePublishDataOptions = VoiceEngineV2DataOptions;
 
 export type VoiceEngineV2BridgeTrackKind = VoiceEngineV2TrackKind;
@@ -491,6 +495,9 @@ export interface VoiceEngineV2BridgeIpcMethods {
 	pushScreenAudioPcm: {args: [VoiceEngineV2BridgePcmFrame]; result: boolean};
 	pushScreenAudioFloat: {args: [VoiceEngineV2BridgeFloatPcmFrame]; result: boolean};
 	unpublishScreenAudio: {args: []; result: void};
+	publishSoundboardAudio: {args: [VoiceEngineV2BridgePublishSoundboardAudioOptions]; result: void};
+	pushSoundboardPcm: {args: [VoiceEngineV2BridgePcmFrame]; result: boolean};
+	unpublishSoundboardAudio: {args: []; result: void};
 	setMicEnabled: {args: [boolean]; result: VoiceEngineV2BridgeOperationResult};
 	setSpeakingDetection: {args: [VoiceEngineV2BridgeSpeakingDetectionOptions]; result: void};
 	listAudioInputDevices: {args: []; result: Array<VoiceEngineV2BridgeAudioInputDevice>};
@@ -543,6 +550,9 @@ export const VOICE_ENGINE_V2_BRIDGE_METHODS = [
 	'pushScreenAudioPcm',
 	'pushScreenAudioFloat',
 	'unpublishScreenAudio',
+	'publishSoundboardAudio',
+	'pushSoundboardPcm',
+	'unpublishSoundboardAudio',
 	'setMicEnabled',
 	'setSpeakingDetection',
 	'listAudioInputDevices',
@@ -588,6 +598,9 @@ export const VOICE_ENGINE_V2_IPC_CHANNELS = {
 	pushScreenAudioPcm: 'voice-engine-v2:push-screen-audio-pcm',
 	pushScreenAudioFloat: 'voice-engine-v2:push-screen-audio-float',
 	unpublishScreenAudio: 'voice-engine-v2:unpublish-screen-audio',
+	publishSoundboardAudio: 'voice-engine-v2:publish-soundboard-audio',
+	pushSoundboardPcm: 'voice-engine-v2:push-soundboard-pcm',
+	unpublishSoundboardAudio: 'voice-engine-v2:unpublish-soundboard-audio',
 	setMicEnabled: 'voice-engine-v2:set-mic-enabled',
 	setSpeakingDetection: 'voice-engine-v2:set-speaking-detection',
 	listAudioInputDevices: 'voice-engine-v2:list-audio-input-devices',
@@ -645,6 +658,9 @@ export interface VoiceEngineV2BridgeApi {
 	pushScreenAudioPcm(frame: VoiceEngineV2BridgePcmFrame): Promise<boolean>;
 	pushScreenAudioFloat(frame: VoiceEngineV2BridgeFloatPcmFrame): Promise<boolean>;
 	unpublishScreenAudio(): Promise<void>;
+	publishSoundboardAudio(options: VoiceEngineV2BridgePublishSoundboardAudioOptions): Promise<void>;
+	pushSoundboardPcm(frame: VoiceEngineV2BridgePcmFrame): Promise<boolean>;
+	unpublishSoundboardAudio(): Promise<void>;
 	setMicEnabled(enabled: boolean): Promise<VoiceEngineV2BridgeOperationResult>;
 	setSpeakingDetection(options: VoiceEngineV2BridgeSpeakingDetectionOptions): Promise<void>;
 	listAudioInputDevices(): Promise<Array<VoiceEngineV2BridgeAudioInputDevice>>;

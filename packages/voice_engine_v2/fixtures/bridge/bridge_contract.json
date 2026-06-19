@@ -1,5 +1,5 @@
 {
-	"version": 18,
+	"version": 19,
 	"methods": [
 		"isSupported",
 		"getCapabilities",
@@ -17,6 +17,9 @@
 		"pushScreenAudioPcm",
 		"pushScreenAudioFloat",
 		"unpublishScreenAudio",
+		"publishSoundboardAudio",
+		"pushSoundboardPcm",
+		"unpublishSoundboardAudio",
 		"setMicEnabled",
 		"setSpeakingDetection",
 		"listAudioInputDevices",
@@ -61,6 +64,9 @@
 		"pushScreenAudioPcm": "voice-engine-v2:push-screen-audio-pcm",
 		"pushScreenAudioFloat": "voice-engine-v2:push-screen-audio-float",
 		"unpublishScreenAudio": "voice-engine-v2:unpublish-screen-audio",
+		"publishSoundboardAudio": "voice-engine-v2:publish-soundboard-audio",
+		"pushSoundboardPcm": "voice-engine-v2:push-soundboard-pcm",
+		"unpublishSoundboardAudio": "voice-engine-v2:unpublish-soundboard-audio",
 		"setMicEnabled": "voice-engine-v2:set-mic-enabled",
 		"setSpeakingDetection": "voice-engine-v2:set-speaking-detection",
 		"listAudioInputDevices": "voice-engine-v2:list-audio-input-devices",

@@ -2,6 +2,7 @@
 
 ARG BUILD_VERSION=""
 ARG PUBLIC_ASSET_BASE_URL=""
+ARG PUBLIC_SELF_HOSTED_DESKTOP_DOWNLOAD_URL=""
 ARG FLUXER_APP_PROXY_TIME_FREEZE_ENABLED="true"
 
 # ---------- Stage 1: Build the SPA (fluxer_app) ----------
@@ -9,6 +10,7 @@ FROM node:24-bookworm-slim AS app-build
 
 ARG BUILD_VERSION
 ARG PUBLIC_ASSET_BASE_URL
+ARG PUBLIC_SELF_HOSTED_DESKTOP_DOWNLOAD_URL
 
 WORKDIR /usr/src/app
 
@@ -69,7 +71,8 @@ COPY fluxer_app/scripts/ ./fluxer_app/scripts/
 COPY fluxer_app/src/ ./fluxer_app/src/
 
 ENV BUILD_VERSION=${BUILD_VERSION} \
-	PUBLIC_ASSET_BASE_URL=${PUBLIC_ASSET_BASE_URL}
+	PUBLIC_ASSET_BASE_URL=${PUBLIC_ASSET_BASE_URL} \
+	PUBLIC_SELF_HOSTED_DESKTOP_DOWNLOAD_URL=${PUBLIC_SELF_HOSTED_DESKTOP_DOWNLOAD_URL}
 
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
 	--mount=type=cache,target=/usr/local/cargo/git \

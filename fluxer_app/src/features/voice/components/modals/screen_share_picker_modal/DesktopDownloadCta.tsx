@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import {DESKTOP_DOWNLOAD_URL, PRODUCT_NAME} from '@app/features/app/config/I18nDisplayConstants';
+import {PRODUCT_NAME} from '@app/features/app/config/I18nDisplayConstants';
+import {resolveDesktopDownloadUrl} from '@app/features/app/utils/DesktopDownloadUrl';
 import {Button} from '@app/features/ui/button/Button';
 import {openExternalUrl} from '@app/features/ui/utils/NativeUtils';
 import styles from '@app/features/voice/components/modals/ScreenSharePickerModal.module.css';
@@ -57,7 +58,7 @@ export const DesktopDownloadCta: React.FC = () => {
 				</div>
 				<Button
 					variant="primary"
-					onClick={() => void openExternalUrl(DESKTOP_DOWNLOAD_URL)}
+					onClick={() => void openExternalUrl(resolveDesktopDownloadUrl())}
 					data-flx="voice.screen-share-picker-modal.button--3"
 				>
 					{i18n._(GET_THE_DESKTOP_APP_DESCRIPTOR)}

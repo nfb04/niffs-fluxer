@@ -19,6 +19,7 @@ import type {
 	VoiceEngineV2BridgePublishProcessedCameraOptions,
 	VoiceEngineV2BridgePublishProcessedCameraResult,
 	VoiceEngineV2BridgePublishScreenAudioOptions,
+	VoiceEngineV2BridgePublishSoundboardAudioOptions,
 	VoiceEngineV2BridgePublishScreenOptions,
 	VoiceEngineV2BridgeReadiness,
 	VoiceEngineV2BridgeRemoteTrackSubscriptionOptions,
@@ -351,6 +352,12 @@ export function isVoiceEngineV2BridgePublishScreenAudioOptions(
 		isOptionalString(value.captureId) &&
 		isOptionalString(value.tapId)
 	);
+}
+
+export function isVoiceEngineV2BridgePublishSoundboardAudioOptions(
+	value: unknown,
+): value is VoiceEngineV2BridgePublishSoundboardAudioOptions {
+	return isVoiceEngineV2BridgePublishScreenAudioOptions(value);
 }
 
 export function isVoiceEngineV2ParticipantVolumeOptions(

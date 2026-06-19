@@ -110,6 +110,7 @@ function resolvePublicValues() {
 		PUBLIC_RELEASE_CHANNEL: resolveReleaseChannel(),
 		PUBLIC_BOOTSTRAP_API_ENDPOINT: envString('PUBLIC_BOOTSTRAP_API_ENDPOINT', '/api'),
 		PUBLIC_BOOTSTRAP_API_PUBLIC_ENDPOINT: envString('PUBLIC_BOOTSTRAP_API_PUBLIC_ENDPOINT'),
+		PUBLIC_SELF_HOSTED_DESKTOP_DOWNLOAD_URL: envString('PUBLIC_SELF_HOSTED_DESKTOP_DOWNLOAD_URL'),
 	};
 }
 
@@ -426,6 +427,10 @@ export default () => {
 				'import.meta.env.PUBLIC_BOOTSTRAP_API_PUBLIC_ENDPOINT': getPublicEnvVar(
 					publicValues,
 					'PUBLIC_BOOTSTRAP_API_PUBLIC_ENDPOINT',
+				),
+				'import.meta.env.PUBLIC_SELF_HOSTED_DESKTOP_DOWNLOAD_URL': getPublicEnvVar(
+					publicValues,
+					'PUBLIC_SELF_HOSTED_DESKTOP_DOWNLOAD_URL',
 				),
 			}),
 			{

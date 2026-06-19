@@ -808,6 +808,10 @@ const api: ElectronAPI = {
 		pushScreenAudioPcm: (frame) => ipcRenderer.invoke(VOICE_ENGINE_V2_IPC_CHANNELS.pushScreenAudioPcm, frame),
 		pushScreenAudioFloat: (frame) => ipcRenderer.invoke(VOICE_ENGINE_V2_IPC_CHANNELS.pushScreenAudioFloat, frame),
 		unpublishScreenAudio: () => ipcRenderer.invoke(VOICE_ENGINE_V2_IPC_CHANNELS.unpublishScreenAudio),
+		publishSoundboardAudio: (options) =>
+			ipcRenderer.invoke(VOICE_ENGINE_V2_IPC_CHANNELS.publishSoundboardAudio, options),
+		pushSoundboardPcm: (frame) => ipcRenderer.invoke(VOICE_ENGINE_V2_IPC_CHANNELS.pushSoundboardPcm, frame),
+		unpublishSoundboardAudio: () => ipcRenderer.invoke(VOICE_ENGINE_V2_IPC_CHANNELS.unpublishSoundboardAudio),
 		setMicEnabled: (enabled) => ipcRenderer.invoke(VOICE_ENGINE_V2_IPC_CHANNELS.setMicEnabled, enabled),
 		setSpeakingDetection: (options) => ipcRenderer.invoke(VOICE_ENGINE_V2_IPC_CHANNELS.setSpeakingDetection, options),
 		listAudioInputDevices: () => ipcRenderer.invoke(VOICE_ENGINE_V2_IPC_CHANNELS.listAudioInputDevices),

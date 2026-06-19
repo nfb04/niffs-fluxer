@@ -3,13 +3,13 @@
 import {ConfirmModal} from '@app/features/app/components/dialogs/ConfirmModal';
 import {SettingsTabSection} from '@app/features/app/components/dialogs/shared/SettingsTabLayout';
 import {
-	DESKTOP_DOWNLOAD_URL,
 	MACOS_INPUT_MONITORING_PERMISSION_NAME,
 	MACOS_MICROPHONE_PERMISSION_NAME,
 	MACOS_PRIVACY_AND_SECURITY_SETTINGS_NAME,
 	MACOS_SYSTEM_SETTINGS_NAME,
 	PRODUCT_NAME,
 } from '@app/features/app/config/I18nDisplayConstants';
+import {resolveDesktopDownloadUrl} from '@app/features/app/utils/DesktopDownloadUrl';
 import {KeybindRecorder} from '@app/features/input/components/KeybindRecorder';
 import Keybind, {getDefaultKeybind} from '@app/features/input/state/InputKeybind';
 import {openMacPermissionsModal} from '@app/features/permissions/system/commands/MacPermissionsModalCommands';
@@ -331,7 +331,7 @@ export const VoiceTab: React.FC<VoiceTabProps> = observer(({voiceSettings, autoR
 						primaryVariant="primary"
 						secondaryText={i18n._(I_UNDERSTAND_DESCRIPTOR)}
 						onPrimary={() => {
-							void openExternalUrl(DESKTOP_DOWNLOAD_URL);
+							void openExternalUrl(resolveDesktopDownloadUrl());
 						}}
 						onSecondary={() => {
 							Keybind.setTransmitMode(mode);
@@ -419,7 +419,7 @@ export const VoiceTab: React.FC<VoiceTabProps> = observer(({voiceSettings, autoR
 							<Button
 								variant="primary"
 								small={true}
-								onClick={() => void openExternalUrl(DESKTOP_DOWNLOAD_URL)}
+								onClick={() => void openExternalUrl(resolveDesktopDownloadUrl())}
 								data-flx="user.voice-tab.render-ptt-controls.button.download-desktop-app"
 							>
 								{i18n._(DOWNLOAD_DESKTOP_APP_DESCRIPTOR)}

@@ -746,7 +746,7 @@ const getDefaultKeybinds = (
 		{
 			action: 'voice_toggle_mute',
 			label: i18n._(TOGGLE_MUTE_DESCRIPTOR),
-			combo: {key: 'm', ctrlOrMeta: true, shift: true, global: false, enabled: true},
+			combo: {key: 'm', ctrlOrMeta: true, shift: true, global: true, enabled: true},
 			allowGlobal: true,
 			assignable: true,
 			section: 'voice_and_video',
@@ -754,7 +754,7 @@ const getDefaultKeybinds = (
 		{
 			action: 'voice_toggle_deafen',
 			label: i18n._(VOICE_TOGGLE_DEAFEN_DESCRIPTOR),
-			combo: {key: 'd', ctrlOrMeta: true, shift: true, global: false, enabled: true},
+			combo: {key: 'd', ctrlOrMeta: true, shift: true, global: true, enabled: true},
 			allowGlobal: true,
 			assignable: true,
 			section: 'voice_and_video',

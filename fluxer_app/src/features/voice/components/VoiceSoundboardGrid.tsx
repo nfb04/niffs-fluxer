@@ -6,7 +6,7 @@ import * as GuildSoundboardCommands from '@app/features/expressions/commands/Gui
 import {mediaUrl} from '@app/features/messaging/utils/MessagingUrlUtils';
 import {SOUNDBOARD_SOUNDS} from '@app/features/voice/components/VoiceSoundboardConstants';
 import styles from '@app/features/voice/components/VoiceSoundboardPopover.module.css';
-import {playSoundboardSound} from '@app/features/voice/utils/VoiceSoundboardUtils';
+import {canPlaySoundboardSound, playSoundboardSound} from '@app/features/voice/utils/VoiceSoundboardUtils';
 import {useLingui} from '@lingui/react/macro';
 import {MagnifyingGlassIcon} from '@phosphor-icons/react';
 import type {Room} from 'livekit-client';
@@ -125,7 +125,7 @@ export function VoiceSoundboardGrid({room, guildId}: VoiceSoundboardGridProps) {
 
 	const handlePlay = useCallback(
 		async (url: string, id: string) => {
-			if (!room) return;
+			if (!canPlaySoundboardSound()) return;
 			setLoadingId(id);
 			try {
 				const res = await fetch(url, {cache: 'no-store'});

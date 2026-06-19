@@ -267,6 +267,22 @@ class VoiceEngine {
 		return this.native.isPublishingScreenAudio();
 	}
 
+	publishSoundboardAudio(sampleRate, numChannels) {
+		return this.native.publishSoundboardAudio(sampleRate, numChannels);
+	}
+
+	pushSoundboardPcm(buffer, sampleRate, numChannels) {
+		return this.native.pushSoundboardPcm(buffer, sampleRate, numChannels);
+	}
+
+	unpublishSoundboardAudio() {
+		return this.native.unpublishSoundboardAudio();
+	}
+
+	isPublishingSoundboardAudio() {
+		return this.native.isPublishingSoundboardAudio();
+	}
+
 	publishMicrophone(sampleRate, numChannels) {
 		return this.native.publishMicrophone(sampleRate, numChannels);
 	}

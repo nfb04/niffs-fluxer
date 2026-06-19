@@ -284,8 +284,8 @@ describe('voice engine v2 video frame invariants', () => {
 });
 
 describe('voice engine v2 bridge schema version literal', () => {
-	it('pins the TS bridge version to the literal 18 to pair with the native addon bridge', () => {
-		expect(VOICE_ENGINE_V2_BRIDGE_VERSION).toBe(18);
+	it('pins the TS bridge version to the literal 19 to pair with the native addon bridge', () => {
+		expect(VOICE_ENGINE_V2_BRIDGE_VERSION).toBe(19);
 	});
 
 	it('reuses the schema-version airlock helper from bridge exports', () => {

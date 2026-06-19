@@ -244,6 +244,25 @@ struct ScreenAudioSource {
     ring: Arc<ScreenAudioRing>,
 }
 
+struct SoundboardAudioSource {
+    source: NativeAudioSource,
+    sample_rate: u32,
+    num_channels: u32,
+    track_sid: TrackSid,
+    pcm_scratch: PcmScratch,
+}
+
+impl SoundboardAudioSource {
+    fn matches_format(&self, sample_rate: u32, num_channels: u32) -> bool {
+        same_audio_format(
+            self.sample_rate,
+            self.num_channels,
+            sample_rate,
+            num_channels,
+        )
+    }
+}
+
 impl ScreenAudioSource {
     fn matches_format(&self, sample_rate: u32, num_channels: u32) -> bool {
         same_audio_format(
@@ -731,6 +750,7 @@ struct LocalTrackSlots<'a> {
     screen_camera: &'a Mutex<Option<CameraSource>>,
     screen: &'a Mutex<Option<ScreenSource>>,
     screen_audio: &'a Mutex<Option<ScreenAudioSource>>,
+    soundboard_audio: &'a Mutex<Option<SoundboardAudioSource>>,
     mic: &'a Mutex<Option<MicSource>>,
 }
 
@@ -747,6 +767,7 @@ fn apply_local_track_republish(
     }
     matched += republish_screen_slot_sid(slots.screen, previous_sid, republished_sid);
     matched += republish_screen_audio_slot_sid(slots.screen_audio, previous_sid, republished_sid);
+    matched += republish_soundboard_audio_slot_sid(slots.soundboard_audio, previous_sid, republished_sid);
     matched += republish_mic_slot_sid(slots.mic, previous_sid, republished_sid);
     assert!(matched <= 1);
     matched == 1
@@ -807,6 +828,18 @@ fn republish_screen_sids(
 
 fn republish_screen_audio_slot_sid(
     slot: &Mutex<Option<ScreenAudioSource>>,
+    previous_sid: &str,
+    republished_sid: &str,
+) -> u32 {
+    let mut guard = slot.lock();
+    let Some(audio) = guard.as_mut() else {
+        return 0;
+    };
+    republish_track_sid_value(&mut audio.track_sid, previous_sid, republished_sid)
+}
+
+fn republish_soundboard_audio_slot_sid(
+    slot: &Mutex<Option<SoundboardAudioSource>>,
     previous_sid: &str,
     republished_sid: &str,
 ) -> u32 {
@@ -1700,6 +1733,7 @@ struct RoomEventForwarders {
     screen_camera: Arc<Mutex<Option<CameraSource>>>,
     screen: Arc<Mutex<Option<ScreenSource>>>,
     screen_audio: Arc<Mutex<Option<ScreenAudioSource>>>,
+    soundboard_audio: Arc<Mutex<Option<SoundboardAudioSource>>>,
     mic: Arc<Mutex<Option<MicSource>>>,
     inbound_forwarders: Arc<InboundForwarderRegistry>,
     count_inbound_audio: bool,
@@ -1744,6 +1778,7 @@ impl RoomEventForwarders {
             screen_camera: &self.screen_camera,
             screen: &self.screen,
             screen_audio: &self.screen_audio,
+            soundboard_audio: &self.soundboard_audio,
             mic: &self.mic,
         };
         let swapped = apply_local_track_republish(&slots, previous_sid, republished_sid);
@@ -1932,6 +1967,7 @@ pub struct VoiceEngine {
     screen: Arc<Mutex<Option<ScreenSource>>>,
     screen_audio: Arc<Mutex<Option<ScreenAudioSource>>>,
     screen_audio_ring: Arc<ScreenAudioRing>,
+    soundboard_audio: Arc<Mutex<Option<SoundboardAudioSource>>>,
     mic: Arc<Mutex<Option<MicSource>>>,
     camera: Arc<Mutex<Option<CameraSource>>>,
     camera_preview: Arc<Mutex<Option<Arc<AtomicBool>>>>,
@@ -1974,6 +2010,7 @@ impl VoiceEngine {
             screen: Arc::new(Mutex::new(None)),
             screen_audio: Arc::new(Mutex::new(None)),
             screen_audio_ring: Arc::new(ScreenAudioRing::new()),
+            soundboard_audio: Arc::new(Mutex::new(None)),
             mic: Arc::new(Mutex::new(None)),
             camera: Arc::new(Mutex::new(None)),
             camera_preview: Arc::new(Mutex::new(None)),
@@ -2246,6 +2283,7 @@ impl VoiceEngine {
             screen_camera: self.screen_camera.clone(),
             screen: self.screen.clone(),
             screen_audio: self.screen_audio.clone(),
+            soundboard_audio: self.soundboard_audio.clone(),
             mic: self.mic.clone(),
             inbound_forwarders: self.inbound_forwarders.clone(),
             count_inbound_audio: self.count_inbound_audio.load(Ordering::Acquire),
@@ -2590,6 +2628,17 @@ impl VoiceEngine {
                 .unpublish_track(&audio.track_sid)
                 .await
                 .map_err(|e| napi::Error::from_reason(format!("unpublish screen audio: {e}")))?;
+        }
+        Ok(())
+    }
+
+    async fn unpublish_existing_soundboard_audio(&self, local: &LocalParticipant) -> napi::Result<()> {
+        let existing = self.soundboard_audio.lock().take();
+        if let Some(audio) = existing {
+            local
+                .unpublish_track(&audio.track_sid)
+                .await
+                .map_err(|e| napi::Error::from_reason(format!("unpublish soundboard audio: {e}")))?;
         }
         Ok(())
     }
@@ -2939,6 +2988,7 @@ impl VoiceEngine {
         *self.texture_capability.lock() =
             TextureCapability::unavailable(texture_source::TextureEncodeError::UnsupportedCodec);
         *self.screen_audio.lock() = None;
+        *self.soundboard_audio.lock() = None;
         self.stop_mic_speaking_tap();
         *self.mic.lock() = None;
         self.set_device_mic_recording_requested(false);
@@ -3199,6 +3249,116 @@ impl VoiceEngine {
     #[napi]
     pub fn is_publishing_screen_audio(&self) -> bool {
         self.screen_audio.lock().is_some()
+    }
+
+    #[napi]
+    pub async fn publish_soundboard_audio(
+        &self,
+        sample_rate: u32,
+        num_channels: u32,
+    ) -> napi::Result<()> {
+        if self.state.load(Ordering::Acquire) != S_CONNECTED {
+            return Err(napi::Error::from_reason("not connected"));
+        }
+        if !valid_audio_format(sample_rate, num_channels) {
+            return Err(napi::Error::from_reason("invalid sample_rate/num_channels"));
+        }
+        {
+            let guard = self.soundboard_audio.lock();
+            if guard
+                .as_ref()
+                .is_some_and(|audio| audio.matches_format(sample_rate, num_channels))
+            {
+                return Ok(());
+            }
+        }
+        let local = self.local_participant()?;
+        self.unpublish_existing_soundboard_audio(&local).await?;
+        let source = NativeAudioSource::new(
+            AudioSourceOptions::default(),
+            sample_rate,
+            num_channels,
+            self.max_audio_buffer_ms.load(Ordering::Relaxed) as u32,
+        );
+        let track = LocalAudioTrack::create_audio_track(
+            "soundboard",
+            RtcAudioSource::Native(source.clone()),
+        );
+        let options = TrackPublishOptions {
+            source: TrackSource::Microphone,
+            red: true,
+            dtx: true,
+            ..Default::default()
+        };
+        let publication = local
+            .publish_track(LocalTrack::Audio(track), options)
+            .await
+            .map_err(|e| napi::Error::from_reason(format!("publish soundboard audio: {e}")))?;
+        let pcm_scratch = new_pcm_scratch(sample_rate, num_channels);
+        *self.soundboard_audio.lock() = Some(SoundboardAudioSource {
+            source,
+            sample_rate,
+            num_channels,
+            track_sid: publication.sid(),
+            pcm_scratch,
+        });
+        Ok(())
+    }
+
+    #[napi]
+    pub async fn push_soundboard_pcm(
+        &self,
+        data: Buffer,
+        sample_rate: u32,
+        num_channels: u32,
+    ) -> napi::Result<bool> {
+        let (source, scratch) = {
+            let guard = self.soundboard_audio.lock();
+            match guard.as_ref() {
+                Some(audio)
+                    if audio.sample_rate == sample_rate && audio.num_channels == num_channels =>
+                {
+                    (audio.source.clone(), audio.pcm_scratch.clone())
+                }
+                Some(_) => {
+                    return Err(napi::Error::from_reason(
+                        "pcm format does not match published soundboard audio",
+                    ));
+                }
+                None => return Ok(false),
+            }
+        };
+        let mut samples = scratch.lock().await;
+        let Some(frame) =
+            pcm16_audio_frame_into(data.as_ref(), sample_rate, num_channels, &mut samples)
+        else {
+            return Ok(false);
+        };
+        self.send_audio_stats.record_push(now_millis());
+        source
+            .capture_frame(&frame)
+            .await
+            .map_err(|e| napi::Error::from_reason(format!("capture soundboard audio frame: {e}")))?;
+        Ok(true)
+    }
+
+    #[napi]
+    pub async fn unpublish_soundboard_audio(&self) -> napi::Result<()> {
+        let local = {
+            let guard = self.room.lock();
+            guard.as_ref().map(|room| room.local_participant())
+        };
+        if let Some(local) = local {
+            self.unpublish_existing_soundboard_audio(&local).await?;
+        } else {
+            *self.soundboard_audio.lock() = None;
+        }
+        Ok(())
+    }
+
+    #[napi]
+    pub fn is_publishing_soundboard_audio(&self) -> bool {
+        self.soundboard_audio.lock().is_some()
     }
 
     #[napi]
@@ -6468,6 +6628,7 @@ mod tests {
         screen_camera: Mutex<Option<CameraSource>>,
         screen: Mutex<Option<ScreenSource>>,
         screen_audio: Mutex<Option<ScreenAudioSource>>,
+        soundboard_audio: Mutex<Option<SoundboardAudioSource>>,
         mic: Mutex<Option<MicSource>>,
     }
 
@@ -6478,6 +6639,7 @@ mod tests {
                 screen_camera: Mutex::new(None),
                 screen: Mutex::new(None),
                 screen_audio: Mutex::new(None),
+                soundboard_audio: Mutex::new(None),
                 mic: Mutex::new(None),
             }
         }
@@ -6488,6 +6650,7 @@ mod tests {
                 screen_camera: &self.screen_camera,
                 screen: &self.screen,
                 screen_audio: &self.screen_audio,
+                soundboard_audio: &self.soundboard_audio,
                 mic: &self.mic,
             }
         }

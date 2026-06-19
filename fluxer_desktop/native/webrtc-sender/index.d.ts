@@ -312,6 +312,11 @@ export declare class VoiceEngine {
 	unpublishScreenShareAudio(): Promise<void>;
 	isPublishingScreenAudio(): boolean;
 
+	publishSoundboardAudio(sampleRate: number, numChannels: number): Promise<void>;
+	pushSoundboardPcm(buffer: Buffer, sampleRate: number, numChannels: number): Promise<boolean>;
+	unpublishSoundboardAudio(): Promise<void>;
+	isPublishingSoundboardAudio(): boolean;
+
 	publishMicrophone(sampleRate: number, numChannels: number): Promise<void>;
 	publishDeviceMicrophone(opts?: PublishMicrophoneOptions): Promise<void>;
 	pushPcm(buffer: Buffer, sampleRate: number, numChannels: number): Promise<boolean>;
