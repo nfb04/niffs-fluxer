@@ -11,7 +11,7 @@ import {
 } from '@electron/common/DesktopConfig';
 import {createChildLogger} from '@electron/common/Logger';
 import type {InstanceTabInfo} from '@electron/common/Types';
-import {type BrowserWindow, shell, WebContentsView} from 'electron';
+import {BrowserWindow, shell, WebContentsView} from 'electron';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const logger = createChildLogger('InstanceTabs');
@@ -75,9 +75,7 @@ function getTabBarDataUrl(): string {
 			});
 		}
 		document.getElementById('add').onclick = function() {
-			var raw = prompt('Enter instance URL (e.g. https://chat.niffbot.com)');
-			if (!raw) return;
-			window.electron.addInstanceTab(raw.trim());
+			window.electron.promptAddInstanceTab();
 		};
 		render();
 		window.electron.onInstanceTabsUpdated && window.electron.onInstanceTabsUpdated(render);
@@ -290,4 +288,96 @@ export function getInstanceTabsState(): {tabs: Array<InstanceTabInfo>; activeInd
 export function removeInstanceTabAt(globalTabIndex: number): void {
 	removeInstanceAtIndex(globalTabIndex);
 	removeTabView(globalTabIndex);
+}
+
+function getAddInstancePromptHtml(): string {
+	return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+		* { box-sizing: border-box; }
+		body { margin: 0; padding: 16px; font-family: system-ui, sans-serif; background: #2b2d31; color: #dbdee1; }
+		label { display: block; font-size: 13px; margin-bottom: 8px; }
+		input { width: 100%; padding: 8px 10px; border-radius: 4px; border: 1px solid #1e1f22; background: #1e1f22; color: #fff; font-size: 13px; }
+		input:focus { outline: 2px solid #5865f2; border-color: #5865f2; }
+		.actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+		button { border: 0; border-radius: 4px; padding: 8px 14px; font-size: 13px; cursor: pointer; }
+		.cancel { background: transparent; color: #b5bac1; }
+		.cancel:hover { color: #fff; }
+		.submit { background: #5865f2; color: #fff; }
+		.submit:hover { background: #4752c4; }
+		.error { color: #f23f43; font-size: 12px; margin-top: 8px; min-height: 16px; }
+	</style></head><body>
+		<label for="url">Instance URL</label>
+		<input id="url" type="url" placeholder="https://chat.niffbot.com" autofocus />
+		<div class="error" id="error"></div>
+		<div class="actions">
+			<button type="button" class="cancel" id="cancel">Cancel</button>
+			<button type="button" class="submit" id="submit">Add</button>
+		</div>
+		<script>
+		(function() {
+			var input = document.getElementById('url');
+			var error = document.getElementById('error');
+			function submit() {
+				var value = (input.value || '').trim();
+				if (!value) {
+					error.textContent = 'Instance URL is required';
+					return;
+				}
+				window.electron.addInstanceTab(value).then(function() {
+					window.electron.closeAddInstancePrompt();
+				}).catch(function(err) {
+					error.textContent = err && err.message ? err.message : String(err);
+				});
+			}
+			document.getElementById('submit').onclick = submit;
+			document.getElementById('cancel').onclick = function() { window.electron.closeAddInstancePrompt(); };
+			input.addEventListener('keydown', function(e) {
+				if (e.key === 'Enter') submit();
+				if (e.key === 'Escape') window.electron.closeAddInstancePrompt();
+			});
+		})();
+		</script></body></html>`;
+}
+
+let addInstancePromptWindow: BrowserWindow | null = null;
+
+export async function promptAddInstanceTabDialog(parent: BrowserWindow | null): Promise<void> {
+	if (!parent || parent.isDestroyed()) return;
+	if (addInstancePromptWindow && !addInstancePromptWindow.isDestroyed()) {
+		addInstancePromptWindow.focus();
+		return;
+	}
+	const preloadPath = path.join(__dirname, '../preload/index.cjs');
+	addInstancePromptWindow = new BrowserWindow({
+		parent,
+		modal: true,
+		width: 440,
+		height: 180,
+		resizable: false,
+		minimizable: false,
+		maximizable: false,
+		show: false,
+		autoHideMenuBar: true,
+		title: 'Add instance',
+		backgroundColor: '#2b2d31',
+		webPreferences: {
+			preload: preloadPath,
+			contextIsolation: true,
+			nodeIntegration: false,
+			sandbox: false,
+		},
+	});
+	addInstancePromptWindow.on('closed', () => {
+		addInstancePromptWindow = null;
+	});
+	await addInstancePromptWindow.loadURL(
+		`data:text/html;charset=utf-8,${encodeURIComponent(getAddInstancePromptHtml())}`,
+	);
+	addInstancePromptWindow.show();
+}
+
+export function closeAddInstancePromptDialog(): void {
+	if (addInstancePromptWindow && !addInstancePromptWindow.isDestroyed()) {
+		addInstancePromptWindow.close();
+	}
+	addInstancePromptWindow = null;
 }

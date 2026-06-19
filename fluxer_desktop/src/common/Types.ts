@@ -799,6 +799,8 @@ export interface ElectronAPI {
 	switchTab: (index: number) => Promise<void>;
 	removeInstanceTab: (globalTabIndex: number) => Promise<void>;
 	addInstanceTab: (instanceUrl: string) => Promise<void>;
+	promptAddInstanceTab: () => Promise<void>;
+	closeAddInstancePrompt: () => Promise<void>;
 	onInstanceTabsUpdated: (callback: () => void) => () => void;
 	desktopAccountsList: () => Promise<Array<Record<string, unknown>>>;
 	desktopAccountsGet: (userId: string) => Promise<Record<string, unknown> | null>;

@@ -42,8 +42,10 @@ import {setNativeStrings} from '@electron/main/MainI18n';
 import {copyRemoteFileToClipboard, parseClipboardWriteFileOptions} from '@electron/main/MediaClipboard';
 import {registerNotificationIpcHandlers} from '@electron/main/NotificationsIpc';
 import {
+	closeAddInstancePromptDialog,
 	getInstanceTabsState,
 	notifyInstanceTabsUpdated,
+	promptAddInstanceTabDialog,
 	removeInstanceTabAt,
 	switchActiveTab,
 	switchOrAddInstanceTab,
@@ -294,6 +296,16 @@ export function registerIpcHandlers(): void {
 		await assertValidFluxerInstance(instanceOrigin);
 		switchOrAddInstanceTab(instanceOrigin, '/');
 		notifyInstanceTabsUpdated();
+	});
+	ipcMain.handle('prompt-add-instance-tab', async (event): Promise<void> => {
+		const parent = BrowserWindow.fromWebContents(event.sender) ?? getMainWindow();
+		if (!parent || parent.isDestroyed()) {
+			throw new Error('Main window not available');
+		}
+		await promptAddInstanceTabDialog(parent);
+	});
+	ipcMain.handle('close-add-instance-prompt', (): void => {
+		closeAddInstancePromptDialog();
 	});
 	ipcMain.handle('consume-desktop-handoff-code', (): string | null => {
 		const code = pendingDesktopHandoffCode;

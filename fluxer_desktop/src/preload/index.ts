@@ -492,6 +492,8 @@ const api: ElectronAPI = {
 	consumeDesktopAccountSwitchUserId: (): Promise<string | null> =>
 		ipcRenderer.invoke('consume-desktop-account-switch-user-id'),
 	addInstanceTab: (instanceUrl: string): Promise<void> => ipcRenderer.invoke('add-instance-tab', instanceUrl),
+	promptAddInstanceTab: (): Promise<void> => ipcRenderer.invoke('prompt-add-instance-tab'),
+	closeAddInstancePrompt: (): Promise<void> => ipcRenderer.invoke('close-add-instance-prompt'),
 	getInstanceTabs: (): Promise<{tabs: Array<InstanceTabInfo>; activeIndex: number}> =>
 		ipcRenderer.invoke('get-instance-tabs'),
 	switchTab: (index: number): Promise<void> => ipcRenderer.invoke('switch-tab', index),
@@ -948,3 +950,28 @@ ipcRenderer.on('spellcheck-engine-resolved', (_event, info: SpellcheckResolvedEn
 });
 
 contextBridge.exposeInMainWorld('electron', api);
+
+function suppressWebAppAccountTabBarWhenNativeTabsExist(): void {
+	if (typeof api.getInstanceTabs !== 'function') {
+		return;
+	}
+	const styleId = 'fluxer-native-instance-tab-shell';
+	const install = (): void => {
+		if (document.getElementById(styleId)) {
+			return;
+		}
+		const style = document.createElement('style');
+		style.id = styleId;
+		style.textContent = '[data-flx*="desktop-account-tabs"]{display:none!important}';
+		(document.head ?? document.documentElement).appendChild(style);
+	};
+	if (document.readyState === 'loading') {
+		document.addEventListener('DOMContentLoaded', install, {once: true});
+	} else {
+		install();
+	}
+	const observer = new MutationObserver(install);
+	observer.observe(document.documentElement, {childList: true, subtree: true});
+}
+
+suppressWebAppAccountTabBarWhenNativeTabsExist();
