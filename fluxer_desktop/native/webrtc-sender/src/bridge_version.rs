@@ -2,7 +2,7 @@
 
 use napi_derive::napi;
 
-pub const ENGINE_BRIDGE_VERSION: u32 = 18;
+pub const ENGINE_BRIDGE_VERSION: u32 = 19;
 
 const _: () = assert!(ENGINE_BRIDGE_VERSION > 0);
 
