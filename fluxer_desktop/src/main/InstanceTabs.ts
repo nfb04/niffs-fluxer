@@ -21,6 +21,7 @@ const TAB_VIEW_BACKGROUND = '#1a1a1a';
 const POPOUT_NAMESPACE = 'fluxer_';
 
 let tabViews: Array<WebContentsView> = [];
+let tabBarView: WebContentsView | null = null;
 let tabBarWindow: BrowserWindow | null = null;
 
 export interface InstanceTabViewOptions {
@@ -36,11 +37,11 @@ function getTabBarDataUrl(): string {
 		* { box-sizing: border-box; }
 		html, body { margin: 0; height: ${TAB_BAR_HEIGHT}px; overflow: hidden; }
 		body { font-family: system-ui, sans-serif; font-size: 13px; background: #2b2d31; color: #b5bac1; -webkit-app-region: drag; user-select: none; display: flex; align-items: center; padding: 0 8px; gap: 8px; }
-		.tabs { display: flex; align-items: center; gap: 2px; -webkit-app-region: no-drag; min-width: 0; flex: 1; overflow-x: auto; }
-		.tab { padding: 6px 12px; border-radius: 4px; cursor: pointer; white-space: nowrap; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+		.tabs { display: flex; align-items: center; gap: 2px; min-width: 0; flex: 1; overflow-x: auto; }
+		.tab { padding: 6px 12px; border-radius: 4px; cursor: pointer; white-space: nowrap; max-width: 160px; overflow: hidden; text-overflow: ellipsis; -webkit-app-region: no-drag; }
 		.tab:hover { background: rgba(255,255,255,0.06); color: #fff; }
 		.tab.active { background: #404249; color: #fff; }
-		.tab-close { margin-left: 4px; padding: 0 4px; opacity: 0.6; font-size: 14px; }
+		.tab-close { margin-left: 4px; padding: 0 4px; opacity: 0.6; font-size: 14px; -webkit-app-region: no-drag; }
 		.tab-close:hover { opacity: 1; }
 		.tab.official .tab-close { display: none; }
 		.add-btn { -webkit-app-region: no-drag; border: 0; background: transparent; color: #b5bac1; width: 28px; height: 28px; border-radius: 4px; cursor: pointer; font-size: 18px; line-height: 1; }
@@ -91,6 +92,48 @@ function isTabViewAlive(view: WebContentsView | null | undefined): boolean {
 	} catch {
 		return false;
 	}
+}
+
+function getTabBarBounds(): {x: number; y: number; width: number; height: number} | null {
+	if (!tabBarWindow || tabBarWindow.isDestroyed()) return null;
+	const bounds = tabBarWindow.getContentBounds();
+	return {
+		x: 0,
+		y: 0,
+		width: Math.max(1, bounds.width),
+		height: TAB_BAR_HEIGHT,
+	};
+}
+
+function attachTabBarViewOnTop(): void {
+	if (!tabBarWindow || tabBarWindow.isDestroyed() || !tabBarView) return;
+	const contentView = tabBarWindow.contentView;
+	try {
+		contentView.removeChildView(tabBarView);
+	} catch {}
+	contentView.addChildView(tabBarView);
+	tabBarView.setVisible(true);
+}
+
+function setTabBarBounds(): void {
+	const bounds = getTabBarBounds();
+	if (!bounds || !tabBarView) return;
+	tabBarView.setBounds(bounds);
+	attachTabBarViewOnTop();
+}
+
+function createTabBarWebContentsView(): WebContentsView {
+	const preloadPath = path.join(__dirname, '../preload/index.cjs');
+	const view = new WebContentsView({
+		webPreferences: {
+			preload: preloadPath,
+			contextIsolation: true,
+			nodeIntegration: false,
+			sandbox: false,
+		},
+	});
+	view.setBackgroundColor('#2b2d31');
+	return view;
 }
 
 function getContentAreaBounds(): {x: number; y: number; width: number; height: number} | null {
@@ -147,10 +190,11 @@ export function setTabViewBounds(): void {
 			attachTabView(view, true);
 		}
 	}
+	setTabBarBounds();
 }
 
 export function notifyInstanceTabsUpdated(): void {
-	tabBarWindow?.webContents.send('instance-tabs-updated');
+	tabBarView?.webContents.send('instance-tabs-updated');
 }
 
 export function switchActiveTab(index: number): void {
@@ -246,16 +290,13 @@ let tabBarWindowOptions: InstanceTabViewOptions;
 export function initializeInstanceTabShell(mainWindow: BrowserWindow, options: InstanceTabViewOptions): void {
 	tabBarWindow = mainWindow;
 	tabBarWindowOptions = options;
-	const webContents = mainWindow.webContents;
-	webContents.on('will-navigate', (event, url) => {
-		if (!url.startsWith('data:')) {
-			event.preventDefault();
-		}
-	});
-	mainWindow.loadURL(getTabBarDataUrl()).catch((error) => {
+	tabBarView = createTabBarWebContentsView();
+	setTabBarBounds();
+	void mainWindow.loadURL('about:blank');
+	tabBarView.webContents.loadURL(getTabBarDataUrl()).catch((error) => {
 		logger.error('Failed to load instance tab bar', error);
 	});
-	webContents.once('did-finish-load', () => {
+	tabBarView.webContents.once('did-finish-load', () => {
 		const tabs = getInstanceTabsList();
 		const activeIdx = getActiveTabIndex();
 		tabViews = tabs.map((tab) => createTabWebContentsView(tab.url, options));
@@ -275,6 +316,10 @@ export function destroyInstanceTabs(): void {
 		destroyTabView(view);
 	}
 	tabViews = [];
+	if (tabBarView) {
+		destroyTabView(tabBarView);
+		tabBarView = null;
+	}
 	tabBarWindow = null;
 }
 
