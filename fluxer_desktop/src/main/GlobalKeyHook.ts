@@ -12,7 +12,7 @@ import {GlobalKeyHookLifecycle} from '@electron/main/GlobalKeyHookLifecycle';
 import {getLinuxInputHookMode} from '@electron/main/LaunchOptions';
 import {isFlatpakRuntime} from '@electron/main/LinuxSandbox';
 import {getTccStatus} from '@electron/main/MacTcc';
-import {getMainWindow} from '@electron/main/Window';
+import {getActiveWebContents, getMainWindow} from '@electron/main/Window';
 import {ipcMain} from 'electron';
 
 const logger = createChildLogger('GlobalKeyHook');
@@ -160,6 +160,18 @@ function normalizeEvdevKeyName(name: string | null): string | null {
 	return name;
 }
 
+function sendToKeybindRenderer(channel: string, payload: unknown): void {
+	const webContents = getActiveWebContents();
+	if (webContents && !webContents.isDestroyed()) {
+		webContents.send(channel, payload);
+		return;
+	}
+	const mainWindow = getMainWindow();
+	if (mainWindow && !mainWindow.webContents.isDestroyed()) {
+		mainWindow.webContents.send(channel, payload);
+	}
+}
+
 function dispatchKeyEvent(event: {
 	type: 'keydown' | 'keyup';
 	keycode: number;
@@ -169,10 +181,8 @@ function dispatchKeyEvent(event: {
 	shiftKey: boolean;
 	metaKey: boolean;
 }): void {
-	const mainWindow = getMainWindow();
-	if (!mainWindow) return;
 	const eventWithBackend = {...event, backend: activeBackend};
-	mainWindow.webContents.send('global-key-event', eventWithBackend);
+	sendToKeybindRenderer('global-key-event', eventWithBackend);
 	for (const [id, keybind] of registeredKeybinds) {
 		if (!keyEventMatchesRegistration(keybind, eventWithBackend)) continue;
 		if (event.type === 'keyup') {
@@ -194,9 +204,7 @@ function dispatchKeyEvent(event: {
 }
 
 function dispatchGlobalKeybindTriggered(id: string, type: 'keydown' | 'keyup'): void {
-	const mainWindow = getMainWindow();
-	if (!mainWindow) return;
-	mainWindow.webContents.send('global-keybind-triggered', {id, type});
+	sendToKeybindRenderer('global-keybind-triggered', {id, type});
 }
 
 function shouldPreferPhysicalKeyNameForRegistration(): boolean {
@@ -243,9 +251,7 @@ function dispatchMouseEvent(event: {
 	if (event.type === 'mousedown' && !observedMouseButtons.has(event.button)) {
 		observedMouseButtons.add(event.button);
 	}
-	const mainWindow = getMainWindow();
-	if (!mainWindow) return;
-	mainWindow.webContents.send('global-mouse-event', event);
+	sendToKeybindRenderer('global-mouse-event', event);
 	for (const [id, keybind] of registeredKeybinds) {
 		if (keybind.mouseButton !== event.button) continue;
 		if (event.type === 'mouseup') {

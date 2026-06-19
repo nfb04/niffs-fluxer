@@ -72,6 +72,7 @@ import NativePermission, {
 	type LinuxInputAccessNagbarReason,
 } from '@app/features/permissions/system/state/NativePermission';
 import {ensureMacPermission} from '@app/features/permissions/system/utils/MacPermissionGate';
+import Platform from '@app/features/platform/types/Platform';
 import {Logger} from '@app/features/platform/utils/AppLogger';
 import ReadStates from '@app/features/read_state/state/ReadStates';
 import KeyboardMode from '@app/features/ui/state/KeyboardMode';
@@ -174,8 +175,23 @@ class KeybindManager {
 		return activeKeybinds.filter((entry) => this.isActionAllowedForCurrentView(entry.action));
 	}
 
+	private withDesktopGlobalVoiceShortcuts(keybinds: Array<RuntimeKeybind>): Array<RuntimeKeybind> {
+		if (!Platform.isElectron) return keybinds;
+		return keybinds.map((keybind) => {
+			if (
+				(keybind.action === 'voice_toggle_mute' || keybind.action === 'voice_toggle_deafen') &&
+				keybind.allowGlobal &&
+				!(keybind.combo.global ?? false)
+			) {
+				return {...keybind, combo: {...keybind.combo, global: true}};
+			}
+			return keybind;
+		});
+	}
+
 	private get activeGlobalKeybinds(): Array<RuntimeKeybind> {
-		return this.activeKeybinds.filter(
+		const keybinds = this.withDesktopGlobalVoiceShortcuts(this.activeKeybinds);
+		return keybinds.filter(
 			(k) =>
 				!HOLD_ACTIONS.includes(k.action as HoldAction) &&
 				k.allowGlobal &&
