@@ -177,6 +177,16 @@ export function getActiveTabWebContents(): Electron.WebContents | null {
 	return isTabViewAlive(view) ? view.webContents : null;
 }
 
+export function focusActiveTabWebContents(): void {
+	const webContents = getActiveTabWebContents();
+	if (!webContents || webContents.isDestroyed()) return;
+	try {
+		webContents.focus();
+	} catch (error) {
+		logger.warn('Failed to focus active tab webContents', error);
+	}
+}
+
 export function setTabViewBounds(): void {
 	const area = getContentAreaBounds();
 	if (!area) return;
@@ -200,6 +210,7 @@ export function notifyInstanceTabsUpdated(): void {
 export function switchActiveTab(index: number): void {
 	setActiveTabIndex(index);
 	setTabViewBounds();
+	focusActiveTabWebContents();
 	notifyInstanceTabsUpdated();
 }
 

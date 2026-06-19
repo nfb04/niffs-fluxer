@@ -43,6 +43,10 @@ export function isDesktop(): boolean {
 	return isElectron();
 }
 
+export function hasNativeInstanceTabShell(): boolean {
+	return typeof getElectronAPI()?.getInstanceTabs === 'function';
+}
+
 export function isCanaryDesktop(): boolean {
 	return getElectronAPI()?.buildChannel === 'canary';
 }

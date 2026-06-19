@@ -51,6 +51,25 @@ async function decodeBlobTo48kMonoPcm(blob: Blob): Promise<Int16Array> {
 	}
 }
 
+async function playSoundboardSoundLocally(blob: Blob): Promise<void> {
+	const audioContext = new AudioContext();
+	try {
+		const arrayBuffer = await blob.arrayBuffer();
+		const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
+		const source = audioContext.createBufferSource();
+		source.buffer = audioBuffer;
+		source.connect(audioContext.destination);
+		await new Promise<void>((resolve) => {
+			source.onended = () => resolve();
+			source.start();
+		});
+	} catch (error) {
+		logger.error('Local soundboard preview failed', error);
+	} finally {
+		await audioContext.close().catch(() => undefined);
+	}
+}
+
 async function streamPcmThroughNativeBridge(bridge: VoiceEngineV2BridgeApi, pcm: Int16Array): Promise<void> {
 	await bridge.publishSoundboardAudio({
 		sampleRate: SOUNDBOARD_SAMPLE_RATE,
@@ -147,6 +166,7 @@ export async function playSoundboardSound(room: Room | null, blob: Blob): Promis
 	}
 	try {
 		const pcm = await decodeBlobTo48kMonoPcm(blob);
+		void playSoundboardSoundLocally(blob);
 		await streamPcmThroughNativeBridge(bridge, pcm);
 	} catch (error) {
 		logger.error('Native soundboard play failed', error);

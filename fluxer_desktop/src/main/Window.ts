@@ -28,6 +28,7 @@ import {registerSpellcheck} from '@electron/main/Spellcheck';
 import {resetStreamingPriority} from '@electron/main/StreamingPriority';
 import {
 	destroyInstanceTabs,
+	focusActiveTabWebContents,
 	getActiveTabWebContents,
 	initializeInstanceTabShell,
 	setTabViewBounds,
@@ -1011,6 +1012,9 @@ export function createWindow(options: CreateWindowOptions = {}): BrowserWindow {
 	};
 	logger.info('Initializing native instance tab shell');
 	initializeInstanceTabShell(mainWindow, instanceTabOptions);
+	mainWindow.on('focus', () => {
+		focusActiveTabWebContents();
+	});
 	logPhase('instance-tab-shell-initialized');
 	void clearStartupRenderingCaches(session);
 	webContents.on('did-create-window', (window, details) => {

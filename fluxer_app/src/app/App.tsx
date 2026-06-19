@@ -51,7 +51,7 @@ import {
 	getDesktopWindowBehaviorSettings,
 	setDesktopWindowBehaviorSettings,
 } from '@app/features/ui/utils/DesktopWindowBehaviorUtils';
-import {attachExternalLinkInterceptor, isDesktop} from '@app/features/ui/utils/NativeUtils';
+import {attachExternalLinkInterceptor, hasNativeInstanceTabShell, isDesktop} from '@app/features/ui/utils/NativeUtils';
 import {
 	FIRST_CLICK_PASSTHROUGH_WHEN_UNFOCUSED_CLASS,
 	UNFOCUSED_FULLY_INTERACTIVE_CLASS,
@@ -88,7 +88,9 @@ export const AppWrapper = observer(({children}: AppWrapperProps) => {
 	const {i18n} = useLingui();
 	const reducedMotion = Accessibility.useReducedMotion;
 	const stayInteractiveWhenUnfocused = Accessibility.stayInteractiveWhenUnfocused;
-	const firstClickPassThroughWhenUnfocused = Accessibility.firstClickPassThroughWhenUnfocused;
+	const usesNativeInstanceTabShell = hasNativeInstanceTabShell();
+	const firstClickPassThroughWhenUnfocused =
+		Accessibility.firstClickPassThroughWhenUnfocused || usesNativeInstanceTabShell;
 	const {platform, isNative, isMacOS} = useNativePlatform();
 	const useSystemTitleBar = useNativeTitleBar();
 	const messageDisplayCompact = UserSettings.getMessageDisplayCompact();
