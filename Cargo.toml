@@ -8,7 +8,6 @@ members = [
 	"fluxer_svc",
 	"fluxer_messages",
 	"fluxer_snowflakes",
-	"tools/ci",
 	"tools/content/update-frozen-snapshot",
 	"tools/dev",
 	"tools/i18n_auto",

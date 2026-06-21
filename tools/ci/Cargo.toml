@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
 
+# Standalone workspace so desktop/CI builds only resolve fluxer-ci deps (not the full monorepo).
+[workspace]
+resolver = "2"
+
 [dependencies]
 anyhow = "1.0.102"
 aws-config = "1.8.18"

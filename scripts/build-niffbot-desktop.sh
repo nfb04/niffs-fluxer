@@ -157,15 +157,37 @@ copy_artifacts_to_downloads() {
 	ls -la "$OUTPUT_DIR"
 }
 
+cargo_with_retry() {
+	local attempt=1
+	local max_attempts="${CARGO_RETRY_ATTEMPTS:-5}"
+	local delay="${CARGO_RETRY_DELAY_SECONDS:-5}"
+	while (( attempt <= max_attempts )); do
+		if "$@"; then
+			return 0
+		fi
+		if (( attempt == max_attempts )); then
+			echo "Cargo command failed after ${max_attempts} attempts: $*" >&2
+			return 1
+		fi
+		echo "Cargo command failed (attempt ${attempt}/${max_attempts}); retrying in ${delay}s..." >&2
+		sleep "$delay"
+		delay=$((delay * 2))
+		attempt=$((attempt + 1))
+	done
+}
+
 ensure_pnpm
 ensure_rust
+
+export CARGO_NET_RETRY="${CARGO_NET_RETRY:-5}"
+export CARGO_NET_GIT_FETCH_WITH_CLI="${CARGO_NET_GIT_FETCH_WITH_CLI:-true}"
 
 case "$TARGET" in
 	win)
 		setup_windows_cross_compile
 		echo "==> Rebuilding fluxer-ci (desktop native build driver)"
 		touch "$ROOT/tools/ci/src/desktop_native.rs"
-		cargo build --locked --quiet --manifest-path "$ROOT/tools/ci/Cargo.toml"
+		cargo_with_retry cargo build --locked --quiet --manifest-path "$ROOT/tools/ci/Cargo.toml"
 		;;
 	linux)
 		export FLUXER_NATIVE_PACKAGE_PLATFORM=linux
