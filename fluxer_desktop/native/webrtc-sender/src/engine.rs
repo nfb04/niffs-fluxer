@@ -33,7 +33,7 @@ use std::ffi::c_void;
 #[cfg(target_os = "linux")]
 use std::os::fd::{AsRawFd, OwnedFd};
 use std::panic::{AssertUnwindSafe, catch_unwind};
-use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU8, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU32, AtomicU8, AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock, mpsc};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 

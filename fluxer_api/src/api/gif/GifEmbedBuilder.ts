@@ -207,6 +207,18 @@ async function resolveProviderGif(
 	}
 }
 
+export function isGifMediaEmbedType(type: string | null | undefined): boolean {
+	return type === 'gifv' || type === 'image';
+}
+
+export async function isGifProviderUrl(url: string, gifService: GifService): Promise<boolean> {
+	for (const provider of gifService.listProviders()) {
+		if (!(await provider.isAvailable())) continue;
+		if (provider.extractSlugFromUrl(url)) return true;
+	}
+	return false;
+}
+
 export async function resolveGifEmbedFromProviders(
 	url: string,
 	gifService: GifService,

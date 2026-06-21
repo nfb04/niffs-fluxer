@@ -88,11 +88,6 @@ function isKlipyFileBucket(value: unknown): value is KlipyFileBucket {
 	return isJsonRecord(value) && Object.values(value).every(isKlipyFileEntry);
 }
 
-function isKlipyFallbackMediaFormat(value: unknown): value is NonNullable<KlipyGif['media_formats']>['webm'] {
-	if (!isJsonRecord(value) || typeof value.url !== 'string' || !Array.isArray(value.dims)) return false;
-	return value.dims.length === 2 && value.dims.every((dimension) => typeof dimension === 'number');
-}
-
 function isKlipyGif(value: unknown): value is KlipyGif {
 	if (
 		!isJsonRecord(value) ||
@@ -105,9 +100,7 @@ function isKlipyGif(value: unknown): value is KlipyGif {
 	return (
 		(value.slug === undefined || typeof value.slug === 'string') &&
 		(value.file === undefined || (isJsonRecord(value.file) && Object.values(value.file).every(isKlipyFileBucket))) &&
-		(value.media_formats === undefined ||
-			(isJsonRecord(value.media_formats) &&
-				(value.media_formats.webm === undefined || isKlipyFallbackMediaFormat(value.media_formats.webm))))
+		(value.media_formats === undefined || isJsonRecord(value.media_formats))
 	);
 }
 
@@ -144,6 +137,8 @@ export class KlipyGifProvider implements IGifProvider {
 	readonly meta = KLIPY_PROVIDER_META;
 	private readonly FEATURED_CACHE_KEY = 'klipy:featured';
 	private readonly TRENDING_CACHE_KEY = 'klipy:trending';
+	private readonly SEARCH_CACHE_PREFIX = 'klipy:search';
+	private readonly RESOLVE_CACHE_PREFIX = 'klipy:resolve';
 	private refreshingKeys: Map<string, boolean> = new Map();
 
 	constructor(
@@ -260,6 +255,12 @@ export class KlipyGifProvider implements IGifProvider {
 	}
 
 	async search(params: {q: string; locale: string; country: string}): Promise<Array<GifResponse>> {
+		const normalizedQuery = params.q.trim().toLowerCase();
+		const cacheKey = `${this.SEARCH_CACHE_PREFIX}:${params.locale}:${params.country}:${normalizedQuery}`;
+		const cached = await this.getCache<Array<GifResponse>>(cacheKey);
+		if (cached && !cached.isStale) {
+			return cached.data;
+		}
 		const apiKey = await this.getApiKey();
 		const url = this.createURL({
 			endpoint: 'search',
@@ -271,7 +272,9 @@ export class KlipyGifProvider implements IGifProvider {
 				limit: 50,
 			},
 		});
-		return this.fetchAndTransformGifs(url);
+		const results = await this.fetchAndTransformGifs(url);
+		await this.setCache(cacheKey, results);
+		return results;
 	}
 
 	async registerShare(params: {id: string; q: string; locale: string; country: string}): Promise<void> {
@@ -315,7 +318,8 @@ export class KlipyGifProvider implements IGifProvider {
 		gifs: Array<GifResponse>;
 		categories: Array<GifCategoryTagResponse>;
 	}> {
-		const [gifs, categories] = await Promise.all([this.getFeaturedGifs(params), this.getFeaturedCategories(params)]);
+		const gifs = await this.getFeaturedGifs(params);
+		const categories = await this.getFeaturedCategories(params);
 		return {gifs, categories};
 	}
 
@@ -364,8 +368,51 @@ export class KlipyGifProvider implements IGifProvider {
 	async resolveByUrl(params: {url: string; locale: string; country: string}): Promise<GifResponse | null> {
 		const slug = this.extractSlugFromUrl(params.url);
 		if (!slug) return null;
+		const cacheKey = `${this.RESOLVE_CACHE_PREFIX}:${params.locale}:${params.country}:${slug}`;
+		const cached = await this.getCache<GifResponse>(cacheKey);
+		if (cached && !cached.isStale) {
+			return cached.data;
+		}
+		const apiKey = await this.getApiKey();
+		const itemUrl = this.createURL({
+			endpoint: 'items',
+			params: {
+				key: apiKey,
+				id: slug,
+				country: params.country,
+				locale: params.locale,
+			},
+		});
+		try {
+			const itemPayload = await this.fetchKlipyData(itemUrl);
+			const itemCandidates: Array<unknown> = [];
+			if (isJsonRecord(itemPayload)) {
+				if (Array.isArray(itemPayload.results)) {
+					itemCandidates.push(...itemPayload.results);
+				} else if (isKlipyGif(itemPayload.data)) {
+					itemCandidates.push(itemPayload.data);
+				} else if (isKlipyGif(itemPayload)) {
+					itemCandidates.push(itemPayload);
+				}
+			}
+			const directMatch = itemCandidates
+				.filter(isKlipyGif)
+				.map((gif) => this.transformKlipyGif(gif))
+				.find((gif): gif is GifResponse => gif !== null);
+			if (directMatch) {
+				await this.setCache(cacheKey, directMatch);
+				return directMatch;
+			}
+		} catch (error) {
+			Logger.debug({slug, error}, 'KLIPY items lookup failed; falling back to search');
+		}
 		const results = await this.search({q: slug, locale: params.locale, country: params.country});
-		return results.find((gif) => gif.slug === slug || this.extractSlugFromUrl(gif.url) === slug) ?? results[0] ?? null;
+		const resolved =
+			results.find((gif) => gif.slug === slug || this.extractSlugFromUrl(gif.url) === slug) ?? results[0] ?? null;
+		if (resolved) {
+			await this.setCache(cacheKey, resolved);
+		}
+		return resolved;
 	}
 
 	private async getFeaturedGifs(params: {locale: string; country: string}): Promise<Array<GifResponse>> {
@@ -469,7 +516,7 @@ export class KlipyGifProvider implements IGifProvider {
 					Logger.debug({err: error, tag: tag.name, ...params}, 'Failed to enrich GIF category');
 					enriched.push(tag);
 				}
-				await new Promise((resolve) => setTimeout(resolve, 150));
+				await new Promise((resolve) => setTimeout(resolve, 300));
 			}
 			await writeEnrichedCategoriesCache(this.cacheService, this.meta.name, params.locale, params.country, enriched);
 		} catch (error) {

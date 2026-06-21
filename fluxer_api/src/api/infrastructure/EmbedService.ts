@@ -17,7 +17,7 @@ import type {RichEmbedMediaWithMetadata} from '../channel/EmbedTypes';
 import type {IChannelRepository} from '../channel/IChannelRepository';
 import {nextVersion} from '../database/CassandraTypes';
 import type {MessageEmbed, MessageEmbedChild} from '../database/types/MessageTypes';
-import {buildGifEmbedFromResponse, isRenderableGifEmbedFromModel, resolveGifEmbedFromProviders} from '../gif/GifEmbedBuilder';
+import {buildGifEmbedFromResponse, isGifMediaEmbedType, isGifProviderUrl, isRenderableGifEmbedFromModel, resolveGifEmbedFromProviders} from '../gif/GifEmbedBuilder';
 import type {GifService} from '../gif/GifService';
 import {Logger} from '../Logger';
 import {Embed} from '../models/Embed';
@@ -121,16 +121,20 @@ export class EmbedService {
 		nsfwMode: MediaProxyNsfwMode = 'block',
 		options: UnfurlOptions = {},
 	): Promise<ProcessedUrlEmbeds> {
+		const isGifUrl = await isGifProviderUrl(url, this.gifService);
 		const result = await this.unfurlerService.unfurlWithCachePolicy(url, nsfwMode, options);
 		if (result.embeds.length > 0) {
 			const embeds = result.embeds.map((embedData) => new Embed(this.mapResponseEmbed(embedData)));
-			const renderableEmbeds = embeds.filter((embed) =>
+			let renderableEmbeds = embeds.filter((embed) =>
 				isRenderableGifEmbedFromModel({
 					type: embed.type,
 					thumbnail: embed.thumbnail,
 					video: embed.video,
 				}),
 			);
+			if (isGifUrl) {
+				renderableEmbeds = renderableEmbeds.filter((embed) => isGifMediaEmbedType(embed.type));
+			}
 			if (renderableEmbeds.length > 0) {
 				return {
 					embeds: renderableEmbeds,
@@ -138,7 +142,7 @@ export class EmbedService {
 				};
 			}
 		}
-		if (!options.cacheOnly) {
+		if (isGifUrl || !options.cacheOnly) {
 			const providerEmbed = await resolveGifEmbedFromProviders(url, this.gifService);
 			if (providerEmbed) {
 				return {
