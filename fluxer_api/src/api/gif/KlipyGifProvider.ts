@@ -213,9 +213,16 @@ export class KlipyGifProvider implements IGifProvider {
 		throw new Error('Exceeded maximum retries');
 	}
 
-	private async fetchAndTransformGifs(url: URL): Promise<Array<GifResponse>> {
+	private async fetchAndTransformGifs(
+		url: URL,
+		cacheContext?: {locale: string; country: string},
+	): Promise<Array<GifResponse>> {
 		const results = readResultsArray(await this.fetchKlipyData(url)).filter(isKlipyGif);
-		return results.map((gif) => this.transformKlipyGif(gif)).filter((gif): gif is GifResponse => gif !== null);
+		const gifs = results.map((gif) => this.transformKlipyGif(gif)).filter((gif): gif is GifResponse => gif !== null);
+		if (cacheContext) {
+			await this.cacheGifsBySlug(gifs, cacheContext.locale, cacheContext.country);
+		}
+		return gifs;
 	}
 
 	private async getCache<T>(key: string): Promise<{
@@ -235,6 +242,20 @@ export class KlipyGifProvider implements IGifProvider {
 			timestamp: Date.now(),
 		};
 		await this.cacheService.set(key, cacheEntry);
+	}
+
+	private resolveCacheKey(locale: string, country: string, slug: string): string {
+		return `${this.RESOLVE_CACHE_PREFIX}:${locale}:${country}:${slug}`;
+	}
+
+	private async cacheGifsBySlug(gifs: Array<GifResponse>, locale: string, country: string): Promise<void> {
+		await Promise.all(
+			gifs.map(async (gif) => {
+				const slug = gif.slug?.trim();
+				if (!slug) return;
+				await this.setCache(this.resolveCacheKey(locale, country, slug), gif);
+			}),
+		);
 	}
 
 	private triggerBackgroundRefresh<T>(key: string, refreshFn: () => Promise<T>): void {
@@ -259,6 +280,7 @@ export class KlipyGifProvider implements IGifProvider {
 		const cacheKey = `${this.SEARCH_CACHE_PREFIX}:${params.locale}:${params.country}:${normalizedQuery}`;
 		const cached = await this.getCache<Array<GifResponse>>(cacheKey);
 		if (cached && !cached.isStale) {
+			await this.cacheGifsBySlug(cached.data, params.locale, params.country);
 			return cached.data;
 		}
 		const apiKey = await this.getApiKey();
@@ -272,7 +294,7 @@ export class KlipyGifProvider implements IGifProvider {
 				limit: 50,
 			},
 		});
-		const results = await this.fetchAndTransformGifs(url);
+		const results = await this.fetchAndTransformGifs(url, params);
 		await this.setCache(cacheKey, results);
 		return results;
 	}
@@ -307,6 +329,12 @@ export class KlipyGifProvider implements IGifProvider {
 			if (cached.isStale) {
 				this.triggerBackgroundRefresh(this.FEATURED_CACHE_KEY, () => this.fetchFeaturedData(params));
 			}
+			await this.cacheGifsBySlug(cached.data.gifs, params.locale, params.country);
+			for (const category of cached.data.categories) {
+				if (category.gif) {
+					await this.cacheGifsBySlug([category.gif], params.locale, params.country);
+				}
+			}
 			return cached.data;
 		}
 		const data = await this.fetchFeaturedData(params);
@@ -329,6 +357,7 @@ export class KlipyGifProvider implements IGifProvider {
 			if (cached.isStale) {
 				this.triggerBackgroundRefresh(this.TRENDING_CACHE_KEY, () => this.fetchTrendingGifs(params));
 			}
+			await this.cacheGifsBySlug(cached.data, params.locale, params.country);
 			return cached.data;
 		}
 		const gifs = await this.fetchTrendingGifs(params);
@@ -347,7 +376,7 @@ export class KlipyGifProvider implements IGifProvider {
 				limit: 50,
 			},
 		});
-		return this.fetchAndTransformGifs(url);
+		return this.fetchAndTransformGifs(url, params);
 	}
 
 	async suggest(params: {q: string; locale: string}): Promise<Array<string>> {
@@ -365,54 +394,34 @@ export class KlipyGifProvider implements IGifProvider {
 		);
 	}
 
-	async resolveByUrl(params: {url: string; locale: string; country: string}): Promise<GifResponse | null> {
+	async resolveByUrl(params: {
+		url: string;
+		locale: string;
+		country: string;
+		cacheOnly?: boolean;
+	}): Promise<GifResponse | null> {
 		const slug = this.extractSlugFromUrl(params.url);
 		if (!slug) return null;
-		const cacheKey = `${this.RESOLVE_CACHE_PREFIX}:${params.locale}:${params.country}:${slug}`;
+		const cacheKey = this.resolveCacheKey(params.locale, params.country, slug);
 		const cached = await this.getCache<GifResponse>(cacheKey);
-		if (cached && !cached.isStale) {
+		if (cached) {
 			return cached.data;
 		}
-		const apiKey = await this.getApiKey();
-		const itemUrl = this.createURL({
-			endpoint: 'items',
-			params: {
-				key: apiKey,
-				id: slug,
-				country: params.country,
-				locale: params.locale,
-			},
-		});
+		if (params.cacheOnly) {
+			return null;
+		}
 		try {
-			const itemPayload = await this.fetchKlipyData(itemUrl);
-			const itemCandidates: Array<unknown> = [];
-			if (isJsonRecord(itemPayload)) {
-				if (Array.isArray(itemPayload.results)) {
-					itemCandidates.push(...itemPayload.results);
-				} else if (isKlipyGif(itemPayload.data)) {
-					itemCandidates.push(itemPayload.data);
-				} else if (isKlipyGif(itemPayload)) {
-					itemCandidates.push(itemPayload);
-				}
+			const results = await this.search({q: slug, locale: params.locale, country: params.country});
+			const resolved =
+				results.find((gif) => gif.slug === slug || this.extractSlugFromUrl(gif.url) === slug) ?? results[0] ?? null;
+			if (resolved) {
+				await this.setCache(cacheKey, resolved);
 			}
-			const directMatch = itemCandidates
-				.filter(isKlipyGif)
-				.map((gif) => this.transformKlipyGif(gif))
-				.find((gif): gif is GifResponse => gif !== null);
-			if (directMatch) {
-				await this.setCache(cacheKey, directMatch);
-				return directMatch;
-			}
+			return resolved;
 		} catch (error) {
-			Logger.debug({slug, error}, 'KLIPY items lookup failed; falling back to search');
+			Logger.debug({slug, error}, 'KLIPY resolve-by-url search failed');
+			return null;
 		}
-		const results = await this.search({q: slug, locale: params.locale, country: params.country});
-		const resolved =
-			results.find((gif) => gif.slug === slug || this.extractSlugFromUrl(gif.url) === slug) ?? results[0] ?? null;
-		if (resolved) {
-			await this.setCache(cacheKey, resolved);
-		}
-		return resolved;
 	}
 
 	private async getFeaturedGifs(params: {locale: string; country: string}): Promise<Array<GifResponse>> {
@@ -426,7 +435,7 @@ export class KlipyGifProvider implements IGifProvider {
 				limit: 1,
 			},
 		});
-		return this.fetchAndTransformGifs(url);
+		return this.fetchAndTransformGifs(url, params);
 	}
 
 	private async getFeaturedCategories(params: {

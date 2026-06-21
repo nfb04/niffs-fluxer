@@ -318,7 +318,15 @@ export class TenorGifProvider implements IGifProvider {
 		);
 	}
 
-	async resolveByUrl(params: {url: string; locale: string; country: string}): Promise<GifResponse | null> {
+	async resolveByUrl(params: {
+		url: string;
+		locale: string;
+		country: string;
+		cacheOnly?: boolean;
+	}): Promise<GifResponse | null> {
+		if (params.cacheOnly) {
+			return null;
+		}
 		const slug = this.extractSlugFromUrl(params.url);
 		if (!slug) return null;
 		const id = this.extractIdFromSlug(slug);

@@ -197,7 +197,7 @@ export const buildGifvEmbedFromResponse = buildGifEmbedFromResponse;
 
 async function resolveProviderGif(
 	provider: IGifProvider,
-	params: {url: string; locale: string; country: string},
+	params: {url: string; locale: string; country: string; cacheOnly?: boolean},
 ): Promise<GifResponse | null> {
 	try {
 		return await provider.resolveByUrl(params);
@@ -219,15 +219,22 @@ export async function isGifProviderUrl(url: string, gifService: GifService): Pro
 	return false;
 }
 
+export interface ResolveGifEmbedOptions {
+	cacheOnly?: boolean;
+	locale?: string;
+	country?: string;
+}
+
 export async function resolveGifEmbedFromProviders(
 	url: string,
 	gifService: GifService,
-	locale = 'en_US',
-	country = 'US',
+	options: ResolveGifEmbedOptions = {},
 ): Promise<MessageEmbedChild | null> {
+	const locale = options.locale ?? 'en_US';
+	const country = options.country ?? 'US';
 	for (const provider of gifService.listProviders()) {
 		if (!(await provider.isAvailable()) || !provider.extractSlugFromUrl(url)) continue;
-		const gif = await resolveProviderGif(provider, {url, locale, country});
+		const gif = await resolveProviderGif(provider, {url, locale, country, cacheOnly: options.cacheOnly});
 		if (!gif) continue;
 		const embed = buildGifEmbedFromResponse(gif, url);
 		if (embed) return embed;

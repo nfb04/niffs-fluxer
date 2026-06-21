@@ -143,7 +143,9 @@ export class EmbedService {
 			}
 		}
 		if (isGifUrl || !options.cacheOnly) {
-			const providerEmbed = await resolveGifEmbedFromProviders(url, this.gifService);
+			const providerEmbed = await resolveGifEmbedFromProviders(url, this.gifService, {
+				cacheOnly: options.cacheOnly,
+			});
 			if (providerEmbed) {
 				return {
 					embeds: [new Embed(providerEmbed)],

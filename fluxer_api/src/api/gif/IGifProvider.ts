@@ -20,7 +20,12 @@ export interface IGifProvider {
 	getTrendingGifs(params: {locale: string; country: string}): Promise<Array<GifResponse>>;
 	suggest(params: {q: string; locale: string}): Promise<Array<string>>;
 	refreshFeaturedCategories(params: {locale: string; country: string}): Promise<void>;
-	resolveByUrl(params: {url: string; locale: string; country: string}): Promise<GifResponse | null>;
+	resolveByUrl(params: {
+		url: string;
+		locale: string;
+		country: string;
+		cacheOnly?: boolean;
+	}): Promise<GifResponse | null>;
 	buildShareUrl(slug: string): string;
 	extractSlugFromUrl(url: string): string | null;
 }
