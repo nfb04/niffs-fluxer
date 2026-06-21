@@ -22,6 +22,7 @@ import type {GifProviderMeta, IGifProvider} from './IGifProvider';
 
 const KLIPY_BASE_URL = 'https://api.klipy.com/v2';
 const DEFAULT_CONTENT_FILTER = 'low';
+const DEFAULT_MEDIA_FILTER = 'webm';
 const CLIENT_KEY = 'fluxer';
 const MAX_RETRIES = 3;
 const BACKOFF_BASE_DELAY = ms('1 second');
@@ -49,12 +50,15 @@ interface KlipyGif {
 	title: string;
 	itemurl: string;
 	file?: Partial<Record<KlipySizeKey, KlipyFileBucket>>;
-	media_formats?: {
-		webm?: {
-			url: string;
-			dims: [number, number];
-		};
-	};
+	media_formats?: Partial<
+		Record<
+			string,
+			{
+				url: string;
+				dims?: [number, number];
+			}
+		>
+	>;
 }
 
 const KLIPY_SIZE_PREFERENCE: ReadonlyArray<KlipySizeKey> = ['hd', 'md', 'sm', 'xs'];
@@ -165,6 +169,7 @@ export class KlipyGifProvider implements IGifProvider {
 		const defaultParams = {
 			client_key: CLIENT_KEY,
 			contentfilter: DEFAULT_CONTENT_FILTER,
+			media_filter: DEFAULT_MEDIA_FILTER,
 			...params,
 		};
 		for (const [key, value] of Object.entries(defaultParams)) {
@@ -183,6 +188,15 @@ export class KlipyGifProvider implements IGifProvider {
 					signal: AbortSignal.timeout(ms('30 seconds')),
 				});
 				if (!response.ok) {
+					if (response.status === 429 && attempt < MAX_RETRIES - 1) {
+						const retryAfterHeader = response.headers.get('Retry-After');
+						const retryAfterSeconds = retryAfterHeader ? Number.parseInt(retryAfterHeader, 10) : 5;
+						const delay = Number.isFinite(retryAfterSeconds)
+							? Math.max(retryAfterSeconds, 1) * 1000
+							: BACKOFF_BASE_DELAY * 2 ** attempt;
+						await new Promise((resolve) => setTimeout(resolve, delay));
+						continue;
+					}
 					throw new Error(`Failed to fetch KLIPY data: ${response.statusText}`);
 				}
 				const responseText = await FetchUtils.streamToStringWithLimit(response.body, {
@@ -437,23 +451,26 @@ export class KlipyGifProvider implements IGifProvider {
 		}
 		try {
 			const rawTags = await this.fetchRawCategoryTags(params);
-			const enriched = await Promise.all(
-				rawTags.map(async (tag) => {
-					try {
-						const [gif] = await this.search({q: tag.name, locale: params.locale, country: params.country});
-						if (!gif) return tag;
-						return {
+			const enriched: Array<GifCategoryTagResponse> = [];
+			for (const tag of rawTags) {
+				try {
+					const [gif] = await this.search({q: tag.name, locale: params.locale, country: params.country});
+					if (!gif) {
+						enriched.push(tag);
+					} else {
+						enriched.push({
 							...tag,
 							src: gif.src,
 							proxy_src: gif.proxy_src,
 							gif,
-						};
-					} catch (error) {
-						Logger.debug({err: error, tag: tag.name, ...params}, 'Failed to enrich GIF category');
-						return tag;
+						});
 					}
-				}),
-			);
+				} catch (error) {
+					Logger.debug({err: error, tag: tag.name, ...params}, 'Failed to enrich GIF category');
+					enriched.push(tag);
+				}
+				await new Promise((resolve) => setTimeout(resolve, 150));
+			}
 			await writeEnrichedCategoriesCache(this.cacheService, this.meta.name, params.locale, params.country, enriched);
 		} catch (error) {
 			Logger.warn({err: error, ...params}, 'Failed to refresh enriched GIF categories');
@@ -485,15 +502,35 @@ export class KlipyGifProvider implements IGifProvider {
 
 	private toMediaFormat(entry: KlipyFileEntry | undefined): GifMediaFormat | null {
 		if (!entry?.url) return null;
-		const width = typeof entry.width === 'number' && entry.width > 0 ? entry.width : 0;
-		const height = typeof entry.height === 'number' && entry.height > 0 ? entry.height : 0;
-		if (!width || !height) return null;
+		const width = typeof entry.width === 'number' && entry.width > 0 ? entry.width : 480;
+		const height = typeof entry.height === 'number' && entry.height > 0 ? entry.height : 480;
 		return {
 			src: entry.url,
 			proxy_src: this.mediaService.getExternalMediaProxyURL(entry.url),
 			width,
 			height,
 		};
+	}
+
+	private collectLegacyMediaFormats(input: KlipyGif, media: Record<string, GifMediaFormat>): GifMediaFormat | null {
+		const legacy = input.media_formats;
+		if (!legacy) return null;
+		let preferred: GifMediaFormat | null = null;
+		for (const key of ['webm', 'mp4', 'gif', 'webp'] as const) {
+			const format = legacy[key];
+			if (!format?.url) continue;
+			const width = format.dims?.[0] && format.dims[0] > 0 ? format.dims[0] : 480;
+			const height = format.dims?.[1] && format.dims[1] > 0 ? format.dims[1] : 480;
+			const entry: GifMediaFormat = {
+				src: format.url,
+				proxy_src: this.mediaService.getExternalMediaProxyURL(format.url),
+				width,
+				height,
+			};
+			media[key] = entry;
+			if (!preferred) preferred = entry;
+		}
+		return preferred;
 	}
 
 	private collectKlipyMedia(input: KlipyGif): {
@@ -513,16 +550,8 @@ export class KlipyGifProvider implements IGifProvider {
 				if (!preferred) preferred = entry;
 			}
 		}
-		if (Object.keys(media).length === 0 && input.media_formats?.webm) {
-			const webm = input.media_formats.webm;
-			const fallback: GifMediaFormat = {
-				src: webm.url,
-				proxy_src: this.mediaService.getExternalMediaProxyURL(webm.url),
-				width: webm.dims[0],
-				height: webm.dims[1],
-			};
-			media.webm = fallback;
-			preferred = fallback;
+		if (preferred === null) {
+			preferred = this.collectLegacyMediaFormats(input, media);
 		}
 		return {media, preferred};
 	}
@@ -535,7 +564,14 @@ export class KlipyGifProvider implements IGifProvider {
 		const normalizedUrl =
 			parsedPath || explicitSlug ? this.buildKlipyPageUrl({type: normalizedType, slug: normalizedSlug}) : input.itemurl;
 		const {media, preferred} = this.collectKlipyMedia(input);
-		const top = media.webm ?? preferred;
+		const top =
+			media.gif ??
+			media.mediumgif ??
+			media.tinygif ??
+			media.webm ??
+			media.mp4 ??
+			media.webp ??
+			preferred;
 		if (!top) return null;
 		return {
 			id: normalizedSlug,

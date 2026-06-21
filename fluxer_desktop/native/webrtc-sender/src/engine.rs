@@ -518,6 +518,7 @@ fn spawn_deep_filter_processing_thread(
     stop: Arc<AtomicBool>,
     diagnostics: DeepFilterDiagnostics,
     frame_receiver: mpsc::Receiver<DeepFilterCaptureFrame>,
+    mic_input_gain_permille: Arc<AtomicU32>,
 ) -> Result<tokio::sync::oneshot::Receiver<Result<(), String>>, String> {
     assert!(!stop.load(Ordering::Acquire));
     assert_eq!(diagnostics.degraded_frames.load(Ordering::Acquire), 0);
@@ -535,10 +536,28 @@ fn spawn_deep_filter_processing_thread(
             if ready_sender.send(Ok(())).is_err() {
                 return;
             }
-            run_deep_filter_processing(processor, source, stop, diagnostics, frame_receiver);
+            run_deep_filter_processing(
+                processor,
+                source,
+                stop,
+                diagnostics,
+                frame_receiver,
+                mic_input_gain_permille,
+            );
         })
         .map_err(|error| format!("spawn deep filter thread: {error}"))?;
     Ok(ready_receiver)
+}
+
+fn apply_mic_input_gain(samples: &mut [i16], gain_permille: u32) {
+    if gain_permille == 1000 {
+        return;
+    }
+    let gain = gain_permille as f32 / 1000.0;
+    for sample in samples.iter_mut() {
+        let scaled = (*sample as f32) * gain;
+        *sample = scaled.clamp(i16::MIN as f32, i16::MAX as f32) as i16;
+    }
 }
 
 fn run_deep_filter_processing(
@@ -547,6 +566,7 @@ fn run_deep_filter_processing(
     stop: Arc<AtomicBool>,
     diagnostics: DeepFilterDiagnostics,
     frame_receiver: mpsc::Receiver<DeepFilterCaptureFrame>,
+    mic_input_gain_permille: Arc<AtomicU32>,
 ) {
     loop {
         if stop.load(Ordering::Acquire) {
@@ -561,6 +581,7 @@ fn run_deep_filter_processing(
                     &source,
                     &diagnostics,
                     &mut frame.samples,
+                    mic_input_gain_permille.load(Ordering::Relaxed),
                 );
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {}
@@ -574,8 +595,10 @@ fn process_and_capture_deep_filter_frame(
     source: &NativeAudioSource,
     diagnostics: &DeepFilterDiagnostics,
     samples: &mut [i16; deep_filter::DEEP_FILTER_FRAME_SAMPLES],
+    mic_input_gain_permille: u32,
 ) {
     assert_eq!(samples.len(), deep_filter::DEEP_FILTER_FRAME_SAMPLES);
+    apply_mic_input_gain(samples, mic_input_gain_permille);
     if let Err(error) = processor.process_frame(samples) {
         diagnostics.record_degraded_frame(&error);
     }
@@ -1976,6 +1999,8 @@ pub struct VoiceEngine {
     platform_audio: Arc<Mutex<Option<PlatformAudio>>>,
     device_mic_recording_requested: Arc<AtomicBool>,
     participant_volumes: Arc<Mutex<HashMap<String, f64>>>,
+    participant_mute_states: Arc<Mutex<HashMap<String, bool>>>,
+    mic_input_gain_permille: Arc<AtomicU32>,
     byte_samples: Arc<Mutex<HashMap<String, stats_mod::ByteRateSample>>>,
     last_stats_json: Arc<Mutex<Option<String>>>,
     stats_running: Arc<AtomicBool>,
@@ -2019,6 +2044,8 @@ impl VoiceEngine {
             platform_audio: Arc::new(Mutex::new(None)),
             device_mic_recording_requested: Arc::new(AtomicBool::new(false)),
             participant_volumes: Arc::new(Mutex::new(HashMap::new())),
+            participant_mute_states: Arc::new(Mutex::new(HashMap::new())),
+            mic_input_gain_permille: Arc::new(AtomicU32::new(1000)),
             byte_samples: Arc::new(Mutex::new(HashMap::new())),
             last_stats_json: Arc::new(Mutex::new(None)),
             stats_running: Arc::new(AtomicBool::new(false)),
@@ -2681,6 +2708,10 @@ impl VoiceEngine {
         }
         let options = build_microphone_publish_options(&opts)?;
         let local = self.local_participant()?;
+        let input_gain = opts.input_volume.unwrap_or(1.0);
+        let permille = (audio::clamp_volume(input_gain) * 1000.0).round() as u32;
+        self.mic_input_gain_permille
+            .store(permille.max(1), Ordering::Release);
         let platform_audio = self.platform_audio()?;
         let _selected_device_id =
             self.select_recording_device(&platform_audio, opts.device_id.as_deref())?;
@@ -2748,6 +2779,7 @@ impl VoiceEngine {
             stop.clone(),
             diagnostics.clone(),
             frame_receiver,
+            self.mic_input_gain_permille.clone(),
         )?;
         Ok(DeepFilterPipeParts {
             source,
@@ -3001,6 +3033,7 @@ impl VoiceEngine {
         }
         *self.platform_audio.lock() = None;
         self.participant_volumes.lock().clear();
+        self.participant_mute_states.lock().clear();
         self.byte_samples.lock().clear();
         *self.last_stats_json.lock() = None;
         self.camera_live_background.clear();
@@ -3329,17 +3362,38 @@ impl VoiceEngine {
             }
         };
         let mut samples = scratch.lock().await;
-        let Some(frame) =
-            pcm16_audio_frame_into(data.as_ref(), sample_rate, num_channels, &mut samples)
-        else {
+        let sample_count = data.as_ref().len() / 2;
+        if sample_count == 0 || data.as_ref().len() % 2 != 0 {
             return Ok(false);
-        };
-        self.send_audio_stats.record_push(now_millis());
-        source
-            .capture_frame(&frame)
-            .await
-            .map_err(|e| napi::Error::from_reason(format!("capture soundboard audio frame: {e}")))?;
-        Ok(true)
+        }
+        let samples_per_channel_10ms =
+            (sample_rate as usize).saturating_mul(num_channels as usize) / 100;
+        if samples_per_channel_10ms == 0 {
+            return Ok(false);
+        }
+        let frame_samples = samples_per_channel_10ms.saturating_mul(num_channels as usize);
+        let mut offset = 0;
+        let mut pushed_any = false;
+        while offset < sample_count {
+            let end = (offset + frame_samples).min(sample_count);
+            let chunk = &data.as_ref()[offset * 2..end * 2];
+            let Some(frame) =
+                pcm16_audio_frame_into(chunk, sample_rate, num_channels, &mut samples)
+            else {
+                break;
+            };
+            self.send_audio_stats.record_push(now_millis());
+            if source
+                .capture_frame(&frame)
+                .await
+                .is_err()
+            {
+                break;
+            }
+            pushed_any = true;
+            offset = end;
+        }
+        Ok(pushed_any)
     }
 
     #[napi]
@@ -3464,6 +3518,13 @@ impl VoiceEngine {
             .lock()
             .insert(participant_sid.clone(), clamped);
         let muted = audio::is_muted_volume(clamped);
+        let previous_muted = {
+            let mut mute_states = self.participant_mute_states.lock();
+            mute_states.insert(participant_sid.clone(), muted)
+        };
+        if previous_muted == Some(muted) {
+            return;
+        }
 
         let participant = {
             let guard = self.room.lock();
@@ -4416,7 +4477,8 @@ pub struct MicrophoneOptions {
     pub auto_gain_control: Option<bool>,
     pub deep_filter: Option<bool>,
     pub deep_filter_noise_reduction_level: Option<f64>,
-    pub max_bitrate_bps: Option<f64>,
+	pub max_bitrate_bps: Option<f64>,
+    pub input_volume: Option<f64>,
 }
 
 #[napi(object)]

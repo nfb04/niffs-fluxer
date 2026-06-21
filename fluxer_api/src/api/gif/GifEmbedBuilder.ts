@@ -7,6 +7,36 @@ import type {MessageEmbedChild} from '../database/types/MessageTypes';
 import type {GifService} from './GifService';
 import type {IGifProvider} from './IGifProvider';
 
+export function isRenderableGifEmbedFromModel(embed: {
+	type: string;
+	thumbnail: {url?: string | null; width?: number | null; height?: number | null} | null;
+	video: {url?: string | null; width?: number | null; height?: number | null} | null;
+}): boolean {
+	if (embed.type !== 'image' && embed.type !== 'gifv') {
+		return true;
+	}
+	return isRenderableGifEmbed({
+		type: embed.type,
+		thumbnail: embed.thumbnail as MessageEmbedChild['thumbnail'],
+		video: embed.video as MessageEmbedChild['video'],
+	});
+}
+
+function isRenderableGifEmbed(embed: Pick<MessageEmbedChild, 'type' | 'thumbnail' | 'video'>): boolean {
+	if (embed.type === 'image') {
+		return Boolean(embed.thumbnail?.url && embed.thumbnail.width && embed.thumbnail.height);
+	}
+	if (embed.type === 'gifv') {
+		return Boolean(
+			embed.video?.url &&
+				embed.video.width &&
+				embed.video.height &&
+				(embed.thumbnail?.url ? embed.thumbnail.width && embed.thumbnail.height : true),
+		);
+	}
+	return false;
+}
+
 const ANIMATED_IMAGE_FORMAT_PRIORITY = [
 	'gif',
 	'mediumgif',

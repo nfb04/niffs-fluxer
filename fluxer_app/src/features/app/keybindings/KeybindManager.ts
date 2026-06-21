@@ -120,6 +120,7 @@ class KeybindManager {
 	private inputMonitoringHookStatus: 'unknown' | 'granted' | 'denied' = 'unknown';
 	pttReleaseTimer: NodeJS.Timeout | null = null;
 	private registeredGlobalHookShortcutIds = new Set<string>();
+	private hookRegistrationSignatures = new Map<string, string>();
 	private globalKeyHookUnsubscribes: Array<() => void> = [];
 	private globalKeybindTriggeredUnsubscribe: (() => void) | null = null;
 	private globalKeyHookStarted = false;
@@ -133,6 +134,10 @@ class KeybindManager {
 	private gamepadPollIntervalId: number | null = null;
 	private gamepadListenersAttached = false;
 	private gamepadShortcutStates = new Map<string, {binding: RuntimeKeybind; pressed: boolean}>();
+	private physicalKeycodeToDomCodeMap = new Map<number, string>();
+	private pendingPhysicalKeycodeCaptures = new Map<string, (keycode: number) => void>();
+	private lastDomKeydownCode: {code: string; t: number} | null = null;
+	private lastGlobalHookToggleFireAt = new Map<KeybindCommand, number>();
 	logger = new Logger('KeybindManager');
 
 	private get suspended(): boolean {
@@ -541,7 +546,7 @@ class KeybindManager {
 		for (const binding of bindings) {
 			const hasGlobalRoutable = !!(binding.combo.key || binding.combo.code || binding.mouseButton != null);
 			if (globalReady && hasGlobalRoutable && (binding.combo.global ?? false)) {
-				binding.keycode = jsKeyToUiohookKeycode(binding.combo.code ?? binding.combo.key);
+				binding.keycode = this.resolvePhysicalKeycodeForCombo(binding.combo);
 				binding.keyName = keyNameForGlobalHook(binding.combo);
 				binding.physicalKeyName = physicalKeyNameForGlobalHook(binding.combo);
 				binding.routing = 'global';
@@ -1145,6 +1150,7 @@ class KeybindManager {
 			}
 		}
 		this.registeredGlobalHookShortcutIds.clear();
+		this.hookRegistrationSignatures.clear();
 		this.handlers.clear();
 		this.combokeys?.detach();
 		this.combokeys = null;
@@ -1166,19 +1172,39 @@ class KeybindManager {
 			return false;
 		}
 		this.globalKeyHookStarted = true;
+		const domCalibrationListener = (event: KeyboardEvent) => {
+			this.lastDomKeydownCode = {code: event.code, t: Date.now()};
+		};
+		document.addEventListener('keydown', domCalibrationListener, true);
+		this.globalKeyHookUnsubscribes.push(() => {
+			document.removeEventListener('keydown', domCalibrationListener, true);
+		});
 		const keyEventUnsub = electronApi.onGlobalKeyEvent?.((event) => {
-			this.handleGlobalKeyEvent(
-				event as {
-					type: 'keydown' | 'keyup';
-					keycode: number;
-					keyName: string;
-					backend?: 'evdev' | 'native' | null;
-					ctrlKey: boolean;
-					altKey: boolean;
-					shiftKey: boolean;
-					metaKey: boolean;
-				},
-			);
+			const normalizedEvent = event as {
+				type: 'keydown' | 'keyup';
+				keycode: number;
+				scanCode?: number;
+				keyName: string;
+				backend?: 'evdev' | 'native' | null;
+				ctrlKey: boolean;
+				altKey: boolean;
+				shiftKey: boolean;
+				metaKey: boolean;
+			};
+			if (normalizedEvent.type === 'keydown') {
+				if (this.lastDomKeydownCode && Date.now() - this.lastDomKeydownCode.t < 150) {
+					const domCode = this.lastDomKeydownCode.code;
+					const physicalKeycode = this.physicalKeycodeFromGlobalEvent(normalizedEvent);
+					if (physicalKeycode !== 0) {
+						this.physicalKeycodeToDomCodeMap.set(physicalKeycode, domCode);
+						this.lastDomKeydownCode = null;
+						const pendingResolve = this.pendingPhysicalKeycodeCaptures.get(domCode);
+						if (pendingResolve) pendingResolve(physicalKeycode);
+						this.persistPhysicalKeycodeForDomCode(domCode, physicalKeycode);
+					}
+				}
+			}
+			this.handleGlobalKeyEvent(normalizedEvent);
 		});
 		if (keyEventUnsub) this.globalKeyHookUnsubscribes.push(keyEventUnsub);
 		const mouseEventUnsub = electronApi.onGlobalMouseEvent?.((event) => {
@@ -1204,6 +1230,9 @@ class KeybindManager {
 		this.globalKeybindTriggeredUnsubscribe =
 			electronApi?.onGlobalKeybindTriggered?.((event) => {
 				if (!this.registeredGlobalHookShortcutIds.has(event.id)) {
+					return;
+				}
+				if (typeof document !== 'undefined' && document.hasFocus()) {
 					return;
 				}
 				const keybind = this.resolveGlobalShortcutEventId(event.id);
@@ -1283,6 +1312,7 @@ class KeybindManager {
 	private handleGlobalKeyEvent(event: {
 		type: 'keydown' | 'keyup';
 		keycode: number;
+		scanCode?: number;
 		keyName: string;
 		backend?: 'evdev' | 'native' | null;
 		ctrlKey: boolean;
@@ -1294,6 +1324,66 @@ class KeybindManager {
 			if (binding.routing !== 'global') continue;
 			this.handleGlobalKeyEventForBinding(binding, event);
 		}
+		this.handleGlobalHookToggleFromKeyEvent(event);
+	}
+
+	private globalHookModifiersMatch(
+		combo: KeyCombo,
+		event: {
+			ctrlKey: boolean;
+			altKey: boolean;
+			shiftKey: boolean;
+			metaKey: boolean;
+		},
+	): boolean {
+		const expectedCtrl = Boolean(combo.ctrl) || (!isNativeMacOS() && Boolean(combo.ctrlOrMeta));
+		const expectedShift = Boolean(combo.shift);
+		const expectedAlt = Boolean(combo.alt);
+		const expectedMeta = Boolean(combo.meta) || (isNativeMacOS() && Boolean(combo.ctrlOrMeta));
+		return (
+			event.ctrlKey === expectedCtrl &&
+			event.shiftKey === expectedShift &&
+			event.altKey === expectedAlt &&
+			event.metaKey === expectedMeta
+		);
+	}
+
+	private handleGlobalHookToggleFromKeyEvent(event: {
+		type: 'keydown' | 'keyup';
+		keycode: number;
+		scanCode?: number;
+		keyName: string;
+		backend?: 'evdev' | 'native' | null;
+		ctrlKey: boolean;
+		altKey: boolean;
+		shiftKey: boolean;
+		metaKey: boolean;
+	}): void {
+		if (typeof document !== 'undefined' && document.hasFocus()) return;
+		if (this.registeredGlobalHookShortcutIds.size === 0) return;
+		if (event.type !== 'keydown') return;
+		const eventPhysical = this.physicalKeycodeFromGlobalEvent(event);
+		if (eventPhysical === 0) return;
+		for (const keybind of this.activeGlobalKeybinds) {
+			const shortcutId = hookShortcutIdForKeybind(keybind);
+			if (!shortcutId || !this.registeredGlobalHookShortcutIds.has(shortcutId)) continue;
+			const expectedPhysical = this.resolvePhysicalKeycodeForCombo(keybind.combo);
+			if (expectedPhysical === null || eventPhysical !== expectedPhysical) continue;
+			if (!this.globalHookModifiersMatch(keybind.combo, event)) continue;
+			const lastFire = this.lastGlobalHookToggleFireAt.get(keybind.action) ?? 0;
+			if (Date.now() - lastFire < 200) return;
+			this.lastGlobalHookToggleFireAt.set(keybind.action, Date.now());
+			if (this.activeGlobalShortcutPressIds.has(shortcutId)) return;
+			this.activeGlobalShortcutPressIds.add(shortcutId);
+			const handler = this.handlers.get(keybind.action);
+			if (!handler) return;
+			if (this.suspended) return;
+			if (!this.isActionAllowedForCurrentView(keybind.action)) return;
+			if (shouldSuppressShortcutForFullscreenMedia()) return;
+			if (Keybind.isActionMuted(keybind.action)) return;
+			handler({type: 'press', source: 'global'});
+			return;
+		}
 	}
 
 	private handleGlobalKeyEventForBinding(
@@ -1301,6 +1391,7 @@ class KeybindManager {
 		event: {
 			type: 'keydown' | 'keyup';
 			keycode: number;
+			scanCode?: number;
 			keyName: string;
 			backend?: 'evdev' | 'native' | null;
 			ctrlKey: boolean;
@@ -1309,19 +1400,20 @@ class KeybindManager {
 			metaKey: boolean;
 		},
 	): void {
+		const eventPhysicalKeycode = this.physicalKeycodeFromGlobalEvent(event);
 		if (binding.isModifierOnly) {
 			if (!this.isHoldModifierEvent(binding, event)) return;
 			const requiredCount = this.requiredModifierKeyCount(binding);
 			if (event.type === 'keydown') {
-				if (binding.pressedKeycodes.has(event.keycode)) return;
-				binding.pressedKeycodes.add(event.keycode);
+				if (binding.pressedKeycodes.has(eventPhysicalKeycode)) return;
+				binding.pressedKeycodes.add(eventPhysicalKeycode);
 				if (binding.pressedKeycodes.size === requiredCount) {
 					this.fireHoldHandler(binding, 'press', 'global');
 				}
 			} else {
-				if (!binding.pressedKeycodes.has(event.keycode)) return;
+				if (!binding.pressedKeycodes.has(eventPhysicalKeycode)) return;
 				const wasAtThreshold = binding.pressedKeycodes.size === requiredCount;
-				binding.pressedKeycodes.delete(event.keycode);
+				binding.pressedKeycodes.delete(eventPhysicalKeycode);
 				if (wasAtThreshold) {
 					this.fireHoldHandler(binding, 'release', 'global');
 				}
@@ -1331,13 +1423,13 @@ class KeybindManager {
 		if (binding.keycode === null && binding.keyName === null) return;
 		if (!this.globalKeyEventMatchesHoldBinding(binding, event)) return;
 		if (event.type === 'keyup') {
-			if (!binding.pressedKeycodes.delete(event.keycode)) return;
+			if (!binding.pressedKeycodes.delete(eventPhysicalKeycode)) return;
 			this.fireHoldHandler(binding, 'release', 'global');
 			return;
 		}
 		if (!this.globalHoldModifiersMatch(binding, event)) return;
-		if (binding.pressedKeycodes.has(event.keycode)) return;
-		binding.pressedKeycodes.add(event.keycode);
+		if (binding.pressedKeycodes.has(eventPhysicalKeycode)) return;
+		binding.pressedKeycodes.add(eventPhysicalKeycode);
 		this.fireHoldHandler(binding, 'press', 'global');
 	}
 
@@ -1345,14 +1437,17 @@ class KeybindManager {
 		binding: HoldBindingRuntime,
 		event: {
 			keycode: number;
+			scanCode?: number;
 			keyName: string;
 			backend?: 'evdev' | 'native' | null;
 		},
 	): boolean {
-		const expectedName =
-			event.backend === 'evdev' || (event.backend === 'native' && isNativeMacOS())
-				? (binding.physicalKeyName ?? binding.keyName)
-				: binding.keyName;
+		const expectedPhysical = binding.keycode;
+		const eventPhysical = this.physicalKeycodeFromGlobalEvent(event);
+		if (expectedPhysical !== null && eventPhysical !== 0 && eventPhysical === expectedPhysical) {
+			return true;
+		}
+		const expectedName = binding.physicalKeyName ?? binding.keyName;
 		if (expectedName !== null) return event.keyName === expectedName;
 		return binding.keycode !== null && event.keycode === binding.keycode;
 	}
@@ -1579,20 +1674,38 @@ class KeybindManager {
 				this.logger.error(`Failed to unregister global hook shortcut ${shortcut}`, error);
 			}
 			this.registeredGlobalHookShortcutIds.delete(shortcut);
+			this.hookRegistrationSignatures.delete(shortcut);
 			this.activeGlobalShortcutPressIds.delete(shortcut);
 		}
 		for (const shortcut of desired) {
-			if (this.registeredGlobalHookShortcutIds.has(shortcut)) continue;
 			const desiredCombo = desiredCombos.get(shortcut);
 			if (!desiredCombo) continue;
+			const signature = this.hookRegistrationSignature(desiredCombo);
+			const existingSignature = this.hookRegistrationSignatures.get(shortcut);
+			if (this.registeredGlobalHookShortcutIds.has(shortcut) && existingSignature === signature) {
+				continue;
+			}
+			if (this.registeredGlobalHookShortcutIds.has(shortcut)) {
+				try {
+					this.releaseGlobalRegistration(shortcut);
+					await electronApi.globalKeyHookUnregister?.(shortcut);
+				} catch (error) {
+					this.logger.error(`Failed to re-register global hook shortcut ${shortcut}`, error);
+				}
+				this.registeredGlobalHookShortcutIds.delete(shortcut);
+				this.hookRegistrationSignatures.delete(shortcut);
+				this.activeGlobalShortcutPressIds.delete(shortcut);
+			}
 			if (await this.tryRegisterGlobalHookShortcut(shortcut, desiredCombo)) {
 				this.registeredGlobalHookShortcutIds.add(shortcut);
+				this.hookRegistrationSignatures.set(shortcut, signature);
 			}
 		}
 		if (this.registeredGlobalHookShortcutIds.size > 0 && !this.globalKeyHookStarted) {
 			const started = await this.startGlobalKeyHook();
 			if (!started) {
 				this.registeredGlobalHookShortcutIds.clear();
+				this.hookRegistrationSignatures.clear();
 				this.activeGlobalShortcutPressIds.clear();
 				void electronApi.globalKeyHookUnregisterAll?.().catch((error) => {
 					this.logger.error('Failed to unregister global hook shortcuts after hook start failure', error);
@@ -1621,7 +1734,8 @@ class KeybindManager {
 		const electronApi = getElectronAPI();
 		if (!electronApi?.globalKeyHookRegister) return false;
 		const mouseButton = combo.mouseButton;
-		const keycode = mouseButton == null ? jsKeyToUiohookKeycode(combo.code ?? combo.key) : null;
+		const keycode =
+			mouseButton == null ? this.resolvePhysicalKeycodeForCombo(combo) : null;
 		const keyName = mouseButton == null ? keyNameForGlobalHook(combo) : null;
 		const physicalKeyName = mouseButton == null ? physicalKeyNameForGlobalHook(combo) : null;
 		if (mouseButton == null) {
@@ -1830,6 +1944,71 @@ class KeybindManager {
 			combokeys.bind(shortcut, wrapHandler('press'), 'keydown');
 			combokeys.bind(shortcut, wrapHandler('release'), 'keyup');
 		}
+	}
+
+	private physicalKeycodeFromGlobalEvent(event: {
+		keycode: number;
+		scanCode?: number;
+		backend?: 'evdev' | 'native' | null;
+	}): number {
+		if (event.backend === 'native' && !isNativeMacOS()) {
+			return event.scanCode ?? event.keycode ?? 0;
+		}
+		return event.keycode;
+	}
+
+	private hookRegistrationSignature(combo: KeyCombo): string {
+		return JSON.stringify({
+			physicalKeycode: this.resolvePhysicalKeycodeForCombo(combo),
+			keyName: keyNameForGlobalHook(combo),
+			mouseButton: combo.mouseButton ?? null,
+			ctrl: Boolean(combo.ctrl) || (!isNativeMacOS() && Boolean(combo.ctrlOrMeta)),
+			alt: Boolean(combo.alt),
+			shift: Boolean(combo.shift),
+			meta: Boolean(combo.meta) || (isNativeMacOS() && Boolean(combo.ctrlOrMeta)),
+		});
+	}
+
+	private resolvePhysicalKeycodeForCombo(combo: KeyCombo): number | null {
+		if (combo.physicalKeycode != null) return combo.physicalKeycode;
+		if (combo.code) {
+			for (const [physicalKeycode, domCode] of this.physicalKeycodeToDomCodeMap) {
+				if (domCode === combo.code) return physicalKeycode;
+			}
+		}
+		if (combo.code) return jsKeyToUiohookKeycode(combo.code);
+		return jsKeyToUiohookKeycode(combo.key);
+	}
+
+	private persistPhysicalKeycodeForDomCode(domCode: string, physicalKeycode: number): void {
+		let updated = false;
+		for (const keybind of this.activeGlobalKeybinds) {
+			if (keybind.combo.code !== domCode) continue;
+			if (keybind.combo.physicalKeycode === physicalKeycode) continue;
+			Keybind.setPrimaryCustomKeybindCombo(keybind.action, {...keybind.combo, physicalKeycode});
+			updated = true;
+		}
+		if (updated) {
+			void this.enqueueInputSync(() => this.applyGlobalShortcuts(this.computeDesiredGlobalHookShortcuts()));
+		}
+	}
+
+	async capturePhysicalKeycodeForDomCode(domCode: string, timeoutMs = 500): Promise<number | null> {
+		for (const [physicalKeycode, mappedDomCode] of this.physicalKeycodeToDomCodeMap) {
+			if (mappedDomCode === domCode) return physicalKeycode;
+		}
+		await this.startGlobalKeyHook();
+		return new Promise((resolve) => {
+			const timeoutId = setTimeout(() => {
+				this.pendingPhysicalKeycodeCaptures.delete(domCode);
+				resolve(null);
+			}, timeoutMs);
+			this.pendingPhysicalKeycodeCaptures.set(domCode, (physicalKeycode) => {
+				clearTimeout(timeoutId);
+				this.pendingPhysicalKeycodeCaptures.delete(domCode);
+				resolve(physicalKeycode);
+			});
+		});
 	}
 }
 

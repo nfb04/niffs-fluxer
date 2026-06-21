@@ -43,6 +43,7 @@ impl EventKind {
 pub struct QueuedEvent {
     pub kind: EventKind,
     pub keycode: u32,
+    pub scan_code: u32,
     pub button: u8,
     pub delta_x: i32,
     pub delta_y: i32,
@@ -99,6 +100,86 @@ pub fn write_key_name(buf: &mut [u8; KEY_NAME_BUF], len_out: &mut u8, vk: u16) {
     }
 }
 
+fn uiohook_scan_code(scan_code: u32, flags: u32) -> u32 {
+    if (flags & LLKHF_EXTENDED_FLAG) != 0 {
+        scan_code | 0xE000
+    } else {
+        scan_code
+    }
+}
+
+fn scan_code_to_physical_key_name(scan: u32) -> Option<&'static str> {
+    match scan {
+        1 => Some("Escape"),
+        41 => Some("Backquote"),
+        2 => Some("1"),
+        3 => Some("2"),
+        4 => Some("3"),
+        5 => Some("4"),
+        6 => Some("5"),
+        7 => Some("6"),
+        8 => Some("7"),
+        9 => Some("8"),
+        10 => Some("9"),
+        11 => Some("0"),
+        12 => Some("Minus"),
+        13 => Some("Equal"),
+        14 => Some("Backspace"),
+        15 => Some("Tab"),
+        16 => Some("Q"),
+        17 => Some("W"),
+        18 => Some("E"),
+        19 => Some("R"),
+        20 => Some("T"),
+        21 => Some("Y"),
+        22 => Some("U"),
+        23 => Some("I"),
+        24 => Some("O"),
+        25 => Some("P"),
+        26 => Some("BracketLeft"),
+        27 => Some("BracketRight"),
+        43 => Some("Backslash"),
+        58 => Some("CapsLock"),
+        30 => Some("A"),
+        31 => Some("S"),
+        32 => Some("D"),
+        33 => Some("F"),
+        34 => Some("G"),
+        35 => Some("H"),
+        36 => Some("J"),
+        37 => Some("K"),
+        38 => Some("L"),
+        39 => Some("Semicolon"),
+        40 => Some("Quote"),
+        28 => Some("Enter"),
+        42 => Some("ShiftLeft"),
+        44 => Some("Z"),
+        45 => Some("X"),
+        46 => Some("C"),
+        47 => Some("V"),
+        48 => Some("B"),
+        49 => Some("N"),
+        50 => Some("M"),
+        51 => Some("Comma"),
+        52 => Some("Period"),
+        53 => Some("Slash"),
+        57 => Some("Space"),
+        59 => Some("F1"),
+        60 => Some("F2"),
+        61 => Some("F3"),
+        62 => Some("F4"),
+        63 => Some("F5"),
+        64 => Some("F6"),
+        65 => Some("F7"),
+        66 => Some("F8"),
+        67 => Some("F9"),
+        68 => Some("F10"),
+        87 => Some("F11"),
+        88 => Some("F12"),
+        _ => None,
+    }
+}
+
 pub fn write_key_name_from_hook(
     buf: &mut [u8; KEY_NAME_BUF],
     len_out: &mut u8,
@@ -124,6 +205,7 @@ impl ToNapiValue for QueuedEvent {
         match event.kind {
             EventKind::KeyDown | EventKind::KeyUp => {
                 object.set("keycode", event.keycode)?;
+                object.set("scanCode", event.scan_code)?;
                 object.set("keyName", event.key_name())?;
             }
             EventKind::MouseDown | EventKind::MouseUp => {
@@ -162,7 +244,10 @@ type EventThreadsafeFunction = ThreadsafeFunction<
 
 #[cfg(target_os = "windows")]
 mod platform {
-    use super::{EventKind, EventThreadsafeFunction, QueuedEvent, write_key_name_from_hook};
+    use super::{
+        EventKind, EventThreadsafeFunction, QueuedEvent, scan_code_to_physical_key_name,
+        uiohook_scan_code, write_ascii_key_name, write_key_name_from_hook,
+    };
     use napi::threadsafe_function::ThreadsafeFunctionCallMode;
     use std::sync::{
         Arc, Mutex, MutexGuard, OnceLock,
@@ -295,26 +380,36 @@ mod platform {
             let is_up = msg == WM_KEYUP || msg == WM_SYSKEYUP;
             if is_down || is_up {
                 let (ctrl, alt, shift, meta) = sample_modifiers();
+                let hook_scan = uiohook_scan_code(info.scanCode, info.flags.0);
                 let mut event = QueuedEvent {
                     kind: if is_down {
                         EventKind::KeyDown
                     } else {
                         EventKind::KeyUp
                     },
-                    keycode: info.vkCode,
+                    keycode: hook_scan,
+                    scan_code: hook_scan,
                     ctrl,
                     alt,
                     shift,
                     meta,
                     ..QueuedEvent::default()
                 };
-                let layout_vk = layout_aware_vk_from_scan_code(vk, info.scanCode, info.flags.0);
-                write_key_name_from_hook(
-                    &mut event.key_name_buf,
-                    &mut event.key_name_len,
-                    layout_vk,
-                    info.flags.0,
-                );
+                if let Some(physical) = scan_code_to_physical_key_name(hook_scan) {
+                    write_ascii_key_name(
+                        &mut event.key_name_buf,
+                        &mut event.key_name_len,
+                        physical,
+                    );
+                } else {
+                    let layout_vk = layout_aware_vk_from_scan_code(vk, info.scanCode, info.flags.0);
+                    write_key_name_from_hook(
+                        &mut event.key_name_buf,
+                        &mut event.key_name_len,
+                        layout_vk,
+                        info.flags.0,
+                    );
+                }
                 enqueue(&handle, event);
             }
         }

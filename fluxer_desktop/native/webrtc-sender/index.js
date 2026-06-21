@@ -300,6 +300,7 @@ class VoiceEngine {
 			...(opts.deepFilterNoiseReductionLevel !== undefined
 				? {deepFilterNoiseReductionLevel: opts.deepFilterNoiseReductionLevel}
 				: {}),
+			...(opts.inputVolume !== undefined ? {inputVolume: opts.inputVolume} : {}),
 			maxBitrateBps: opts.maxBitrateBps,
 		});
 	}

@@ -97,6 +97,7 @@ export interface VoiceEngineV2BridgePublishMicrophoneOptions {
 	autoGainControl?: boolean;
 	deepFilter?: boolean;
 	deepFilterNoiseReductionLevel?: number;
+	inputVolume?: number;
 	sampleRate?: number;
 	numChannels?: number;
 	maxBitrateBps?: number;

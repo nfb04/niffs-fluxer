@@ -540,7 +540,7 @@ pub fn resolve_microphone_apm_intent(
     MicrophoneApmIntent {
         echo_cancellation,
         noise_suppression: Some(true),
-        auto_gain_control: Some(true),
+        auto_gain_control: Some(false),
     }
 }
 

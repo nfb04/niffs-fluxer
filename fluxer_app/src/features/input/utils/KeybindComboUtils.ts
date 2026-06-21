@@ -68,5 +68,6 @@ export function mergeStoredComboWithDefaults(stored: KeyCombo, defaultCombo: Key
 		modifierOnly: stored.modifierOnly,
 		bothSides: stored.bothSides,
 		gamepadButton: stored.gamepadButton,
+		physicalKeycode: stored.physicalKeycode,
 	};
 }

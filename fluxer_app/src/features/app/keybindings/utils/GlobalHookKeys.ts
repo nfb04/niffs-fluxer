@@ -124,9 +124,13 @@ const globalHookCharacterKeyMap: Record<string, string> = {
 	'}': 'BracketRight',
 	'`': 'Backquote',
 	'~': 'Backquote',
+	'^': 'Backquote',
 };
 export const keyNameForGlobalHook = (combo: KeyCombo): string | null => {
 	if (combo.mouseButton != null || combo.gamepadButton != null || combo.modifierOnly) return null;
+	if (combo.key === 'Dead' || combo.key === 'Unidentified' || combo.key === 'Process') {
+		return keyNameForGlobalHookCode(combo.code) ?? null;
+	}
 	const code = combo.code;
 	if (shouldPreferLayoutKeyForShortcut(combo)) {
 		const keyName = keyNameForGlobalHookKey(combo.key);

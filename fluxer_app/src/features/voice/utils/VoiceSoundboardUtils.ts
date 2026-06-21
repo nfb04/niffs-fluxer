@@ -14,12 +14,7 @@ const SOUNDBOARD_SAMPLE_RATE = 48_000;
 const SOUNDBOARD_CHANNELS = 1;
 const SOUNDBOARD_FRAME_MS = 10;
 const SOUNDBOARD_SAMPLES_PER_FRAME = (SOUNDBOARD_SAMPLE_RATE * SOUNDBOARD_FRAME_MS) / 1000;
-
-function sleep(ms: number): Promise<void> {
-	return new Promise((resolve) => {
-		window.setTimeout(resolve, ms);
-	});
-}
+const SOUNDBOARD_IPC_CHUNK_FRAMES = 5;
 
 function floatToInt16Pcm(samples: Float32Array): Int16Array {
 	const pcm = new Int16Array(samples.length);
@@ -76,8 +71,9 @@ async function streamPcmThroughNativeBridge(bridge: VoiceEngineV2BridgeApi, pcm:
 		numChannels: SOUNDBOARD_CHANNELS,
 	});
 	try {
-		for (let offset = 0; offset < pcm.length; offset += SOUNDBOARD_SAMPLES_PER_FRAME) {
-			const chunk = pcm.subarray(offset, offset + SOUNDBOARD_SAMPLES_PER_FRAME);
+		const chunkSamples = SOUNDBOARD_SAMPLES_PER_FRAME * SOUNDBOARD_IPC_CHUNK_FRAMES;
+		for (let offset = 0; offset < pcm.length; offset += chunkSamples) {
+			const chunk = pcm.subarray(offset, offset + chunkSamples);
 			const samples = chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength);
 			const pushed = await bridge.pushSoundboardPcm({
 				sampleRate: SOUNDBOARD_SAMPLE_RATE,
@@ -87,16 +83,12 @@ async function streamPcmThroughNativeBridge(bridge: VoiceEngineV2BridgeApi, pcm:
 			if (!pushed) {
 				break;
 			}
-			if (offset + SOUNDBOARD_SAMPLES_PER_FRAME < pcm.length) {
-				await sleep(SOUNDBOARD_FRAME_MS);
-			}
 		}
-		const tailMs = Math.max(
-			0,
-			((pcm.length % SOUNDBOARD_SAMPLES_PER_FRAME) / SOUNDBOARD_SAMPLE_RATE) * 1000,
-		);
-		if (tailMs > 0) {
-			await sleep(tailMs);
+		const durationMs = Math.ceil((pcm.length / SOUNDBOARD_SAMPLE_RATE) * 1000);
+		if (durationMs > 0) {
+			await new Promise<void>((resolve) => {
+				window.setTimeout(resolve, durationMs);
+			});
 		}
 	} finally {
 		await bridge.unpublishSoundboardAudio().catch((error) => {
@@ -166,8 +158,8 @@ export async function playSoundboardSound(room: Room | null, blob: Blob): Promis
 	}
 	try {
 		const pcm = await decodeBlobTo48kMonoPcm(blob);
-		void playSoundboardSoundLocally(blob);
 		await streamPcmThroughNativeBridge(bridge, pcm);
+		void playSoundboardSoundLocally(blob);
 	} catch (error) {
 		logger.error('Native soundboard play failed', error);
 	}

@@ -204,6 +204,7 @@ const isKeybindCommand = (value: unknown): value is KeybindCommand =>
 export interface KeyCombo {
 	key: string;
 	code?: string;
+	physicalKeycode?: number;
 	ctrlOrMeta?: boolean;
 	ctrl?: boolean;
 	alt?: boolean;

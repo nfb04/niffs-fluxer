@@ -18,6 +18,7 @@ export interface NativeMicrophonePublishOptions {
 	autoGainControl?: boolean;
 	deepFilter?: boolean;
 	deepFilterNoiseReductionLevel?: number;
+	inputVolume?: number;
 	maxBitrateBps?: number;
 }
 
@@ -153,6 +154,7 @@ export async function handleNativeVoiceEnginePublishMicrophone(
 		autoGainControl: args.autoGainControl,
 		...(args.deepFilter !== undefined ? {deepFilter: args.deepFilter} : {}),
 		...(deepFilterNoiseReductionLevel !== undefined ? {deepFilterNoiseReductionLevel} : {}),
+		...(args.inputVolume !== undefined ? {inputVolume: args.inputVolume} : {}),
 		...(maxBitrateBps !== undefined ? {maxBitrateBps} : {}),
 	});
 }

@@ -18,6 +18,7 @@ class VoiceInputTrackProcessor implements TrackProcessor<Track.Kind.Audio, Audio
 	processedTrack?: MediaStreamTrack;
 	private sourceNode: MediaStreamAudioSourceNode | null = null;
 	private gainNode: GainNode | null = null;
+	private limiterNode: DynamicsCompressorNode | null = null;
 	private passthroughDestination: MediaStreamAudioDestinationNode | null = null;
 	private deepFilterChain: DeepFilterAudioChain | null = null;
 
@@ -71,7 +72,14 @@ class VoiceInputTrackProcessor implements TrackProcessor<Track.Kind.Audio, Audio
 				return;
 			}
 			this.passthroughDestination = opts.audioContext.createMediaStreamDestination();
-			this.gainNode.connect(this.passthroughDestination);
+			this.limiterNode = opts.audioContext.createDynamicsCompressor();
+			this.limiterNode.threshold.value = -12;
+			this.limiterNode.knee.value = 6;
+			this.limiterNode.ratio.value = 8;
+			this.limiterNode.attack.value = 0.003;
+			this.limiterNode.release.value = 0.08;
+			this.gainNode.connect(this.limiterNode);
+			this.limiterNode.connect(this.passthroughDestination);
 			const passthroughTrack = this.passthroughDestination.stream.getAudioTracks()[0];
 			if (!passthroughTrack) {
 				throw new Error('Voice input processor produced no passthrough output track');
@@ -86,6 +94,7 @@ class VoiceInputTrackProcessor implements TrackProcessor<Track.Kind.Audio, Audio
 	private async teardown(): Promise<void> {
 		this.sourceNode?.disconnect();
 		this.gainNode?.disconnect();
+		this.limiterNode?.disconnect();
 		this.passthroughDestination?.disconnect();
 		if (this.deepFilterChain) {
 			try {
@@ -103,6 +112,7 @@ class VoiceInputTrackProcessor implements TrackProcessor<Track.Kind.Audio, Audio
 		}
 		this.sourceNode = null;
 		this.gainNode = null;
+		this.limiterNode = null;
 		this.passthroughDestination = null;
 		this.deepFilterChain = null;
 		this.processedTrack = undefined;
@@ -118,7 +128,13 @@ function resolveActiveVoiceProcessing(): ResolvedVoiceProcessing {
 }
 
 function shouldUseVoiceInputProcessor(): boolean {
-	return resolveActiveVoiceProcessing().deepFilter || VoiceSettings.getInputVolume() !== 100;
+	const profile = resolveActiveVoiceProcessing();
+	return (
+		profile.deepFilter ||
+		VoiceSettings.getInputVolume() !== 100 ||
+		profile.browserNoiseSuppression ||
+		profile.autoGainControl
+	);
 }
 
 export async function syncVoiceInputProcessor(track: LocalAudioTrack | null): Promise<void> {

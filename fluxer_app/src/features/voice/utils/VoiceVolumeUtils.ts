@@ -16,7 +16,10 @@ export function voiceVolumePercentToTrackVolume(value: number): number {
 }
 
 export function inputVoiceVolumePercentToGain(value: number): number {
-	return clampVoiceVolumePercent(value) / UNITY_GAIN_PERCENT;
+	const clamped = clampVoiceVolumePercent(value);
+	const linear = clamped / UNITY_GAIN_PERCENT;
+	const boosted = boostedVoiceVolumePercentToTrackVolume(value);
+	return Math.max(boosted, linear);
 }
 
 export function boostedVoiceVolumePercentToTrackVolume(value: number): number {

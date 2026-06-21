@@ -21,6 +21,7 @@ const requireModule = createRequire(import.meta.url);
 interface NativeInputEvent {
 	type: 'keydown' | 'keyup' | 'mousedown' | 'mouseup' | 'mousemove' | 'wheel';
 	keycode?: number;
+	scanCode?: number;
 	keyName?: string;
 	button?: number;
 	deltaX?: number;
@@ -175,6 +176,7 @@ function sendToKeybindRenderer(channel: string, payload: unknown): void {
 function dispatchKeyEvent(event: {
 	type: 'keydown' | 'keyup';
 	keycode: number;
+	scanCode?: number;
 	keyName: string;
 	ctrlKey: boolean;
 	altKey: boolean;
@@ -208,19 +210,35 @@ function dispatchGlobalKeybindTriggered(id: string, type: 'keydown' | 'keyup'): 
 }
 
 function shouldPreferPhysicalKeyNameForRegistration(): boolean {
-	return activeBackend === 'evdev' || (activeBackend === 'native' && process.platform === 'darwin');
+	return activeBackend === 'evdev' || activeBackend === 'native';
+}
+
+function physicalKeycodeFromEvent(
+	event: Pick<NativeInputEvent, 'keycode' | 'scanCode'> & {backend?: Backend | null},
+): number {
+	const backend = event.backend ?? activeBackend;
+	if (backend === 'native' && process.platform === 'win32') {
+		return event.scanCode ?? event.keycode ?? 0;
+	}
+	return event.keycode ?? 0;
 }
 
 const observedMouseButtons = new Set<number>();
 
 function keyEventMatchesRegistration(
 	keybind: Pick<KeybindRegistration, 'keycode' | 'keyName'>,
-	event: Pick<NativeInputEvent, 'keycode' | 'keyName'>,
+	event: Pick<NativeInputEvent, 'keycode' | 'scanCode' | 'keyName'> & {backend?: Backend | null},
 ): boolean {
+	if (keybind.keycode !== 0) {
+		const eventPhysical = physicalKeycodeFromEvent(event);
+		if (eventPhysical !== 0 && eventPhysical === keybind.keycode) {
+			return true;
+		}
+	}
 	if (keybind.keyName !== null) {
 		return keybind.keyName === event.keyName;
 	}
-	return keybind.keycode !== 0 && keybind.keycode === event.keycode;
+	return keybind.keycode !== 0 && keybind.keycode === (event.keycode ?? 0);
 }
 
 function registrationModifiersMatch(
@@ -274,6 +292,7 @@ function handleNativeEvent(event: NativeInputEvent): void {
 			dispatchKeyEvent({
 				type: event.type,
 				keycode: event.keycode ?? 0,
+				scanCode: event.scanCode,
 				keyName: event.keyName ?? keycodeToKeyName(event.keycode ?? 0),
 				ctrlKey: event.ctrlKey,
 				altKey: event.altKey,
@@ -420,9 +439,6 @@ function trackSender(sender: Electron.WebContents): void {
 	const senderId = sender.id;
 	sender.once('destroyed', () => {
 		trackedSenderIds.delete(senderId);
-		releaseSenderState(senderId);
-	});
-	sender.on('did-navigate', () => {
 		releaseSenderState(senderId);
 	});
 	sender.on('render-process-gone', () => {

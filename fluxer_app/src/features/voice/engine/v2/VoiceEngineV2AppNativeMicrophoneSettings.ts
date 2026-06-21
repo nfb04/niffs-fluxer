@@ -9,10 +9,12 @@ import {
 	getActiveInputDeviceLabel,
 	resolveVoiceProcessingFromStateForDeviceLabel,
 } from '@app/features/voice/utils/VoiceProcessingProfile';
+import {inputVoiceVolumePercentToGain} from '@app/features/voice/utils/VoiceVolumeUtils';
 import type {VoiceEngineV2MicrophoneOptions} from '@fluxer/voice_engine_v2';
 
 export interface VoiceEngineV2NativeMicrophonePublishOptions extends VoiceEngineV2MicrophoneOptions {
 	maxBitrateBps?: number;
+	inputVolume?: number;
 }
 
 export function resolveVoiceEngineV2NativeMicrophoneMaxBitrateBps(
@@ -59,6 +61,7 @@ export function resolveVoiceEngineV2NativeMicrophonePublishOptions(
 		autoGainControl: options.autoGainControl ?? profile.autoGainControl,
 		deepFilter: options.deepFilter ?? profile.deepFilter,
 		deepFilterNoiseReductionLevel: options.deepFilterNoiseReductionLevel ?? profile.deepFilterNoiseReductionLevel,
+		inputVolume: options.inputVolume ?? inputVoiceVolumePercentToGain(store.getInputVolume()),
 		...(maxBitrateBps !== undefined ? {maxBitrateBps} : {}),
 	};
 }

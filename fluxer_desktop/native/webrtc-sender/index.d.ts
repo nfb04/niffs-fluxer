@@ -19,6 +19,7 @@ export interface PublishMicrophoneOptions {
 	autoGainControl?: boolean;
 	deepFilter?: boolean;
 	deepFilterNoiseReductionLevel?: number;
+	inputVolume?: number;
 	maxBitrateBps?: number;
 }
 

@@ -198,6 +198,13 @@ const KeybindEditorPopout: React.FC<KeybindEditorPopoutProps> = ({
 			};
 			onSave(savedCombo);
 			finishRecording(savedCombo);
+			if (savedCombo.code) {
+				void KeybindManager.capturePhysicalKeycodeForDomCode(savedCombo.code).then((physicalKeycode) => {
+					if (physicalKeycode !== null) {
+						onSave({...savedCombo, physicalKeycode});
+					}
+				});
+			}
 		};
 		const handleKeyDown = (event: KeyboardEvent) => {
 			if (event.key === 'Escape') {

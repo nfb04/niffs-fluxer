@@ -839,6 +839,7 @@ export interface GlobalKeyHookRegisterOptions {
 export interface GlobalKeyEvent {
 	type: 'keydown' | 'keyup';
 	keycode: number;
+	scanCode?: number;
 	keyName: string;
 	backend?: 'evdev' | 'native' | null;
 	altKey: boolean;

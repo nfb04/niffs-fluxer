@@ -243,7 +243,8 @@ export const Embed: FC<EmbedProps> = observer(({embed, message, embedIndex, cont
 				</FocusRing>,
 			);
 		}
-		if (embed.type === MessageEmbedTypes.GIFV && isValidMedia(embed.video) && isValidMedia(thumbnail) && embed.url) {
+		if (embed.type === MessageEmbedTypes.GIFV && isValidMedia(embed.video) && embed.url) {
+			const thumbMedia = isValidMedia(thumbnail) ? thumbnail : embed.video;
 			return wrapMediaOnlyEmbed(
 				<FocusRing within ringClassName={mediaFocusRingClass} data-flx="channel.embeds.embed.focus-ring--5">
 					<EmbedGifv
@@ -252,7 +253,7 @@ export const Embed: FC<EmbedProps> = observer(({embed, message, embedIndex, cont
 						videoURL={embed.video.url}
 						naturalWidth={embed.video.width}
 						naturalHeight={embed.video.height}
-						placeholder={thumbnail.placeholder}
+						placeholder={thumbMedia.placeholder ?? thumbnail?.placeholder}
 						alt={embed.video.description ?? thumbnail.description ?? embed.description ?? undefined}
 						channelId={message.channelId}
 						messageId={message.id}
