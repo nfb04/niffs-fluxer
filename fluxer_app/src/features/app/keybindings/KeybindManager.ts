@@ -72,7 +72,7 @@ import NativePermission, {
 	type LinuxInputAccessNagbarReason,
 } from '@app/features/permissions/system/state/NativePermission';
 import {ensureMacPermission} from '@app/features/permissions/system/utils/MacPermissionGate';
-import Platform from '@app/features/platform/types/Platform';
+import {isElectronPlatform} from '@app/features/platform/types/Platform';
 import {Logger} from '@app/features/platform/utils/AppLogger';
 import ReadStates from '@app/features/read_state/state/ReadStates';
 import KeyboardMode from '@app/features/ui/state/KeyboardMode';
@@ -181,7 +181,7 @@ class KeybindManager {
 	}
 
 	private withDesktopGlobalVoiceShortcuts(keybinds: Array<RuntimeKeybind>): Array<RuntimeKeybind> {
-		if (!Platform.isElectron) return keybinds;
+		if (!isElectronPlatform()) return keybinds;
 		return keybinds.map((keybind) => {
 			if (
 				(keybind.action === 'voice_toggle_mute' || keybind.action === 'voice_toggle_deafen') &&

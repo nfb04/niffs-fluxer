@@ -19,7 +19,7 @@ export function getPreuploadMessageAttachmentsDefaultForUserId(userId: string | 
 }
 
 function currentUserIdSafe(): string | null {
-	return SessionManager.userId;
+	return SessionManager?.userId ?? null;
 }
 
 class PrivacyPreferences {
