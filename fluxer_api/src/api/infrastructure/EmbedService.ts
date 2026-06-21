@@ -122,6 +122,21 @@ export class EmbedService {
 		options: UnfurlOptions = {},
 	): Promise<ProcessedUrlEmbeds> {
 		const isGifUrl = await isGifProviderUrl(url, this.gifService);
+		if (isGifUrl && options.cacheOnly) {
+			const providerEmbed = await resolveGifEmbedFromProviders(url, this.gifService, {
+				cacheOnly: true,
+			});
+			if (providerEmbed) {
+				return {
+					embeds: [new Embed(providerEmbed)],
+					cacheTtlSeconds: null,
+				};
+			}
+			return {
+				embeds: [],
+				cacheTtlSeconds: null,
+			};
+		}
 		const result = await this.unfurlerService.unfurlWithCachePolicy(url, nsfwMode, options);
 		if (result.embeds.length > 0) {
 			const embeds = result.embeds.map((embedData) => new Embed(this.mapResponseEmbed(embedData)));

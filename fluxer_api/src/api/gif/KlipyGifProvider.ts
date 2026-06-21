@@ -220,7 +220,7 @@ export class KlipyGifProvider implements IGifProvider {
 		const results = readResultsArray(await this.fetchKlipyData(url)).filter(isKlipyGif);
 		const gifs = results.map((gif) => this.transformKlipyGif(gif)).filter((gif): gif is GifResponse => gif !== null);
 		if (cacheContext) {
-			await this.cacheGifsBySlug(gifs, cacheContext.locale, cacheContext.country);
+			await this.cacheGifsBySlug(gifs);
 		}
 		return gifs;
 	}
@@ -244,16 +244,16 @@ export class KlipyGifProvider implements IGifProvider {
 		await this.cacheService.set(key, cacheEntry);
 	}
 
-	private resolveCacheKey(locale: string, country: string, slug: string): string {
-		return `${this.RESOLVE_CACHE_PREFIX}:${locale}:${country}:${slug}`;
+	private resolveCacheKey(slug: string): string {
+		return `${this.RESOLVE_CACHE_PREFIX}:${slug}`;
 	}
 
-	private async cacheGifsBySlug(gifs: Array<GifResponse>, locale: string, country: string): Promise<void> {
+	private async cacheGifsBySlug(gifs: Array<GifResponse>): Promise<void> {
 		await Promise.all(
 			gifs.map(async (gif) => {
 				const slug = gif.slug?.trim();
 				if (!slug) return;
-				await this.setCache(this.resolveCacheKey(locale, country, slug), gif);
+				await this.setCache(this.resolveCacheKey(slug), gif);
 			}),
 		);
 	}
@@ -280,7 +280,7 @@ export class KlipyGifProvider implements IGifProvider {
 		const cacheKey = `${this.SEARCH_CACHE_PREFIX}:${params.locale}:${params.country}:${normalizedQuery}`;
 		const cached = await this.getCache<Array<GifResponse>>(cacheKey);
 		if (cached && !cached.isStale) {
-			await this.cacheGifsBySlug(cached.data, params.locale, params.country);
+			await this.cacheGifsBySlug(cached.data);
 			return cached.data;
 		}
 		const apiKey = await this.getApiKey();
@@ -329,10 +329,10 @@ export class KlipyGifProvider implements IGifProvider {
 			if (cached.isStale) {
 				this.triggerBackgroundRefresh(this.FEATURED_CACHE_KEY, () => this.fetchFeaturedData(params));
 			}
-			await this.cacheGifsBySlug(cached.data.gifs, params.locale, params.country);
+			await this.cacheGifsBySlug(cached.data.gifs);
 			for (const category of cached.data.categories) {
 				if (category.gif) {
-					await this.cacheGifsBySlug([category.gif], params.locale, params.country);
+					await this.cacheGifsBySlug([category.gif]);
 				}
 			}
 			return cached.data;
@@ -357,7 +357,7 @@ export class KlipyGifProvider implements IGifProvider {
 			if (cached.isStale) {
 				this.triggerBackgroundRefresh(this.TRENDING_CACHE_KEY, () => this.fetchTrendingGifs(params));
 			}
-			await this.cacheGifsBySlug(cached.data, params.locale, params.country);
+			await this.cacheGifsBySlug(cached.data);
 			return cached.data;
 		}
 		const gifs = await this.fetchTrendingGifs(params);
@@ -402,7 +402,7 @@ export class KlipyGifProvider implements IGifProvider {
 	}): Promise<GifResponse | null> {
 		const slug = this.extractSlugFromUrl(params.url);
 		if (!slug) return null;
-		const cacheKey = this.resolveCacheKey(params.locale, params.country, slug);
+		const cacheKey = this.resolveCacheKey(slug);
 		const cached = await this.getCache<GifResponse>(cacheKey);
 		if (cached) {
 			return cached.data;
