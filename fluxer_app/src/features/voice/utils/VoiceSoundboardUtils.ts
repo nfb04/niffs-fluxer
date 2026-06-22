@@ -46,11 +46,16 @@ async function decodeBlobTo48kMonoPcm(blob: Blob): Promise<Int16Array> {
 	}
 }
 
-async function playSoundboardSoundLocally(blob: Blob): Promise<void> {
-	const audioContext = new AudioContext();
+async function playPcmLocally(pcm: Int16Array): Promise<void> {
+	const audioContext = new AudioContext({sampleRate: SOUNDBOARD_SAMPLE_RATE});
 	try {
-		const arrayBuffer = await blob.arrayBuffer();
-		const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
+		const channel = new Float32Array(pcm.length);
+		for (let index = 0; index < pcm.length; index += 1) {
+			const sample = pcm[index] ?? 0;
+			channel[index] = sample / (sample < 0 ? 0x8000 : 0x7fff);
+		}
+		const audioBuffer = audioContext.createBuffer(SOUNDBOARD_CHANNELS, pcm.length, SOUNDBOARD_SAMPLE_RATE);
+		audioBuffer.copyToChannel(channel, 0);
 		const source = audioContext.createBufferSource();
 		source.buffer = audioBuffer;
 		source.connect(audioContext.destination);
@@ -158,8 +163,7 @@ export async function playSoundboardSound(room: Room | null, blob: Blob): Promis
 	}
 	try {
 		const pcm = await decodeBlobTo48kMonoPcm(blob);
-		await streamPcmThroughNativeBridge(bridge, pcm);
-		void playSoundboardSoundLocally(blob);
+		await Promise.all([playPcmLocally(pcm), streamPcmThroughNativeBridge(bridge, pcm)]);
 	} catch (error) {
 		logger.error('Native soundboard play failed', error);
 	}
