@@ -52,14 +52,14 @@ collect_ready_presences(State, _CollectedGuilds) ->
 -spec collect_presence_targets(session_state(), user_id()) -> [user_id()].
 collect_presence_targets(State, CurrentUserId) when is_map(State) ->
     FIds = presence_targets:friend_ids_from_state(State),
-    DmMap = presence_targets:dm_recipients_from_state(State),
+    GroupDmMap = presence_targets:group_dm_recipients_from_state(State),
     TargetMap0 = add_presence_target_ids(FIds, CurrentUserId, #{}),
     TargetMap = maps:fold(
         fun(_Cid, Recipients, Acc) ->
             add_presence_target_map(Recipients, CurrentUserId, Acc)
         end,
         TargetMap0,
-        DmMap
+        GroupDmMap
     ),
     maps:keys(TargetMap).
 
@@ -81,10 +81,6 @@ user_id(User) when is_map(User) ->
     snowflake_id:parse_maybe(maps:get(<<"id">>, User, undefined));
 user_id(_) ->
     undefined.
-
--spec presence_visible(map()) -> boolean().
-presence_visible(P) ->
-    presence_utils:is_visible_presence(P).
 
 -spec dedup_presences([map()]) -> [map()].
 dedup_presences(Presences) ->
@@ -325,15 +321,6 @@ ensure_relationship_id(Rel, UserId) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
-presence_visible_test() ->
-    ?assertEqual(true, presence_visible(#{<<"status">> => <<"online">>})),
-    ?assertEqual(true, presence_visible(#{<<"status">> => <<"idle">>})),
-    ?assertEqual(true, presence_visible(#{<<"status">> => <<"dnd">>})),
-    ?assertEqual(false, presence_visible(#{<<"status">> => <<"offline">>})),
-    ?assertEqual(false, presence_visible(#{<<"status">> => <<"invisible">>})),
-    ?assertEqual(false, presence_visible(#{})),
-    ok.
-
 presence_user_id_rejects_malformed_id_test() ->
     ?assertEqual(undefined, presence_user_id(#{<<"user">> => #{<<"id">> => <<"001">>}})).
 
@@ -363,7 +350,7 @@ collect_presence_targets_deduplicates_before_fetch_test() ->
             }
         }
     },
-    ?assertEqual([2, 3, 5], lists:sort(collect_presence_targets(State, 1))).
+    ?assertEqual([2, 5], lists:sort(collect_presence_targets(State, 1))).
 
 collect_ready_users_collects_directly_into_dedup_map_test() ->
     UserA = #{<<"id">> => <<"10">>, <<"username">> => <<"a">>},

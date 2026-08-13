@@ -345,8 +345,8 @@ msgstr "{count, plural, one {# pièce jointe} other {# pièces jointes}}"
 msgid "{count, plural, one {# blocked message} other {# blocked messages}}"
 msgstr "{count, plural, one {# message bloqué} other {# messages bloqués}}"
 
-#: src/features/app/components/alerts/MaxBookmarksModal.tsx:50
-#: src/features/app/components/alerts/MaxBookmarksModal.tsx:83
+#: src/features/app/components/alerts/MaxBookmarksModal.tsx:51
+#: src/features/app/components/alerts/MaxBookmarksModal.tsx:76
 msgid "{count, plural, one {# bookmark} other {# bookmarks}}"
 msgstr "{count, plural, one {# signet} other {# signets}}"
 
@@ -420,8 +420,8 @@ msgstr "{count, plural, one {# réaction} other {# réactions}}"
 msgid "{count, plural, one {# reactor} other {# reactors}}"
 msgstr "{count, plural, one {# personne a réagi} other {# personnes ont réagi}}"
 
-#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:44
-#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:82
+#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:45
+#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:79
 msgid "{count, plural, one {# saved media item} other {# saved media items}}"
 msgstr "{count, plural, one {# élément multimédia enregistré} other {# éléments multimédias enregistrés}}"
 
@@ -500,7 +500,7 @@ msgstr "{count, plural, one {Déconnecter # appareil} other {Déconnecter # appa
 msgid "{count, plural, one {Used # time.} other {Used # times.}}"
 msgstr "{count, plural, one {Utilisé # fois.} other {Utilisé # fois.}}"
 
-#: src/features/messaging/components/alerts/TooManyAttachmentsModal.tsx:21
+#: src/features/messaging/components/alerts/TooManyAttachmentsModal.tsx:20
 msgid "{count, plural, one {You can only upload # file at a time. Try again with fewer files.} other {You can only upload # files at a time. Try again with fewer files.}}"
 msgstr "{count, plural, one {Vous ne pouvez envoyer qu'un seul fichier à la fois. Réessayez avec moins de fichiers.} other {Vous ne pouvez envoyer que # fichiers à la fois. Réessayez avec moins de fichiers.}}"
 
@@ -525,7 +525,7 @@ msgstr "{count, plural, one {Vous êtes déjà connecté à ce salon vocal depui
 msgid "{count, plural, one {You're already using the one allowed connection for this voice channel. Switch to this device or cancel.} other {You're already using all # allowed connections for this voice channel. Switch to this device or cancel.}}"
 msgstr "{count, plural, one {Vous utilisez déjà la seule connexion autorisée pour ce salon vocal. Passez à cet appareil ou annulez.} other {Vous utilisez déjà toutes les # connexions autorisées pour ce salon vocal. Passez à cet appareil ou annulez.}}"
 
-#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:65
+#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:62
 msgid "{count, plural, one {You're at the cap of # saved media item. Remove one to add another.} other {You're at the cap of # saved media items. Remove one to add another.}}"
 msgstr "{count, plural, one {Vous avez atteint la limite d'un élément multimédia enregistré. Supprimez-en un pour en ajouter un autre.} other {Vous avez atteint la limite de # éléments multimédias enregistrés. Supprimez-en un pour en ajouter un autre.}}"
 
@@ -545,7 +545,7 @@ msgstr "{count, plural, one {Vous avez atteint la limite d'un pack d'autocollant
 msgid "{count, plural, one {You're at the limit of # sticker pack. Delete one to create another.} other {You're at the limit of # sticker packs. Delete one to create another.}}"
 msgstr "{count, plural, one {Vous avez atteint la limite de # pack d'autocollants. Supprimez-en un pour en créer un autre.} other {Vous avez atteint la limite de # packs d'autocollants. Supprimez-en un pour en créer un autre.}}"
 
-#: src/features/guild/components/alerts/MaxGuildsModal.tsx:25
+#: src/features/guild/components/alerts/MaxGuildsModal.tsx:24
 msgid "{count, plural, one {You've reached the maximum number of communities you can join (# community). Leave a community before joining another one.} other {You've reached the maximum number of communities you can join (# communities). Leave a community before joining another one.}}"
 msgstr "{count, plural, one {Vous avez atteint le nombre maximal de communautés que vous pouvez rejoindre (# communauté). Quittez une communauté avant d'en rejoindre une autre.} other {Vous avez atteint le nombre maximal de communautés que vous pouvez rejoindre (# communautés). Quittez une communauté avant d'en rejoindre une autre.}}"
 
@@ -618,7 +618,7 @@ msgid "{defaultDeviceLabel} ({endpointLabel})"
 msgstr "{defaultDeviceLabel} ({endpointLabel})"
 
 #. Client info desktop build identifier line. Example: "Canary Desktop 2026.419.3". Preserve placeholders.
-#: src/features/app/components/dialogs/components/ClientInfo.tsx:38
+#: src/features/app/components/dialogs/components/ClientInfo.tsx:37
 msgid "{desktopChannel} Desktop {desktopVersion}"
 msgstr "Ordinateur de bureau {desktopChannel} {desktopVersion}"
 
@@ -1089,12 +1089,12 @@ msgid "{productName} Community Team"
 msgstr "Équipe communautaire {productName}"
 
 #. Modal body shown when a user-initiated update check fails. productName is the app name.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:104
+#: src/features/updater/commands/UpdaterModalCommands.tsx:108
 msgid "{productName} could not reach the update service. Check your connection and try again."
 msgstr "{productName} n’a pas pu joindre le service de mise à jour. Vérifiez votre connexion et réessayez."
 
 #. Modal body shown when starting installation of a downloaded desktop update fails. productName is the app name.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:121
+#: src/features/updater/commands/UpdaterModalCommands.tsx:125
 msgid "{productName} could not restart into the downloaded update. Try again from the update button."
 msgstr "{productName} n’a pas pu redémarrer pour lancer la mise à jour téléchargée. Veuillez réessayer en utilisant le bouton de mise à jour."
 
@@ -1124,22 +1124,22 @@ msgid "{productName} member since"
 msgstr "Membre de {productName} depuis le"
 
 #. Body of the camera-permission-denied modal on web. {productName} is Fluxer.
-#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:40
+#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:39
 msgid "{productName} needs access to your camera to enable video chat. Grant camera permission in your browser settings and try again."
 msgstr "{productName} a besoin d'accéder à votre caméra pour activer le chat vidéo. Autorisez l'accès à la caméra dans les paramètres de votre navigateur et réessayez."
 
 #. Body of the camera-permission-denied modal on Windows and Linux. {productName} is Fluxer.
-#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:35
+#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:34
 msgid "{productName} needs access to your camera. Allow camera access in your operating system privacy settings and restart the app."
 msgstr "{productName} a besoin d'accéder à votre caméra. Autorisez l'accès à la caméra dans les paramètres de confidentialité de votre système d'exploitation et redémarrez l'application."
 
 #. Body of the microphone-permission-denied modal on web. {productName} is Fluxer.
-#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:30
+#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:29
 msgid "{productName} needs access to your microphone to enable voice chat. Grant microphone permission in your browser settings and try again."
 msgstr "{productName} a besoin d'accéder à votre microphone pour activer le chat vocal. Accordez l'autorisation d'utiliser le microphone dans les paramètres de votre navigateur et réessayez."
 
 #. Body of the microphone-permission-denied modal on Windows and Linux. {productName} is Fluxer.
-#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:25
+#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:24
 msgid "{productName} needs access to your microphone. Allow microphone access in your operating system privacy settings and restart the app."
 msgstr "{productName} a besoin d'accéder à votre microphone. Autorisez l'accès au microphone dans les paramètres de confidentialité de votre système d'exploitation et redémarrez l'application."
 
@@ -1154,7 +1154,7 @@ msgid "{productName} needs microphone access to list your devices."
 msgstr "{productName} a besoin d'accéder à votre microphone pour afficher vos appareils."
 
 #. Body of the screen-permission-denied modal on non-mac desktop platforms. {productName} is Fluxer.
-#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:45
+#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:44
 msgid "{productName} needs screen recording access. Allow screen recording in your operating system privacy settings and restart the app."
 msgstr "{productName} a besoin d'accéder à l'enregistrement d'écran. Autorisez l'enregistrement d'écran dans les paramètres de confidentialité de votre système d'exploitation et redémarrez l'application."
 
@@ -1179,7 +1179,7 @@ msgid "{productName} spellcheck settings…"
 msgstr "Paramètres de vérification orthographique de {productName}…"
 
 #. Label in the invites disabled modal.
-#: src/features/invite/components/alerts/InvitesDisabledModal.tsx:14
+#: src/features/invite/components/alerts/InvitesDisabledModal.tsx:13
 msgid "{productName} spotted a possible raid here. Invites are paused — try again later."
 msgstr "{productName} a détecté une attaque potentielle ici. Les invitations sont suspendues. Réessayez plus tard."
 
@@ -1210,8 +1210,8 @@ msgstr "{productName} logo"
 
 #. Client info web build identifier line. Example: "Canary Web 2026.518.0". Preserve placeholders.
 #. Client info web build identifier shown after the desktop build when the web and desktop channels differ. Example: "Stable Web 2026.518.0". Preserve placeholders.
-#: src/features/app/components/dialogs/components/ClientInfo.tsx:24
-#: src/features/app/components/dialogs/components/ClientInfo.tsx:33
+#: src/features/app/components/dialogs/components/ClientInfo.tsx:23
+#: src/features/app/components/dialogs/components/ClientInfo.tsx:32
 msgid "{releaseChannel} Web {buildVersion}"
 msgstr "Web {buildVersion} {releaseChannel}"
 
@@ -1242,7 +1242,7 @@ msgid "{renderedPresenceCount} online"
 msgstr "{renderedPresenceCount} en ligne"
 
 #. Short label in the channel display name state. Keep it concise. Preserve {resolvedName}; it is inserted by code.
-#: src/features/channel/state/ChannelDisplayName.ts:12
+#: src/features/channel/state/ChannelDisplayName.ts:13
 msgid "{resolvedName}'s group"
 msgstr "Groupe de {resolvedName}"
 
@@ -1302,11 +1302,6 @@ msgstr "Écran de {streamerDisplayName}"
 #: src/features/app/config/TimeWindowPresets.ts:6
 msgid "{tenSeconds} seconds"
 msgstr "{tenSeconds} secondes"
-
-#. Label in the channel and chat canary tester dm item. Preserve {testersCommunityName} and {canaryReleaseName}; they are inserted by code.
-#: src/features/channel/components/direct_message/CanaryTesterDmItem.tsx:33
-msgid "{testersCommunityName} is a community for {canaryReleaseName} users to share bug reports and feedback that helps shape upcoming releases. Join to chat with the team and other testers."
-msgstr "{testersCommunityName} est une communauté pour les utilisateurs de {canaryReleaseName} afin de partager des rapports de bugs et des commentaires qui aident à façonner les prochaines versions. Rejoignez-nous pour discuter avec l'équipe et les autres testeurs."
 
 #. Template preview summary listing how many text channels, voice channels, categories, and roles will be imported.
 #: src/features/guild/components/modals/add_guild_modal/TemplateImportForm.tsx:147
@@ -1961,7 +1956,7 @@ msgid "a hostname, e.g. {exampleDomain}"
 msgstr "un nom d'hôte, par exemple {exampleDomain}"
 
 #. Linux desktop updater modal body shown before version details and package format selector. productName is the app name.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:126
+#: src/features/updater/commands/UpdaterModalCommands.tsx:130
 msgid "A Linux desktop update is available. Choose the package format for this system and {productName} will save it locally."
 msgstr "Une mise à jour pour le bureau Linux est disponible. Choisissez le format de paquet pour ce système, et {productName} l’enregistrera localement."
 
@@ -1990,7 +1985,7 @@ msgstr "un sondage"
 msgid "A redirect_uri is required when the bot scope is not the only scope."
 msgstr "Une redirect_uri est requise lorsque le champ d'application du bot n'est pas le seul champ d'application."
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:342
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:341
 msgid "A reusable component for empty states, errors, and status messages."
 msgstr "Un composant réutilisable pour les états vides, les erreurs et les messages d'état."
 
@@ -2247,7 +2242,7 @@ msgid "Action"
 msgstr "Action"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:283
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:307
 msgid "Action bar"
 msgstr "Barre d'actions"
 
@@ -2557,7 +2552,7 @@ msgstr "Ajoutez des fichiers depuis votre ordinateur pour les référencer dans 
 msgid "Add friend"
 msgstr "Ajouter un ami"
 
-#: src/features/channel/components/direct_message/DirectMessageList.tsx:311
+#: src/features/channel/components/direct_message/DirectMessageList.tsx:307
 msgid "Add friends"
 msgstr "Ajouter des amis"
 
@@ -2844,7 +2839,7 @@ msgid "Administrator"
 msgstr "Administrateur"
 
 #. Error message in the invites disabled modal.
-#: src/features/invite/components/alerts/InvitesDisabledModal.tsx:18
+#: src/features/invite/components/alerts/InvitesDisabledModal.tsx:17
 msgid "Admins paused invites — you can't join right now."
 msgstr "Les admins ont désactivé les invitations. Vous ne pouvez pas rejoindre la communauté pour le moment."
 
@@ -3253,7 +3248,7 @@ msgid "Already set to cancel"
 msgstr "Déjà programmé pour annulation"
 
 #. Toggle-switch label in the moderator delete-message confirmation dialog. When enabled, the message is reported (category: other) before being deleted. {productName} is the product name (e.g., Fluxer).
-#: src/features/messaging/commands/MessageCommands.tsx:75
+#: src/features/messaging/commands/MessageCommands.tsx:76
 msgid "Also report this message to the {productName} Safety Team"
 msgstr "Signaler également ce message à l'équipe de sécurité de {productName}"
 
@@ -3423,12 +3418,12 @@ msgstr "Et 1 autre appel"
 msgid "Animate on interaction"
 msgstr "Animer lors de l'interaction"
 
-#: src/features/expressions/utils/AnimatedAvifModalUtils.tsx:27
+#: src/features/expressions/utils/AnimatedAvifModalUtils.tsx:26
 msgid "Animated {AVIF_FORMAT_LABEL} files aren't supported. Upload a static {AVIF_FORMAT_LABEL} file instead."
 msgstr "Les fichiers {AVIF_FORMAT_LABEL} animés ne sont pas pris en charge. Veuillez plutôt importer un fichier {AVIF_FORMAT_LABEL} statique."
 
 #. Modal title shown when an animated AVIF upload is rejected by the client.
-#: src/features/expressions/utils/AnimatedAvifModalUtils.tsx:12
+#: src/features/expressions/utils/AnimatedAvifModalUtils.tsx:11
 msgid "Animated {avifFormatLabel} not supported"
 msgstr "Le format animé {avifFormatLabel} n'est pas pris en charge"
 
@@ -3476,7 +3471,7 @@ msgid "Animated emoji"
 msgstr "Émojis animés"
 
 #. Section heading for animated emoji in community emoji settings.
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:104
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:105
 msgid "Animated emoji ({emojiCount})"
 msgstr "Émojis animés ({emojiCount})"
 
@@ -3861,7 +3856,7 @@ msgid "Apply theme"
 msgstr "Appliquer le thème"
 
 #. Short confirmation button label in advanced settings.
-#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:140
+#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:144
 msgid "Apply to all communities"
 msgstr "Appliquer à toutes les communautés"
 
@@ -3891,7 +3886,7 @@ msgstr "Applications"
 msgid "Arabic"
 msgstr "Arabe"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:227
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:226
 msgid "Archive"
 msgstr "Archiver"
 
@@ -3914,7 +3909,7 @@ msgid "Are you sure you want to delete <0>{0}</0>? This cannot be undone."
 msgstr "Voulez-vous vraiment supprimer <0>{0}</0> ? Cette action est irréversible."
 
 #. Body of the destructive purge-personal-notes confirmation alert. Keep tone serious and explicit about irreversibility.
-#: src/features/channel/components/direct_message/DirectMessageList.tsx:72
+#: src/features/channel/components/direct_message/DirectMessageList.tsx:68
 msgid "Are you sure you want to delete every message in your personal notes? This will permanently remove all messages and their attachments. This action cannot be undone."
 msgstr "Voulez-vous vraiment supprimer tous les messages de vos notes personnelles ? Cela supprimera définitivement tous les messages et leurs pièces jointes. Cette action est irréversible."
 
@@ -4019,7 +4014,7 @@ msgid "asc or desc"
 msgstr "asc ou desc"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:351
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:375
 msgid "ASCII smileys"
 msgstr "Sourires ASCII"
 
@@ -4119,7 +4114,7 @@ msgid "Attachment upload"
 msgstr "Téléchargement de pièces jointes"
 
 #. Short label in the attachment upload connectivity modal. Keep it concise.
-#: src/features/messaging/components/alerts/AttachmentUploadConnectivityModal.tsx:13
+#: src/features/messaging/components/alerts/AttachmentUploadConnectivityModal.tsx:12
 msgid "Attachment upload unavailable"
 msgstr "Envoi de pièce jointe impossible"
 
@@ -4619,7 +4614,7 @@ msgid "Automatically remove tracking parameters (like utm_source, fbclid, gclid)
 msgstr "Supprime automatiquement les paramètres de suivi (comme utm_source, fbclid, gclid) des URL dans les messages que vous envoyez. Nettoie le lien avant qu'il n'atteigne qui que ce soit d'autre."
 
 #. Settings search entry description. One-line summary of what the settings search entry controls.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:167
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:191
 msgid "Automatically remove tracking parameters from URLs in messages you send"
 msgstr "Supprimer automatiquement les paramètres de suivi des URL dans les messages que vous envoyez"
 
@@ -4667,7 +4662,7 @@ msgid "Autoscrolling"
 msgstr "Défilement automatique"
 
 #. Label for the available desktop version in the Linux update modal.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:136
+#: src/features/updater/commands/UpdaterModalCommands.tsx:140
 msgid "Available"
 msgstr "Disponible"
 
@@ -4685,8 +4680,8 @@ msgstr "Disponible dans l'application de bureau."
 #. Form label for a webhook avatar image.
 #. Settings search entry label. Also used as a search synonym in the settings search bar.
 #: src/features/ui/components/BaseAvatar.tsx:17
-#: src/features/user/components/modals/tabs/my_profile_tab/AvatarUploader.tsx:374
-#: src/features/user/components/modals/tabs/my_profile_tab/AvatarUploader.tsx:422
+#: src/features/user/components/modals/tabs/my_profile_tab/AvatarUploader.tsx:372
+#: src/features/user/components/modals/tabs/my_profile_tab/AvatarUploader.tsx:420
 #: src/features/user/components/settings_utils/search_index/MyProfileIndex.ts:13
 #: src/features/webhook/components/WebhookListItem.tsx:251
 msgid "Avatar"
@@ -5243,26 +5238,6 @@ msgstr "Flouter"
 msgid "Blur strength"
 msgstr "Intensité du flou"
 
-#. Short label in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:82
-msgid "Body"
-msgstr "Corps de texte"
-
-#. Short label in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:66
-msgid "Bold"
-msgstr "Gras"
-
-#. Title in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:134
-msgid "Bold heading"
-msgstr "Titre en gras"
-
-#. Title in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:142
-msgid "Bold title"
-msgstr "Titre en gras"
-
 #. Folder icon option in the community-folder settings modal: a bookmark shape. Refers to the bookmark icon glyph, not the saved-message bookmarks feature.
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #. Short label in the buttons tab. Keep it concise.
@@ -5273,7 +5248,7 @@ msgid "Bookmark"
 msgstr "Marque-page"
 
 #. Short label in the max bookmarks modal.
-#: src/features/app/components/alerts/MaxBookmarksModal.tsx:15
+#: src/features/app/components/alerts/MaxBookmarksModal.tsx:16
 msgid "Bookmark limit reached"
 msgstr "Limite de signets atteinte"
 
@@ -5590,7 +5565,7 @@ msgstr "Variantes de bouton"
 msgid "Button with context menu"
 msgstr "Bouton avec menu contextuel"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:252
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:251
 msgid "Buttons"
 msgstr "Boutons"
 
@@ -5761,7 +5736,7 @@ msgid "Camera on"
 msgstr "Caméra activée"
 
 #. Title of the modal shown when camera permission is denied. Keep tone plain.
-#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:17
+#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:16
 msgid "Camera permission required"
 msgstr "Autorisation d'accès à la caméra requise"
 
@@ -5805,19 +5780,14 @@ msgid "Can't access that email?"
 msgstr "Vous n'avez pas accès à cet e-mail ?"
 
 #. Error message in the attachment permission denied modal. Keep the tone plain and specific.
-#: src/features/messaging/components/alerts/AttachmentPermissionDeniedModal.tsx:12
+#: src/features/messaging/components/alerts/AttachmentPermissionDeniedModal.tsx:9
 msgid "Can't paste image here"
 msgstr "Impossible de coller l'image ici"
 
 #. Error message in the attachment permission denied modal. Keep the tone plain and specific.
-#: src/features/messaging/components/alerts/AttachmentPermissionDeniedModal.tsx:16
+#: src/features/messaging/components/alerts/AttachmentPermissionDeniedModal.tsx:13
 msgid "Can't upload files here"
 msgstr "Impossible de charger des fichiers ici"
-
-#. Developer / debug surface — keep terse and technical. Label in the developer Nagbar controls panel for the canary-tester CTA banner.
-#: src/features/devtools/components/NagbarControls.ts:27
-msgid "Canary tester CTA nagbar"
-msgstr "Barre de notification CTA testeur Canary"
 
 #. Action label for dismissing a mass-mention warning.
 #. Button label on a scheduled message row that cancels (deletes) the scheduled send.
@@ -5872,7 +5842,7 @@ msgstr "Barre de notification CTA testeur Canary"
 #: src/features/user/components/modals/EmailChangeModal.tsx:289
 #: src/features/user/components/modals/EmailChangeModal.tsx:311
 #: src/features/user/components/modals/EmailChangeModal.tsx:326
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:389
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:394
 #: src/features/user/components/modals/PasswordChangeModal.tsx:226
 #: src/features/user/components/modals/PasswordChangeModal.tsx:237
 #: src/features/user/components/modals/PasswordChangeModal.tsx:255
@@ -5899,7 +5869,7 @@ msgstr "Annuler la modification du message programmé"
 msgid "Cancel friend request"
 msgstr "Annuler la demande d'ami"
 
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:144
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:145
 msgid "Cancel if you want to choose a different username instead."
 msgstr "Annuler si vous souhaitez choisir un autre nom d'utilisateur."
 
@@ -5988,11 +5958,6 @@ msgstr "Impossible d'installer le pack de stickers"
 #: src/features/auth/components/CaptchaInterceptor.tsx:14
 msgid "Captcha verification failed. Try again."
 msgstr "Échec de la vérification du CAPTCHA. Veuillez réessayer."
-
-#. Short label in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:74
-msgid "Caption"
-msgstr "Légende"
 
 #. Section header in the Linux audio source picker. Lists capture-target options (entire system / specific apps).
 #: src/features/voice/components/AudioSourcePickerLinux.tsx:48
@@ -6142,8 +6107,8 @@ msgstr "Centré"
 
 #. Title of the modal where the user picks an avatar source (file upload or GIF provider). Keep it concise.
 #: src/features/user/components/modals/tabs/my_profile_tab/AvatarUploader.tsx:110
-#: src/features/user/components/modals/tabs/my_profile_tab/AvatarUploader.tsx:396
-#: src/features/user/components/modals/tabs/my_profile_tab/AvatarUploader.tsx:432
+#: src/features/user/components/modals/tabs/my_profile_tab/AvatarUploader.tsx:394
+#: src/features/user/components/modals/tabs/my_profile_tab/AvatarUploader.tsx:430
 msgid "Change avatar"
 msgstr "Changer d'avatar"
 
@@ -6289,7 +6254,7 @@ msgid "Change username"
 msgstr "Changer de nom d'utilisateur"
 
 #. Short label in the FluxerTag change modal. Keep it concise.
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:47
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:48
 msgid "Change username form"
 msgstr "Formulaire de modification du nom d'utilisateur"
 
@@ -6339,7 +6304,7 @@ msgstr "Modifier votre photo de profil"
 
 #. Settings search entry description. One-line summary of what the settings search entry controls.
 #. Short label in the FluxerTag change modal. Keep it concise.
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:51
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:52
 #: src/features/user/components/settings_utils/search_index/MyProfileIndex.ts:77
 msgid "Change your username"
 msgstr "Changer votre nom d'utilisateur"
@@ -6851,7 +6816,7 @@ msgid "Choose hCaptcha or Cloudflare Turnstile for signup challenges."
 msgstr "Choisissez hCaptcha ou Cloudflare Turnstile pour les défis d'inscription."
 
 #. Settings search entry description. One-line summary of what the settings search entry controls.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:403
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:427
 msgid "Choose how chat moves after you send a message"
 msgstr "Choisissez comment le fil de discussion se déplace après l’envoi d’un message"
 
@@ -7139,7 +7104,7 @@ msgid "Claiming to be another person, brand, or organization."
 msgstr "Se faire passer pour une autre personne, une marque ou une organisation."
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:151
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:175
 msgid "Clean link"
 msgstr "Nettoyer le lien"
 
@@ -7179,7 +7144,7 @@ msgstr "Effacer toutes les surcharges actives"
 msgid "Clear all attachment mocks"
 msgstr "Supprimer tous les aperçus de pièces jointes"
 
-#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:378
+#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:384
 msgid "Clear all token overrides"
 msgstr "Effacer toutes les surcharges de jetons"
 
@@ -7215,7 +7180,7 @@ msgstr "Effacer la maquette pour cette pièce jointe"
 msgid "Clear nickname"
 msgstr "Effacer le pseudo"
 
-#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:401
+#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:407
 msgid "Clear overrides"
 msgstr "Effacer les remplacements"
 
@@ -7299,7 +7264,7 @@ msgstr "A effacé le sujet."
 msgid "Clearing trusted domains..."
 msgstr "Effacement des domaines de confiance…"
 
-#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:359
+#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:365
 msgid "Clears quick CSS, imported themes, uploaded assets, and local file references on this device."
 msgstr "Efface le CSS rapide, les thèmes importés, les ressources téléchargées et les références de fichiers locaux sur cet appareil."
 
@@ -7341,7 +7306,7 @@ msgid "Click to claim your gift!"
 msgstr "Cliquez pour récupérer votre cadeau !"
 
 #. Short label in the settings dialog client info.
-#: src/features/app/components/dialogs/components/ClientInfo.tsx:46
+#: src/features/app/components/dialogs/components/ClientInfo.tsx:45
 msgid "Click to copy"
 msgstr "Cliquer pour copier"
 
@@ -7687,7 +7652,7 @@ msgstr "Deux-points"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:323
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:347
 #: src/features/user/components/settings_utils/section_registry/ChatSettingsSections.ts:154
 msgid "Colon autocomplete"
 msgstr "Autocomplétion des deux-points"
@@ -7829,7 +7794,7 @@ msgid "Community"
 msgstr "Communauté"
 
 #. Short label in the guild at capacity modal. Keep it concise.
-#: src/features/guild/components/alerts/GuildAtCapacityModal.tsx:9
+#: src/features/guild/components/alerts/GuildAtCapacityModal.tsx:8
 msgid "Community at capacity"
 msgstr "Communauté pleine"
 
@@ -7933,7 +7898,7 @@ msgid "Community message notifications"
 msgstr "Notifications des messages de communauté"
 
 #. Developer control label for the community MFA requirement banner.
-#: src/features/devtools/components/NagbarControls.ts:76
+#: src/features/devtools/components/NagbarControls.ts:71
 msgid "Community MFA requirement nagbar"
 msgstr "Bannière d’exigence MFA de la communauté"
 
@@ -8042,7 +8007,7 @@ msgid "Community-wide"
 msgstr "Community-wide"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:276
+#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:271
 #: src/features/user/components/settings_utils/section_registry/AppearanceSections.ts:242
 msgid "Compact"
 msgstr "Compact"
@@ -8126,7 +8091,7 @@ msgstr "Bouton Composer"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:371
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:395
 #: src/features/user/components/settings_utils/section_registry/ChatSettingsSections.ts:190
 msgid "Composer buttons"
 msgstr "Boutons de composition"
@@ -8138,7 +8103,7 @@ msgstr "Mise au point du compositeur"
 
 #. Button label that opens a dedicated advanced settings modal for configuring screen-share encoder controls.
 #. Button label that opens a dedicated advanced settings modal.
-#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:156
+#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:160
 #: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedVideoControls.tsx:162
 msgid "Configure"
 msgstr "Configurer"
@@ -8179,7 +8144,7 @@ msgid "Configure role settings and permissions"
 msgstr "Configurer les paramètres et les autorisations du rôle"
 
 #. Settings search entry description. One-line summary of what the settings search entry controls.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:239
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:263
 msgid "Configure search engines used from selected text"
 msgstr "Configurer les moteurs de recherche utilisés pour la sélection de texte"
 
@@ -8189,7 +8154,7 @@ msgid "Configure spellcheck, dictionaries, and personal words"
 msgstr "Configurer la vérification orthographique, les dictionnaires et les mots personnels"
 
 #. Settings search entry description. One-line summary of what the settings search entry controls.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:271
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:295
 msgid "Configure translator providers used from selected text"
 msgstr "Configurer les fournisseurs de traduction utilisés pour le texte sélectionné"
 
@@ -8212,7 +8177,7 @@ msgstr "Configurer votre badge de profil"
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #: src/features/channel/components/MentionEveryonePopout.tsx:180
 #: src/features/user/components/modals/EmailChangeModal.tsx:340
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:419
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:443
 msgid "Confirm"
 msgstr "Confirmer"
 
@@ -8264,7 +8229,7 @@ msgid "Confirm voice join"
 msgstr "Confirmer la participation vocale"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:415
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:439
 msgid "Confirmation"
 msgstr "Confirmation"
 
@@ -8449,7 +8414,7 @@ msgid "Contact support"
 msgstr "Contacter l'assistance"
 
 #. Short label in the authentication content blocked handler. Keep the tone plain and specific.
-#: src/features/auth/components/ContentBlockedHandler.tsx:11
+#: src/features/auth/components/ContentBlockedHandler.tsx:10
 msgid "Content blocked"
 msgstr "Contenu bloqué"
 
@@ -8515,7 +8480,7 @@ msgstr "Les menus contextuels peuvent être ouverts par un clic gauche (sur les 
 #: src/features/auth/flow/HandoffApprovalFlow.tsx:118
 #: src/features/connection/components/modals/AddConnectionModal.tsx:383
 #: src/features/i18n/utils/CommonMessageDescriptors.ts:711
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:392
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:397
 #: src/features/user/components/modals/tabs/AuthorizedAppsTab.tsx:181
 msgid "Continue"
 msgstr "Continuer"
@@ -8825,7 +8790,7 @@ msgstr "Copier le lien d'invitation"
 #. Generic action label that copies a URL to the clipboard.
 #: src/features/i18n/utils/CommonMessageDescriptors.ts:739
 #: src/features/user/components/modals/tabs/component_gallery_tab/ComponentGalleryTabButtonsTab.tsx:310
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:146
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:145
 msgid "Copy link"
 msgstr "Copier le lien"
 
@@ -8980,16 +8945,6 @@ msgstr "Barre de notification d'installation corrompue"
 msgid "Could not decode this audio file."
 msgstr "Impossible de décoder ce fichier audio."
 
-#. Title of the error modal shown when joining the canary testers community fails. Preserve {testersCommunityName}; it is inserted by code.
-#: src/features/channel/components/direct_message/CanaryTesterDmItem.tsx:44
-msgid "Could not join {testersCommunityName}"
-msgstr "Impossible de rejoindre {testersCommunityName}"
-
-#. Description text in the channel and chat canary tester dm item. Preserve {testersCommunityName}; it is inserted by code.
-#: src/features/channel/components/direct_message/CanaryTesterDmItem.tsx:39
-msgid "Could not join {testersCommunityName}. Try again later."
-msgstr "Impossible de rejoindre {testersCommunityName}. Veuillez réessayer plus tard."
-
 #. Error shown when the setup wizard fails to load the instance configuration.
 #: src/features/app/components/setup/SelfHostedSetupWizardGate.tsx:91
 msgid "Could not load the instance configuration. Try reloading the page."
@@ -9000,7 +8955,7 @@ msgid "Could not load this page"
 msgstr "Impossible de charger cette page"
 
 #. Body of the modal shown when a screen share attempt fails. Advises the user to try sharing the full screen.
-#: src/features/voice/components/alerts/ScreenShareFailedModal.tsx:13
+#: src/features/voice/components/alerts/ScreenShareFailedModal.tsx:12
 msgid "Could not start the screen share. The selected source may no longer be available or may have blocked capture. Try sharing your entire screen or monitor instead of a specific window."
 msgstr "Impossible de démarrer le partage d’écran. La source sélectionnée n’est peut-être plus disponible ou la capture a pu être bloquée. Essayez plutôt de partager l’intégralité de votre écran ou de votre moniteur au lieu d’une fenêtre spécifique."
 
@@ -9065,7 +9020,7 @@ msgid "Couldn't change your billing cycle"
 msgstr "Impossible de modifier votre cycle de facturation"
 
 #. Modal title shown when a user-initiated update check fails.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:100
+#: src/features/updater/commands/UpdaterModalCommands.tsx:104
 msgid "Couldn't check for updates"
 msgstr "Impossible de rechercher les mises à jour"
 
@@ -9172,7 +9127,7 @@ msgid "Couldn't delete your messages"
 msgstr "Impossible de supprimer vos messages"
 
 #. Modal title shown when a desktop update download fails.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:108
+#: src/features/updater/commands/UpdaterModalCommands.tsx:112
 msgid "Couldn't download the desktop update"
 msgstr "Impossible de télécharger la mise à jour de bureau"
 
@@ -9210,11 +9165,6 @@ msgstr "Impossible d'installer ce pack d'emojis. Veuillez réessayer plus tard."
 #: src/features/invite/commands/InviteCommands.tsx:111
 msgid "Couldn't install this sticker pack. Try again later."
 msgstr "Impossible d'installer ce pack de stickers. Réessayez plus tard."
-
-#. Title of the generic fallback error modal shown when joining the canary testers community fails.
-#: src/features/app/components/layout/app_layout/nagbars/CanaryTesterCtaNagbar.tsx:56
-msgid "Couldn't join {testersCommunityName}"
-msgstr "Impossible de rejoindre {testersCommunityName}"
 
 #. Error modal title shown when accepting a community invite fails.
 #: src/features/invite/components/alerts/InviteAcceptFailedModal.tsx:9
@@ -9426,7 +9376,7 @@ msgid "Couldn't start the connection"
 msgstr "Impossible de démarrer la connexion"
 
 #. Modal title shown when starting installation of a downloaded desktop update fails.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:117
+#: src/features/updater/commands/UpdaterModalCommands.tsx:121
 msgid "Couldn't start the desktop update"
 msgstr "Impossible de démarrer la mise à jour de bureau"
 
@@ -9558,7 +9508,7 @@ msgid "Cover"
 msgstr "Couverture"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:267
+#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:262
 #: src/features/user/components/settings_utils/section_registry/AppearanceSections.ts:246
 msgid "Cozy"
 msgstr "Confortable"
@@ -9662,7 +9612,7 @@ msgstr "Formulaire de création de communauté"
 
 #. Accessible label for the create-DM trigger in the DM list header.
 #. Button or menu action label in the create dm modal utils helper. Keep it concise.
-#: src/features/channel/components/direct_message/DirectMessageList.tsx:98
+#: src/features/channel/components/direct_message/DirectMessageList.tsx:94
 #: src/features/channel/utils/CreateDMModalUtils.tsx:35
 msgid "Create DM"
 msgstr "Créer un MP"
@@ -9988,12 +9938,12 @@ msgid "Current uses:"
 msgstr "Utilisations actuelles :"
 
 #. Developer nagbar status: the banner is dismissed in the current real state.
-#: src/features/devtools/components/NagbarControls.ts:109
+#: src/features/devtools/components/NagbarControls.ts:104
 msgid "Currently dismissed"
 msgstr "Actuellement ignoré"
 
 #. Developer nagbar status: the banner is showing in the current real state.
-#: src/features/devtools/components/NagbarControls.ts:113
+#: src/features/devtools/components/NagbarControls.ts:108
 msgid "Currently showing"
 msgstr "Affiché actuellement"
 
@@ -10034,7 +9984,7 @@ msgid "Custom date range"
 msgstr "Plage de dates personnalisée"
 
 #. Error message in the FluxerTag change modal.
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:64
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:65
 msgid "Custom discriminators are not available on this instance"
 msgstr "Les discriminateurs personnalisés ne sont pas disponibles sur cette instance"
 
@@ -10099,7 +10049,7 @@ msgid "Custom ringtone"
 msgstr "Sonnerie personnalisée"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:219
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:243
 msgid "Custom search engine"
 msgstr "Moteur de recherche personnalisé"
 
@@ -10168,7 +10118,7 @@ msgid "Custom title bar"
 msgstr "Barre de titre personnalisée"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:235
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:259
 msgid "Custom translator"
 msgstr "Traducteur personnalisé"
 
@@ -10227,7 +10177,7 @@ msgid "Customize interface elements and behaviors."
 msgstr "Personnaliser les éléments et les comportements de l'interface."
 
 #. Settings search entry description. One-line summary of what the settings search entry controls.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:315
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:339
 msgid "Customize the action bar that appears when hovering over messages"
 msgstr "Personnaliser la barre d'actions qui apparaît au survol des messages"
 
@@ -10251,7 +10201,7 @@ msgstr "Personnaliser votre bannière de profil"
 msgid "Customize your tag ({discriminatorLabel}) to your liking with {premiumProductName}"
 msgstr "Personnalisez votre tag ({discriminatorLabel}) à votre guise avec {premiumProductName}"
 
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:381
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:386
 msgid "Customize your tag or keep it when changing your username"
 msgstr "Personnalisez votre tag ou conservez-le lorsque vous changez de nom d'utilisateur"
 
@@ -10302,7 +10252,7 @@ msgid "Danger button clicked."
 msgstr "Bouton de danger cliqué."
 
 #. Short label in the account security tab. Keep it concise. Keep the tone plain and specific.
-#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:350
+#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:356
 #: src/features/user/components/modals/tabs/account_security_tab/AccountSecuritySections.tsx:39
 #: src/features/user/components/modals/tabs/applications_tab/ApplicationDetail.tsx:697
 msgid "Danger zone"
@@ -10663,13 +10613,13 @@ msgstr "Désactivé par défaut sur mobile pour préserver la batterie et l'util
 #: src/features/emoji/components/emojis/EmojiListItem.tsx:203
 #: src/features/emoji/components/emojis/EmojiListItem.tsx:215
 #: src/features/emoji/components/stickers/StickerGridItem.tsx:34
-#: src/features/messaging/commands/MessageCommands.tsx:71
+#: src/features/messaging/commands/MessageCommands.tsx:72
 #: src/features/moderation/components/report_modal/IARModalCopy.ts:135
 #: src/features/theme_studio/sections/LibrarySection.tsx:514
 #: src/features/user/components/modals/tabs/account_security_tab/SecurityTab.tsx:399
 #: src/features/user/components/modals/tabs/component_gallery_tab/ComponentGalleryTabButtonsTab.tsx:116
 #: src/features/user/components/modals/tabs/component_gallery_tab/ComponentGalleryTabButtonsTab.tsx:272
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:239
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:238
 #: src/features/user/components/modals/tabs/ExpressionPacksTab.tsx:49
 #: src/features/user/components/settings_utils/search_index/AccountSecurityIndex.ts:154
 #: src/features/user/components/settings_utils/section_registry/SharedDescriptors.ts:190
@@ -10908,7 +10858,7 @@ msgid "Delete this message"
 msgstr "Supprimer ce message"
 
 #. Error message in the messaging commands. Keep the tone plain and specific.
-#: src/features/messaging/commands/MessageCommands.tsx:67
+#: src/features/messaging/commands/MessageCommands.tsx:68
 msgid "Delete this message? Can't be undone."
 msgstr "Supprimer ce message ? Cette action est irréversible."
 
@@ -10963,11 +10913,6 @@ msgstr "Vos messages ont été supprimés."
 #: src/features/user/components/modals/tabs/component_gallery_tab/ComponentGalleryTabButtonsTab.tsx:120
 msgid "Deleted."
 msgstr "Supprimé."
-
-#. Label in the typography tab.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:14
-msgid "Delicate and light typography"
-msgstr "Typographie délicate et légère"
 
 #. Status chip for a denied macOS permission.
 #: src/features/permissions/system/components/modals/MacPermissionsModal.tsx:59
@@ -11116,7 +11061,7 @@ msgid "Desktop inactivity before mobile push"
 msgstr "Délai d’inactivité sur ordinateur avant l’envoi d’une notification mobile."
 
 #. Developer control label for the desktop-notification banner.
-#: src/features/devtools/components/NagbarControls.ts:40
+#: src/features/devtools/components/NagbarControls.ts:35
 msgid "Desktop notification nagbar"
 msgstr "Barre de notification du bureau"
 
@@ -11145,12 +11090,12 @@ msgid "Desktop update available. Choose a Linux package."
 msgstr "Mise à jour de l’application disponible. Choisissez un paquet Linux."
 
 #. Modal title shown when a desktop app update has finished downloading.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:83
+#: src/features/updater/commands/UpdaterModalCommands.tsx:87
 msgid "Desktop update ready"
 msgstr "Mise à jour de l'application prête"
 
 #. Desktop updater modal body. The version placeholder is the downloaded app version; productName is the app name.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:87
+#: src/features/updater/commands/UpdaterModalCommands.tsx:91
 msgid "Desktop version {version} has been downloaded. Restart {productName} to finish installing."
 msgstr "La version de bureau {version} a été téléchargée. Redémarrez {productName} pour terminer l’installation."
 
@@ -11384,7 +11329,7 @@ msgstr "Aperçus des messages directs"
 #. Generic section heading / label for the direct messages area.
 #. Summary row label for the direct messages choice in the setup wizard.
 #: src/features/app/components/setup/SetupWizardSteps.tsx:347
-#: src/features/channel/components/direct_message/DirectMessageList.tsx:598
+#: src/features/channel/components/direct_message/DirectMessageList.tsx:592
 #: src/features/i18n/utils/CommonMessageDescriptors.ts:218
 #: src/features/user/components/modals/tabs/privacy_safety_tab/ConnectionsTab.tsx:255
 msgid "Direct messages"
@@ -11753,11 +11698,9 @@ msgstr "Ignorer la mention"
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #. Short label in the chat settings tab. Keep it concise.
 #. Short label in the inline. Keep it concise.
-#. Short label in the typography tab. Keep it concise.
 #: src/features/guild/components/modals/guild_tabs/guild_roles_tab/RoleEditor.tsx:175
 #: src/features/user/components/modals/tabs/chat_settings_tab/ChatSettingsTabInline.tsx:14
 #: src/features/user/components/modals/tabs/ChatSettingsTab.tsx:14
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:102
 #: src/features/user/components/settings_utils/section_registry/AppearanceSections.ts:154
 #: src/features/voice/components/modals/ScreenSharePickerModal.tsx:116
 msgid "Display"
@@ -12197,7 +12140,7 @@ msgstr "Brouillon"
 msgid "Drag and drop"
 msgstr "Glisser-déposer"
 
-#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:295
+#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:290
 msgid "Drag and drop a sticker file here (one at a time)"
 msgstr "Faites glisser et déposez un fichier de sticker ici (un à la fois)"
 
@@ -12206,7 +12149,7 @@ msgstr "Faites glisser et déposez un fichier de sticker ici (un à la fois)"
 msgid "Drag and drop area for file upload"
 msgstr "Zone de glisser-déposer pour l'envoi de fichiers"
 
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:471
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:470
 msgid "Drag and drop emoji files here"
 msgstr "Faites glisser et déposez les fichiers d'emoji ici"
 
@@ -12305,7 +12248,7 @@ msgid "Due to mature content laws in {regionName}, this media is not available f
 msgstr "En raison des lois sur le contenu mature en {regionName}, ce média n'est pas disponible dans votre région actuelle."
 
 #: src/features/theme_studio/sections/LibrarySection.tsx:503
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:221
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:220
 msgid "Duplicate"
 msgstr "Dupliquer"
 
@@ -12590,7 +12533,7 @@ msgid "Edit your profile bio"
 msgstr "Modifier votre bio de profil"
 
 #. Button or menu action label in the index. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:40
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:39
 msgid "Editable text"
 msgstr "Texte modifiable"
 
@@ -12693,7 +12636,7 @@ msgid "Email update required"
 msgstr "Mise à jour de l'e-mail requise"
 
 #. Developer control label for the email-verification banner.
-#: src/features/devtools/components/NagbarControls.ts:36
+#: src/features/devtools/components/NagbarControls.ts:31
 msgid "Email verification nagbar"
 msgstr "Bannière de vérification de l'e-mail"
 
@@ -12808,12 +12751,12 @@ msgid "Emoji & sticker packs"
 msgstr "Packs d'emojis et de stickers"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:327
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:351
 msgid "Emoji autocomplete"
 msgstr "Suggestions d’émojis"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:379
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:403
 msgid "Emoji button"
 msgstr "Bouton emoji"
 
@@ -12848,7 +12791,7 @@ msgid "Emoji name must be at most 32 characters long"
 msgstr "Le nom de l'emoji doit contenir au maximum 32 caractères"
 
 #. Description in the community emoji upload section. {maxSize} is the formatted size limit.
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:95
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:96
 msgid "Emoji names need at least 2 characters and can use letters, numbers, and underscores. Emojis must be under {maxSize}. Static images are resized to 128x128 pixels and compressed automatically. Animated emojis and SVGs must already fit the limit."
 msgstr "Les noms des emojis doivent comporter au moins 2 caractères et peuvent utiliser des lettres, des chiffres et des tirets bas. Les emojis doivent avoir une taille inférieure à {maxSize}. Les images statiques sont redimensionnées à 128 x 128 pixels et compressées automatiquement. Les emojis animés et les SVG doivent déjà respecter cette limite."
 
@@ -12896,7 +12839,7 @@ msgstr "Packs d'emojis"
 msgid "Emoji picker"
 msgstr "Sélecteur d'émojis"
 
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:451
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:450
 msgid "Emoji slots"
 msgstr "Emplacements d'emojis"
 
@@ -12921,13 +12864,13 @@ msgid "Emojis"
 msgstr "Émojis"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:347
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:371
 msgid "Emoticon"
 msgstr "Émoticône"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:343
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:367
 #: src/features/user/components/settings_utils/section_registry/ChatSettingsSections.ts:142
 msgid "Emoticons"
 msgstr "Émoticônes"
@@ -13001,7 +12944,7 @@ msgstr "Activer l'expiration des pièces jointes"
 msgid "Enable audio"
 msgstr "Activer l'audio"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:172
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:171
 msgid "Enable beta feature"
 msgstr "Activer la fonctionnalité bêta"
 
@@ -13038,7 +12981,7 @@ msgstr "Activer le mode développeur"
 msgid "Enable email delivery"
 msgstr "Activer la livraison par e-mail"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:158
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:157
 msgid "Enable extra option"
 msgstr "Activer l'option supplémentaire"
 
@@ -13337,6 +13280,11 @@ msgstr "Améliorée"
 msgctxt "noise-suppression-option"
 msgid "Enhanced"
 msgstr "Améliorée"
+
+#. Settings search entry description. One-line summary of what the settings search entry controls.
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:147
+msgid "Ensures file messages appear in the order you sent them"
+msgstr "Garantit que les messages de fichiers apparaissent dans l'ordre où vous les avez envoyés"
 
 #. Keyboard key label for confirming a mass-mention warning.
 #. Keyboard shortcut keycap label for Enter. Keep it short.
@@ -13655,7 +13603,7 @@ msgstr "Erreur"
 msgid "error code {code}"
 msgstr "code d'erreur {code}"
 
-#: src/features/messaging/components/markdown/index.tsx:39
+#: src/features/messaging/components/markdown/index.tsx:40
 msgid "Error rendering content"
 msgstr "Erreur lors de l'affichage du contenu"
 
@@ -13816,7 +13764,7 @@ msgid "Expand"
 msgstr "Développer"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:303
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:327
 msgid "Expand action bar"
 msgstr "Développer la barre d'actions"
 
@@ -14019,7 +13967,7 @@ msgstr "Afficher la section des paramètres de fuseau horaire réservés aux mem
 
 #. Settings search entry label. Names the settings search entry in the settings UI.
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:319
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:343
 #: src/features/user/components/settings_utils/section_registry/ChatSettingsSections.ts:158
 msgid "Expression autocomplete"
 msgstr "Saisie semi-automatique des expressions"
@@ -14073,7 +14021,7 @@ msgstr "Externe"
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #. Warning text in the external link warning modal. Keep the tone plain and specific.
 #: src/features/messaging/components/modals/ExternalLinkWarningModal.tsx:17
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:191
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:215
 msgid "External link warning"
 msgstr "Avertissement de lien externe"
 
@@ -14089,11 +14037,6 @@ msgstr "Les liens externes peuvent être dangereux. Soyez prudent."
 #: src/features/user/components/modals/tabs/component_gallery_tab/SelectionsTab.tsx:57
 msgid "Extra large"
 msgstr "Très grande"
-
-#. Short label in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:18
-msgid "Extra light"
-msgstr "Très léger"
 
 #. Report category label for a community organized around extremist content or ideology.
 #: src/features/moderation/components/report/OptionDescriptors.ts:90
@@ -14219,7 +14162,7 @@ msgstr "Échec du chargement"
 msgid "Failed to load authorized applications"
 msgstr "Échec du chargement des applications autorisées"
 
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:444
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:443
 msgid "Failed to load emojis. Try again later."
 msgstr "Échec du chargement des emojis. Veuillez réessayer plus tard."
 
@@ -14243,7 +14186,7 @@ msgid "Failed to load shareable sources."
 msgstr "Échec du chargement des sources partageables."
 
 #. Error message in the guild stickers tab.
-#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:74
+#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:71
 msgid "Failed to load stickers"
 msgstr "Échec du chargement des autocollants"
 
@@ -14293,7 +14236,7 @@ msgid "Failed to pin message"
 msgstr "Échec de l'épinglage du message"
 
 #. Error message in the guild emoji tab.
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:54
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:55
 msgid "Failed to prepare emojis"
 msgstr "Échec de la préparation des emojis"
 
@@ -14439,12 +14382,12 @@ msgid "Failed to upload custom sound"
 msgstr "Échec du téléchargement du son personnalisé"
 
 #. Error message in the emoji upload failure modal. startLabel is a chunk label like "#1"; errorMsg is the server error.
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:62
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:63
 msgid "Failed to upload emojis starting at {startLabel}: {errorMsg}"
 msgstr "Échec du téléchargement des emojis à partir de {startLabel} : {errorMsg}"
 
 #. Error message in the guild emoji tab.
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:58
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:59
 msgid "Failed to upload emojis. Try again."
 msgstr "Échec du téléchargement des emojis. Veuillez réessayer."
 
@@ -14538,7 +14481,7 @@ msgid "Feature"
 msgstr "Fonctionnalité"
 
 #. Short label in the feature temporarily disabled modal.
-#: src/features/app/components/alerts/FeatureTemporarilyDisabledModal.tsx:9
+#: src/features/app/components/alerts/FeatureTemporarilyDisabledModal.tsx:8
 msgid "Feature temporarily disabled"
 msgstr "Fonctionnalité temporairement désactivée"
 
@@ -14580,13 +14523,18 @@ msgstr "Le fichier est trop volumineux. La taille maximale est de {maxSize}."
 msgid "File options"
 msgstr "Options du fichier"
 
+#. Settings search synonym. Used to match this term when the user types it in the settings search bar.
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:135
+msgid "File ordering"
+msgstr "Ordre des fichiers"
+
 #. Title of the file-too-large alert variant that offers a Plutonium upsell.
-#: src/features/messaging/components/alerts/FileSizeTooLargeModal.tsx:38
+#: src/features/messaging/components/alerts/FileSizeTooLargeModal.tsx:35
 msgid "File size limit exceeded"
 msgstr "Taille du fichier maximale dépassée"
 
 #. Title of the file-too-large alert.
-#: src/features/messaging/components/alerts/FileSizeTooLargeModal.tsx:34
+#: src/features/messaging/components/alerts/FileSizeTooLargeModal.tsx:31
 msgid "File size too large"
 msgstr "Fichier trop volumineux"
 
@@ -14781,7 +14729,7 @@ msgstr "Premier clic"
 msgid "First click pass-through when unfocused"
 msgstr "Cliquer à travers quand la fenêtre est inactive"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:112
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:111
 msgid "First option"
 msgstr "Première option"
 
@@ -14907,10 +14855,6 @@ msgstr "Suivre la principale • {effectiveValue} %"
 msgid "Font"
 msgstr "Police"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:344
-msgid "Font weights"
-msgstr "Graisses de police"
-
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #: src/features/user/components/settings_utils/section_registry/SharedDescriptors.ts:9
 msgid "Fonts"
@@ -14985,12 +14929,12 @@ msgid "For your security, please confirm it's you to continue."
 msgstr "Pour votre sécurité, veuillez confirmer votre identité pour continuer."
 
 #. Developer nagbar override status: the banner is forced to hide.
-#: src/features/devtools/components/NagbarControls.ts:97
+#: src/features/devtools/components/NagbarControls.ts:92
 msgid "Force disabled"
 msgstr "Forcé à désactiver"
 
 #. Developer nagbar override status: the banner is forced to show.
-#: src/features/devtools/components/NagbarControls.ts:93
+#: src/features/devtools/components/NagbarControls.ts:88
 msgid "Force enabled"
 msgstr "Activé de force"
 
@@ -15267,7 +15211,7 @@ msgstr "Bot convivial"
 #. Profile timezone privacy option label. Allows friends to see local time.
 #. Quick switcher tab label that lists friends.
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/channel/components/direct_message/DirectMessageList.tsx:523
+#: src/features/channel/components/direct_message/DirectMessageList.tsx:518
 #: src/features/connection/components/modals/EditConnectionModal.tsx:86
 #: src/features/search/utils/QuickSwitcherModalUtils.tsx:47
 #: src/features/user/components/modals/tabs/my_profile_tab/TimezoneProfileSettings.tsx:63
@@ -15354,7 +15298,7 @@ msgid "From {start}"
 msgstr "À partir du {start}"
 
 #. placeholder {0}: sourceGuild.name
-#: src/features/channel/components/emoji_picker/EmojiPickerInspector.tsx:104
+#: src/features/channel/components/emoji_picker/EmojiPickerInspector.tsx:102
 msgid "from <0>{0}</0>"
 msgstr "de <0>{0}</0>"
 
@@ -15436,7 +15380,7 @@ msgid "Gap"
 msgstr "Écart"
 
 #. Short label in the temporary invite requires presence modal.
-#: src/features/app/components/alerts/TemporaryInviteRequiresPresenceModal.tsx:9
+#: src/features/app/components/alerts/TemporaryInviteRequiresPresenceModal.tsx:8
 msgid "Gateway connection required"
 msgstr "Connexion à la passerelle requise"
 
@@ -15450,7 +15394,7 @@ msgstr "GDPR"
 msgid "General"
 msgstr "Général"
 
-#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:325
+#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:331
 msgid "Generate a shareable link or copy your combined custom CSS."
 msgstr "Générez un lien partageable ou copiez votre CSS personnalisé combiné."
 
@@ -15470,11 +15414,6 @@ msgstr "Générer un nouveau code"
 #: src/features/auth/flow/HandoffCodeDisplay.tsx:70
 msgid "Generating code…"
 msgstr "Génération du code…"
-
-#. Label in the typography tab.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:22
-msgid "Gentle and airy text display"
-msgstr "Affichage de texte doux et aéré"
 
 #. Developer tools debug menu label. Internal-only surface for developers; translators may keep this terse.
 #: src/features/channel/components/channel_header_components/developer_tools/DeveloperOptionLabels.ts:209
@@ -15512,7 +15451,7 @@ msgid "Get {premiumProductName} to customize your tag"
 msgstr "Obtenez {premiumProductName} pour personnaliser votre tag"
 
 #. Description text in the FluxerTag change modal. Preserve {premiumProductName}; it is inserted by code. Keep the tone plain and specific.
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:55
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:56
 msgid "Get {premiumProductName} to customize your tag or keep it when changing your username"
 msgstr "Obtenez {premiumProductName} pour personnaliser votre tag ou le conserver lorsque vous changez de nom d'utilisateur"
 
@@ -15550,7 +15489,7 @@ msgid "GIF"
 msgstr "GIF"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:375
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:399
 msgid "GIF button"
 msgstr "Bouton GIF"
 
@@ -15661,7 +15600,7 @@ msgid "Gift inventory flow"
 msgstr "Flux d'inventaire des cadeaux"
 
 #. Developer control label for the gift-inventory banner.
-#: src/features/devtools/components/NagbarControls.ts:56
+#: src/features/devtools/components/NagbarControls.ts:51
 msgid "Gift inventory nagbar"
 msgstr "Bannière d'inventaire de cadeaux"
 
@@ -15753,7 +15692,7 @@ msgid "Give everyone on this instance the highest premium limits."
 msgstr "Donnez à tout le monde sur cette instance les limites premium les plus élevées."
 
 #. Modal body shown when the role-edit form is submitted with an empty role name.
-#: src/features/app/components/alerts/RoleNameBlankModal.tsx:13
+#: src/features/app/components/alerts/RoleNameBlankModal.tsx:12
 msgid "Give the role a name before saving."
 msgstr "Donnez un nom au rôle avant d'enregistrer."
 
@@ -15884,7 +15823,7 @@ msgid "Go to third community"
 msgstr "Aller à la troisième communauté"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:263
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:287
 msgid "Google lens"
 msgstr "Google Lens"
 
@@ -16257,11 +16196,6 @@ msgstr "Il"
 msgid "Header"
 msgstr "En-tête"
 
-#. Title in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:94
-msgid "Heading"
-msgstr "Titre"
-
 #. Title in the markdown tab. Keep it concise.
 #: src/features/user/components/modals/tabs/component_gallery_tab/MarkdownTab.tsx:25
 msgid "Headings"
@@ -16395,7 +16329,7 @@ msgid "Hide avatars"
 msgstr "Masquer les avatars"
 
 #. Settings search entry description. One-line summary of what the settings search entry controls.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:455
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:479
 msgid "Hide channels you've muted from community sidebars"
 msgstr "Masquer les canaux masqués des barres latérales de la communauté"
 
@@ -16447,7 +16381,7 @@ msgid "Hide members"
 msgstr "Masquer les membres"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:447
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:471
 msgid "Hide muted"
 msgstr "Masquer les discussions mises en sourdine"
 
@@ -16458,13 +16392,13 @@ msgstr "Masquer les chaînes mises en sourdine"
 
 #. Settings search entry label. Names the settings search entry in the settings UI.
 #. Short label for an advanced sidebar preference.
-#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:132
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:435
+#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:136
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:459
 msgid "Hide muted channels by default"
 msgstr "Masquer les canaux mis en sourdine par défaut"
 
 #. Confirmation prompt in advanced settings.
-#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:136
+#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:140
 msgid "Hide muted channels by default?"
 msgstr "Masquer les canaux mis en sourdine par défaut ?"
 
@@ -16637,7 +16571,7 @@ msgid "Hours"
 msgstr "Heures"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:291
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:315
 msgid "Hover buttons"
 msgstr "Boutons au survol"
 
@@ -16910,11 +16844,11 @@ msgstr "Si vous payez avec une carte en PLN, elle doit toujours être émise en 
 msgid "If you prefer, you can switch to standard USD pricing instead."
 msgstr "Si vous préférez, vous pouvez passer à la tarification standard en USD."
 
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:349
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:354
 msgid "If you save this username, your tag will reroll randomly when your {PREMIUM_PRODUCT_NAME} expires on <0>{premiumExpiresAtLabel}</0>, unless it renews."
 msgstr "Si vous enregistrez ce nom d'utilisateur, votre tag sera relancé aléatoirement à l'expiration de votre {PREMIUM_PRODUCT_NAME} le <0>{premiumExpiresAtLabel}</0>, sauf en cas de renouvellement."
 
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:356
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:361
 msgid "If you save this username, your tag will reroll randomly when your {PREMIUM_PRODUCT_NAME} expires, unless it renews."
 msgstr "Si vous enregistrez ce nom d'utilisateur, votre tag sera relancé aléatoirement à l'expiration de votre {PREMIUM_PRODUCT_NAME}, sauf en cas de renouvellement."
 
@@ -17045,7 +16979,7 @@ msgid "Image dimensions must be between {min}x{min2} and {max}x{max2} pixels."
 msgstr "Les dimensions de l'image doivent être comprises entre {min}x{min2} et {max}x{max2} pixels."
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:259
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:283
 msgid "Image lookup"
 msgstr "Recherche d'image"
 
@@ -17060,12 +16994,12 @@ msgid "Image preview"
 msgstr "Aperçu de l'image"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:251
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:275
 msgid "Image search"
 msgstr "Recherche d'images"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:267
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:291
 msgid "Image search provider"
 msgstr "Fournisseur de recherche d'images"
 
@@ -17088,7 +17022,7 @@ msgstr "Téléchargement d'image"
 msgid "Images"
 msgstr "Images"
 
-#: src/features/messaging/components/alerts/AttachmentPermissionDeniedModal.tsx:38
+#: src/features/messaging/components/alerts/AttachmentPermissionDeniedModal.tsx:35
 msgid "Images pasted from your clipboard are sent as attachments, and you don't have permission to attach files in this channel."
 msgstr "Les images collées depuis votre presse-papiers sont envoyées en tant que pièces jointes, et vous n'avez pas l'autorisation de joindre des fichiers dans ce canal."
 
@@ -17419,7 +17353,7 @@ msgstr "Indexation de la chaîne"
 msgid "Indicator"
 msgstr "Indicateur"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:334
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:333
 msgid "Indicators & status"
 msgstr "Indicateurs et statut"
 
@@ -17547,7 +17481,7 @@ msgstr "États de saisie"
 msgid "Input volume"
 msgstr "Volume d'entrée"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:260
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:259
 msgid "Inputs & text"
 msgstr "Saisie et texte"
 
@@ -17580,7 +17514,7 @@ msgid "Install sticker pack"
 msgstr "Installer le pack de stickers"
 
 #. Label for the installed desktop version in the Linux update modal.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:132
+#: src/features/updater/commands/UpdaterModalCommands.tsx:136
 msgid "Installed"
 msgstr "Installé"
 
@@ -18008,13 +17942,13 @@ msgid "Invites disabled"
 msgstr "Invitations désactivées"
 
 #. Developer control label for the invites-disabled banner.
-#: src/features/devtools/components/NagbarControls.ts:72
+#: src/features/devtools/components/NagbarControls.ts:67
 msgid "Invites disabled nagbar"
 msgstr "Bannière \" Invitations désactivées \""
 
 #. Button or menu action label in the invite accept modal. Keep it concise.
 #. Button or menu action label in the invites disabled modal. Keep it concise.
-#: src/features/invite/components/alerts/InvitesDisabledModal.tsx:10
+#: src/features/invite/components/alerts/InvitesDisabledModal.tsx:9
 #: src/features/invite/components/modals/InviteAcceptModal.tsx:49
 msgid "Invites paused"
 msgstr "Invitations en pause"
@@ -18084,15 +18018,6 @@ msgstr "C'est calme pour l'instant..."
 msgid "Italian"
 msgstr "Italien"
 
-#. Short label in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:114
-msgid "Italic"
-msgstr "Italique"
-
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:392
-msgid "Italic style demonstration"
-msgstr "Exemple de style italique"
-
 #. Country name. EU member state in the illegal-content report country dropdown.
 #: src/features/moderation/components/report/OptionDescriptors.ts:167
 msgid "Italy"
@@ -18131,13 +18056,6 @@ msgstr "Rejoindre {communityName}"
 #: src/features/app/components/layout/app_layout/nagbars/GuildMembershipCtaNagbar.tsx:24
 msgid "Join {communityName} to chat with the team and stay up to date."
 msgstr "Rejoignez {communityName} pour discuter avec l'équipe et rester informé."
-
-#. Button or menu action label in the channel and chat canary tester dm item. Keep it concise. Preserve {testersCommunityName}; it is inserted by code.
-#. CTA button label for joining the canary testers community. testersCommunityName is a community name.
-#: src/features/app/components/layout/app_layout/nagbars/CanaryTesterCtaNagbar.tsx:98
-#: src/features/channel/components/direct_message/CanaryTesterDmItem.tsx:28
-msgid "Join {testersCommunityName}"
-msgstr "Rejoindre {testersCommunityName}"
 
 #. Action button label in the add community modal. Starts the join-by-invite-code flow.
 #: src/features/guild/components/modals/add_guild_modal/shared.ts:101
@@ -18522,10 +18440,6 @@ msgstr "Langue"
 msgid "Language settings"
 msgstr "Paramètres de langue"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:285
-msgid "Language support"
-msgstr "Langues prises en charge"
-
 #. Submenu label in the textarea spellcheck submenu listing manual language overrides.
 #. Subsection title for spellcheck language settings. Keep it concise.
 #: src/features/channel/components/textarea/TextareaContextMenu.tsx:86
@@ -18534,9 +18448,7 @@ msgid "Languages"
 msgstr "Langues"
 
 #. Short label in the selections tab. Keep it concise.
-#. Short label in the typography tab. Keep it concise.
 #: src/features/user/components/modals/tabs/component_gallery_tab/SelectionsTab.tsx:53
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:86
 msgid "Large"
 msgstr "Grande"
 
@@ -18812,9 +18724,7 @@ msgid "Lifetime {premiumProductName}"
 msgstr "À vie {premiumProductName}"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#. Short label in the typography tab. Keep it concise.
 #: src/features/expressions/components/modals/sticker_form/StickerPreview.tsx:48
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:26
 #: src/features/user/components/settings_utils/section_registry/AppearanceSections.ts:54
 msgid "Light"
 msgstr "Clair"
@@ -18954,7 +18864,7 @@ msgid "Link underline"
 msgstr "Soulignement des liens"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:195
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:219
 msgid "Link warnings"
 msgstr "Avertissements concernant les liens"
 
@@ -19002,7 +18912,7 @@ msgid "Linux default"
 msgstr "Linux (par défaut)"
 
 #. Select label for choosing the Linux desktop package format to download.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:148
+#: src/features/updater/commands/UpdaterModalCommands.tsx:152
 msgid "Linux package"
 msgstr "Paquet Linux"
 
@@ -19511,7 +19421,7 @@ msgstr "Mise à jour manuelle de l’application de bureau"
 #. Action label in the inbox popout overflow menu. Marks every inbox channel as read.
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #: src/features/messaging/components/popouts/InboxPopout.tsx:42
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:411
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:435
 msgid "Mark all as read"
 msgstr "Tout marquer comme lu"
 
@@ -19533,7 +19443,7 @@ msgid "Mark all inbox channels as read"
 msgstr "Marquer toutes les conversations comme lues"
 
 #. Settings search entry description. One-line summary of what the settings search entry controls.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:431
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:455
 msgid "Mark all unread inbox channels as read immediately, without asking to confirm"
 msgstr "Marquer immédiatement toutes les chaînes non lues de la boîte de réception comme lues, sans demander de confirmation"
 
@@ -19603,7 +19513,7 @@ msgid "Mark top inbox channel as read"
 msgstr "Marquer le canal de la boîte de réception supérieure comme lu"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:372
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:364
 #: src/features/user/components/settings_utils/section_registry/SharedDescriptors.ts:122
 msgid "Markdown"
 msgstr "Markdown"
@@ -19634,7 +19544,7 @@ msgid "Markers below slider"
 msgstr "Marqueurs sous le curseur"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:143
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:167
 msgid "Marketing parameters"
 msgstr "Paramètres marketing"
 
@@ -19741,7 +19651,7 @@ msgid "Mature content media gate"
 msgstr "Filtre de contenu mature"
 
 #. Error message in the mature content rejected modal.
-#: src/features/moderation/components/alerts/MatureContentRejectedModal.tsx:9
+#: src/features/moderation/components/alerts/MatureContentRejectedModal.tsx:8
 msgid "Mature content not allowed"
 msgstr "Contenu mature non autorisé"
 
@@ -19837,7 +19747,7 @@ msgid "Maximum screen share bitrate"
 msgstr "Débit binaire maximal du partage d'écran"
 
 #. Short label in the max favorite memes modal.
-#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:33
+#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:34
 #: src/features/expressions/components/modals/GiftAcceptModal.tsx:220
 #: src/features/expressions/components/modals/GiftAcceptModal.tsx:277
 msgid "Maybe later"
@@ -19935,10 +19845,8 @@ msgstr "Taille des médias"
 
 #. Member verification level option in the community moderation settings tab. Short standalone severity label.
 #. Short label in the selections tab. Keep it concise.
-#. Short label in the typography tab. Keep it concise.
 #: src/features/guild/components/modals/guild_tabs/GuildModerationTab.tsx:65
 #: src/features/user/components/modals/tabs/component_gallery_tab/SelectionsTab.tsx:49
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:50
 msgid "Medium"
 msgstr "Moyen"
 
@@ -20221,7 +20129,7 @@ msgid "Message @"
 msgstr "Message @"
 
 #. Settings search entry label. Also used as a search synonym in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:279
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:303
 msgid "Message action bar"
 msgstr "Barre d'actions des messages"
 
@@ -20243,7 +20151,7 @@ msgid "Message badge"
 msgstr "Badge de message"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:311
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:335
 msgid "Message buttons"
 msgstr "Boutons de message"
 
@@ -20319,7 +20227,7 @@ msgid "Message history threshold updated"
 msgstr "Seuil de l'historique des messages mis à jour"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:287
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:311
 msgid "Message hover"
 msgstr "Survol du message"
 
@@ -20332,7 +20240,7 @@ msgstr "Saisie de message"
 
 #. Settings search entry label. Names the settings search entry in the settings UI.
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:367
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:391
 #: src/features/user/components/settings_utils/section_registry/ChatSettingsSections.ts:194
 msgid "Message input buttons"
 msgstr "Boutons de saisie de message"
@@ -20445,7 +20353,7 @@ msgstr "Message : {0}."
 #. Short label in the inline. Keep it concise.
 #. Short label in the keybinds tab. Keep it concise.
 #: src/features/channel/components/ChannelChatLayout.tsx:16
-#: src/features/channel/components/direct_message/DirectMessageList.tsx:280
+#: src/features/channel/components/direct_message/DirectMessageList.tsx:276
 #: src/features/input/components/modals/KeyboardShortcutsCheatsheetModal.tsx:28
 #: src/features/user/components/modals/tabs/appearance_tab/AppearanceTabInline.tsx:31
 #: src/features/user/components/modals/tabs/AppearanceTab.tsx:39
@@ -20533,7 +20441,7 @@ msgid "Microphone gain"
 msgstr "Gain du microphone"
 
 #. Title of the modal shown when microphone permission is denied. Keep tone plain.
-#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:13
+#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:12
 msgid "Microphone permission required"
 msgstr "Autorisation micro requise"
 
@@ -20810,7 +20718,7 @@ msgstr "Plus"
 
 #. Short label in the index. Keep it concise.
 #. Short label in the user profile modal. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:48
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:47
 #: src/features/user/components/modals/UserProfileModal.tsx:114
 msgid "More actions"
 msgstr "Plus d'actions"
@@ -20821,7 +20729,7 @@ msgid "More actions for {displayName}"
 msgstr "Plus d'actions pour {displayName}"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:307
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:331
 msgid "More button"
 msgstr "Bouton Plus"
 
@@ -20982,10 +20890,6 @@ msgstr "Authentification à plusieurs facteurs"
 #: src/features/user/components/modals/tabs/component_gallery_tab/MarkdownTab.tsx:57
 msgid "Multi-line"
 msgstr "Multi-line"
-
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:497
-msgid "Multilingual content"
-msgstr "Contenu multilingue"
 
 #. Discovery category dropdown option in the community Discovery settings tab.
 #: src/features/guild/components/modals/guild_tabs/GuildDiscoveryTab.tsx:79
@@ -21170,7 +21074,7 @@ msgstr "masqué"
 #: src/features/app/components/layout/sidebar_nav/GuildListItem.tsx:80
 #: src/features/app/components/layout/VoiceStateIcons.tsx:19
 #: src/features/ui/avatars/AvatarWithPresence.tsx:15
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:439
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:463
 #: src/features/user/components/settings_utils/section_registry/SharedDescriptors.ts:73
 #: src/features/voice/components/voice_participant_tile/shared.ts:75
 #: src/lib/overlay/OverlayContextMenu.tsx:24
@@ -21184,7 +21088,7 @@ msgstr "Désactivé par les modérateurs"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:443
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:467
 #: src/features/user/components/settings_utils/section_registry/SharedDescriptors.ts:69
 msgid "Muted channels"
 msgstr "Canaux masqués"
@@ -21539,7 +21443,7 @@ msgid "NEW"
 msgstr "NEW"
 
 #. Description text in the new account guild limit modal.
-#: src/features/guild/components/alerts/NewAccountGuildLimitModal.tsx:13
+#: src/features/guild/components/alerts/NewAccountGuildLimitModal.tsx:12
 msgid "New accounts can join up to 10 communities in the first 24 hours. Try again later."
 msgstr "Les nouveaux comptes peuvent rejoindre jusqu'à 10 communautés au cours des 24 premières heures. Réessayez plus tard."
 
@@ -21556,20 +21460,20 @@ msgid "New category"
 msgstr "Nouvelle catégorie"
 
 #. Short confirmation button label in advanced settings.
-#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:144
+#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:148
 msgid "New communities only"
 msgstr "Nouvelles communautés uniquement"
 
-#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:618
+#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:635
 msgid "New communities you join will automatically have muted channels hidden. Would you also like to apply this setting to all your existing communities?"
 msgstr "Les nouveaux groupes que vous rejoignez auront automatiquement leurs canaux masqués mis en sourdine. Souhaitez-vous également appliquer ce paramètre à tous vos groupes existants ?"
 
-#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:649
+#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:666
 msgid "New communities you join will no longer have muted channels hidden automatically. Would you also like to show muted channels in all your existing communities?"
 msgstr "Les canaux mis en sourdine des nouvelles communautés que vous rejoindrez ne seront plus masqués automatiquement. Souhaitez-vous également afficher les canaux mis en sourdine dans toutes vos communautés existantes ?"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:451
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:475
 msgid "New community muted"
 msgstr "Nouvelle communauté masquée"
 
@@ -21596,7 +21500,7 @@ msgstr "Nouveau groupe"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #. Tooltip on the new message button at the top of the DM list.
-#: src/features/channel/components/direct_message/DirectMessageList.tsx:94
+#: src/features/channel/components/direct_message/DirectMessageList.tsx:90
 #: src/features/user/components/settings_utils/section_registry/NotificationsSections.ts:159
 msgid "New message"
 msgstr "Nouveau message"
@@ -21643,7 +21547,7 @@ msgid "New users can't join right now. You can still create an account or sign i
 msgstr "Les nouveaux utilisateurs ne peuvent pas s'inscrire pour le moment. Vous pouvez toujours créer un compte ou vous connecter, puis réessayer ce lien plus tard."
 
 #. Fallback version label when the available desktop version is unknown.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:144
+#: src/features/updater/commands/UpdaterModalCommands.tsx:148
 msgid "New version"
 msgstr "Nouvelle version"
 
@@ -21902,16 +21806,16 @@ msgid "No embeds returned"
 msgstr "Aucun aperçu n’a été renvoyé"
 
 #. Empty-state text in the guild emoji tab.
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:46
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:47
 msgid "No emoji slots available"
 msgstr "Aucun emplacement d'emoji disponible"
 
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:479
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:478
 msgid "No emojis found matching your search."
 msgstr "Aucun emoji ne correspond à votre recherche."
 
 #. Empty-state text in the channel and chat emoji picker.
-#: src/features/channel/components/EmojiPicker.tsx:43
+#: src/features/channel/components/EmojiPicker.tsx:41
 msgid "No emojis match that search"
 msgstr "Aucun emoji ne correspond à cette recherche"
 
@@ -22157,7 +22061,7 @@ msgid "No scheduled messages"
 msgstr "Aucun message programmé"
 
 #. Body of the screen-share-unsupported modal shown when xdg-desktop-portal returns no capturable sources.
-#: src/features/voice/components/alerts/ScreenShareUnsupportedModal.tsx:19
+#: src/features/voice/components/alerts/ScreenShareUnsupportedModal.tsx:18
 msgid "No screens or windows were returned by the Linux screen sharing portal. Try again after checking that your desktop environment allows screen capture."
 msgstr "Aucun écran ou aucune fenêtre n'a été renvoyé par le portail de partage d'écran Linux. Veuillez réessayer après avoir vérifié que votre environnement de bureau autorise la capture d'écran."
 
@@ -22185,17 +22089,17 @@ msgid "No specific scopes requested."
 msgstr "Aucune portée spécifique demandée."
 
 #. Empty-state text in the guild stickers tab.
-#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:61
+#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:58
 msgid "No sticker slots available"
 msgstr "Aucun emplacement d'autocollant disponible"
 
 #. Empty-state text in the guild stickers tab.
-#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:57
+#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:54
 msgid "No stickers found"
 msgstr "Aucun sticker trouvé"
 
 #. Empty-state text in the guild stickers tab.
-#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:70
+#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:67
 msgid "No stickers found matching your search."
 msgstr "Aucun sticker ne correspond à votre recherche."
 
@@ -22322,7 +22226,7 @@ msgid "Noise suppression: {noiseSuppressionLabel}"
 msgstr "Suppression du bruit : {noiseSuppressionLabel}"
 
 #. Section heading for static emoji in community emoji settings.
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:100
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:101
 msgid "Non-animated emoji ({emojiCount})"
 msgstr "Émojis non animés ({emojiCount})"
 
@@ -22352,11 +22256,6 @@ msgstr "Aucune"
 #: src/features/channel/components/channel_header_components/developer_tools/OptionPresets.ts:27
 msgid "None (normal behavior)"
 msgstr "Aucun (comportement normal)"
-
-#. Short label in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:106
-msgid "Normal"
-msgstr "Normal"
 
 #. Short label in the language and locale names. Keep it concise.
 #: src/features/user/utils/LocaleUtils.ts:100
@@ -22640,7 +22539,7 @@ msgid "One or more attachments couldn't be read or uploaded. The file may have b
 msgstr "Un ou plusieurs fichiers joints n'ont pas pu être lus ou téléchargés. Le fichier a peut-être été déplacé ou supprimé. Ajoutez-le à nouveau et réessayez."
 
 #. Body of the file-too-large alert for ambiguous count (single or multiple) over the per-file size limit.
-#: src/features/messaging/components/alerts/FileSizeTooLargeModal.tsx:30
+#: src/features/messaging/components/alerts/FileSizeTooLargeModal.tsx:27
 msgid "One or more files you're trying to upload exceed the maximum size limit of {maxSizeFormatted} per file."
 msgstr "Un ou plusieurs fichiers que vous essayez d'envoyer dépassent la limite de taille maximale de {maxSizeFormatted} par fichier."
 
@@ -22782,7 +22681,7 @@ msgid "Only you can see this message. <0>Dismiss</0>"
 msgstr "Seul vous pouvez voir ce message. <0>Ignorer</0>"
 
 #. Short label in the index. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:44
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:43
 msgid "Opacity"
 msgstr "Opacité"
 
@@ -22960,7 +22859,7 @@ msgid "Open date picker"
 msgstr "Ouvrir le sélecteur de date"
 
 #. Button label that opens the Fluxer desktop downloads page in a browser.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:79
+#: src/features/updater/commands/UpdaterModalCommands.tsx:83
 msgid "Open desktop downloads"
 msgstr "Ouvrir les téléchargements pour ordinateur"
 
@@ -23144,7 +23043,7 @@ msgid "Open profile for {nickname}"
 msgstr "Ouvrir le profil de {nickname}"
 
 #. Accessible label and tooltip for the search field at the top of the DM list. Opens the quick switcher.
-#: src/features/channel/components/direct_message/DirectMessageList.tsx:90
+#: src/features/channel/components/direct_message/DirectMessageList.tsx:86
 msgid "Open quick switcher"
 msgstr "Ouvrir le sélecteur rapide"
 
@@ -23154,6 +23053,11 @@ msgstr "Ouvrir le sélecteur rapide"
 #: src/features/permissions/system/components/modals/MacPermissionsModal.tsx:75
 msgid "Open settings"
 msgstr "Ouvrir les réglages"
+
+#. Button label that opens the software center via appstream protocol.
+#: src/features/updater/commands/UpdaterModalCommands.tsx:79
+msgid "Open software center"
+msgstr "Ouvrir le centre logiciel"
 
 #. Action that opens the sticker URL in an external browser.
 #: src/features/ui/action_menu/items/StickerContextMenuItems.tsx:40
@@ -23301,11 +23205,6 @@ msgstr "Système d'exploitation"
 msgid "Opt into experimental per-community and per-channel unread badge controls"
 msgstr "Activez les paramètres expérimentaux de contrôle des badges d’éléments non lus par communauté et par canal"
 
-#. Label in the typography tab.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:46
-msgid "Optimized for longer reading passages"
-msgstr "Optimisé pour les passages de lecture plus longs"
-
 #: src/features/voice/components/modals/CameraPreviewModal.tsx:906
 msgid "Optimizing camera..."
 msgstr "Optimisation de la caméra..."
@@ -23372,6 +23271,11 @@ msgstr "ou envoyer le lien cadeau à un ami :"
 #: src/features/user/components/modals/tabs/component_gallery_tab/MarkdownTab.tsx:41
 msgid "Ordered"
 msgstr "Classé par ordre"
+
+#. Settings search synonym. Used to match this term when the user types it in the settings search bar.
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:139
+msgid "Ordered upload"
+msgstr "Téléchargement ordonné"
 
 #. Error message in the channel and chat reply preview.
 #: src/features/channel/components/ReplyPreview.tsx:29
@@ -23468,7 +23372,7 @@ msgstr "Hors de la période de remboursement"
 msgid "Overlapping avatar groups showing multiple users with automatic overflow counts."
 msgstr "Groupes d'avatars superposés affichant plusieurs utilisateurs avec un nombre de dépassement automatique."
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:327
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:326
 msgid "Overlays & menus"
 msgstr "Superpositions et menus"
 
@@ -23871,11 +23775,6 @@ msgstr "Volume par son"
 msgid "Per-window audio isn't available on this build of macOS."
 msgstr "L'audio par fenêtre n'est pas disponible sur cette version de macOS."
 
-#. Label in the typography tab.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:38
-msgid "Perfect for everyday content"
-msgstr "Parfait pour le contenu quotidien"
-
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #: src/features/user/components/settings_utils/search_index/DesktopSettingsIndex.ts:86
 msgid "Performance"
@@ -23950,7 +23849,7 @@ msgid "Personal notes"
 msgstr "Notes personnelles"
 
 #. Toast shown when triggering the purge personal notes flow on an already empty self-DM.
-#: src/features/channel/components/direct_message/DirectMessageList.tsx:86
+#: src/features/channel/components/direct_message/DirectMessageList.tsx:82
 msgid "Personal notes were already empty"
 msgstr "Les notes personnelles étaient déjà vides"
 
@@ -24078,12 +23977,12 @@ msgid "Pick the rule to review."
 msgstr "Choisissez la règle à examiner."
 
 #. Settings search entry description. One-line summary of what the settings search entry controls.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:335
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:359
 msgid "Pick what appears when you type a colon in the message input"
 msgstr "Choisissez ce qui s’affiche lorsque vous tapez deux-points dans la zone de saisie du message"
 
 #. Settings search entry description. One-line summary of what the settings search entry controls.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:387
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:411
 msgid "Pick which buttons show in the message input"
 msgstr "Choisissez les boutons à afficher dans la zone de saisie des messages"
 
@@ -24402,11 +24301,6 @@ msgstr "Position"
 msgid "Power saving"
 msgstr "Économie d'énergie"
 
-#. Short label in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:70
-msgid "Powerful and attention-grabbing"
-msgstr "Puissant et accrocheur"
-
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:111
 msgid "Pre-upload attachments"
@@ -24469,12 +24363,12 @@ msgid "Premium badge"
 msgstr "Badge Premium"
 
 #. Developer control label for the premium-expired banner.
-#: src/features/devtools/components/NagbarControls.ts:48
+#: src/features/devtools/components/NagbarControls.ts:43
 msgid "Premium expired nagbar"
 msgstr "Bannière d'expiration de l'abonnement Premium"
 
 #. Developer control label for the premium grace-period banner.
-#: src/features/devtools/components/NagbarControls.ts:44
+#: src/features/devtools/components/NagbarControls.ts:39
 msgid "Premium grace period nagbar"
 msgstr "Bannière de période de grâce Premium"
 
@@ -24484,7 +24378,7 @@ msgid "Premium model"
 msgstr "Modèle premium"
 
 #. Developer control label for the premium-onboarding banner.
-#: src/features/devtools/components/NagbarControls.ts:52
+#: src/features/devtools/components/NagbarControls.ts:47
 msgid "Premium onboarding nagbar"
 msgstr "Bannière d'intégration Premium"
 
@@ -24676,7 +24570,7 @@ msgstr "Principal (désactivé)"
 msgid "Primary accent color"
 msgstr "Couleur d'accentuation principale"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:351
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:350
 msgid "Primary action"
 msgstr "Action principale"
 
@@ -24921,7 +24815,7 @@ msgid "Promotion or instructions encouraging self-harm or eating disorders."
 msgstr "Promotion ou instructions encourageant l'automutilation ou les troubles alimentaires."
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:423
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:447
 msgid "Prompt"
 msgstr "Invite"
 
@@ -25040,7 +24934,7 @@ msgstr "Achats indisponibles"
 
 #. Confirm button label on the purge-personal-notes destructive alert.
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/channel/components/direct_message/DirectMessageList.tsx:78
+#: src/features/channel/components/direct_message/DirectMessageList.tsx:74
 #: src/features/user/components/settings_utils/section_registry/PrivacySafetySections.ts:248
 msgid "Purge"
 msgstr "Purger"
@@ -25051,7 +24945,7 @@ msgid "Purge messages"
 msgstr "Purger les messages"
 
 #. Title of the destructive confirmation alert when wiping the personal notes self-DM. Keep tone serious.
-#: src/features/channel/components/direct_message/DirectMessageList.tsx:68
+#: src/features/channel/components/direct_message/DirectMessageList.tsx:64
 #: src/features/ui/action_menu/PersonalNotesContextMenu.tsx:26
 msgid "Purge personal notes"
 msgstr "Purger les notes personnelles"
@@ -25067,7 +24961,7 @@ msgid "Purge this sticker from storage and CDN"
 msgstr "Purger cet autocollant du stockage et du CDN"
 
 #. Toast confirmation after wiping personal notes. deletedCount is the number of messages removed.
-#: src/features/channel/components/direct_message/DirectMessageList.tsx:82
+#: src/features/channel/components/direct_message/DirectMessageList.tsx:78
 msgid "Purged {deletedCount} messages from personal notes"
 msgstr "{deletedCount} messages des notes personnelles ont été purgés"
 
@@ -25197,13 +25091,13 @@ msgid "Quick CSS replaced from {fileName}."
 msgstr "CSS rapide remplacé depuis {fileName}."
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:295
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:319
 msgid "Quick reactions"
 msgstr "Réactions rapides"
 
 #. Accessible label for the desktop quick switcher modal.
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/channel/components/direct_message/DirectMessageList.tsx:484
+#: src/features/channel/components/direct_message/DirectMessageList.tsx:479
 #: src/features/search/components/quick_switcher/QuickSwitcherModal.tsx:77
 #: src/features/user/components/settings_utils/search_index/KeybindsIndex.ts:50
 msgid "Quick switcher"
@@ -25621,7 +25515,7 @@ msgid "Reference copied."
 msgstr "Référence copiée."
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:147
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:171
 msgid "Referral parameters"
 msgstr "Paramètres de parrainage"
 
@@ -25708,11 +25602,6 @@ msgstr "Inscription"
 #: src/features/auth/flow/AuthRegisterFormCore.tsx:312
 msgid "Registration is currently closed. Use a registration link from an admin to create an account."
 msgstr "Les inscriptions sont actuellement fermées. Utilisez un lien d’inscription fourni par un admin pour créer un compte."
-
-#. Short label in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:34
-msgid "Regular"
-msgstr "Normal"
 
 #: src/features/user/components/modals/tabs/component_gallery_tab/ComponentGalleryTabButtonsTab.tsx:226
 msgid "Regular button"
@@ -25918,8 +25807,8 @@ msgstr "Supprimer la pièce jointe"
 msgid "Remove authenticator app"
 msgstr "Supprimer l'application d'authentification"
 
-#: src/features/user/components/modals/tabs/my_profile_tab/AvatarUploader.tsx:406
-#: src/features/user/components/modals/tabs/my_profile_tab/AvatarUploader.tsx:442
+#: src/features/user/components/modals/tabs/my_profile_tab/AvatarUploader.tsx:404
+#: src/features/user/components/modals/tabs/my_profile_tab/AvatarUploader.tsx:440
 msgid "Remove avatar"
 msgstr "Supprimer l'avatar"
 
@@ -26183,7 +26072,7 @@ msgstr "A supprimé la limite d'utilisateurs."
 msgid "Removed timeout from {0}"
 msgstr "Temps mort supprimé pour {0}"
 
-#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:381
+#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:387
 msgid "Removes every per-variable override but keeps your library and assets intact."
 msgstr "Supprime toutes les surcharges par variable, mais conserve votre bibliothèque et vos ressources intactes."
 
@@ -26688,7 +26577,7 @@ msgstr "Réinitialiser les données de l'app"
 msgid "Reset app data and restart"
 msgstr "Réinitialiser les données de l'app et redémarrer"
 
-#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:356
+#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:362
 msgid "Reset custom theme data"
 msgstr "Réinitialiser les données du thème personnalisé"
 
@@ -26699,7 +26588,7 @@ msgstr "Réinitialiser les données du thème personnalisé ?"
 
 #. Button or menu action label in the theme studio settings section. Keep it concise.
 #: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:76
-#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:371
+#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:377
 msgid "Reset data"
 msgstr "Réinitialiser les données"
 
@@ -26839,7 +26728,7 @@ msgid "Restart {appName}"
 msgstr "Redémarrer {appName}"
 
 #. Button label that restarts the app to apply a desktop update. productName is the app name.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:96
+#: src/features/updater/commands/UpdaterModalCommands.tsx:100
 msgid "Restart {productName}"
 msgstr "Redémarrer {productName}"
 
@@ -26938,14 +26827,14 @@ msgid "Reverify your phone number to continue using {productName}."
 msgstr "Veuillez revérifier votre numéro de téléphone pour continuer à utiliser {productName}."
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:247
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:271
 msgid "Reverse image"
 msgstr "Recherche d'image inversée"
 
 #. Generic action label that runs a reverse-image search on the selected media.
 #. Settings search entry label. Also used as a search synonym in the settings search bar.
 #: src/features/i18n/utils/CommonMessageDescriptors.ts:603
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:243
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:267
 msgid "Reverse image search"
 msgstr "Recherche d'image inversée"
 
@@ -26955,7 +26844,7 @@ msgid "Reverse image search provider"
 msgstr "Fournisseur de recherche d'images inversée"
 
 #. Settings search entry description. One-line summary of what the settings search entry controls.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:275
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:299
 msgid "Reverse image search providers"
 msgstr "Fournisseurs de recherche inversée d’images."
 
@@ -27020,7 +26909,7 @@ msgid "Review the permissions {productName} uses for voice, video, screen sharin
 msgstr "Vérifiez les autorisations que {productName} utilise pour la voix, la vidéo, le partage d'écran et les raccourcis."
 
 #. Intro text in the error modal shown after some emoji uploads fail.
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:71
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:72
 msgid "Review these files and try again with smaller or simpler images."
 msgstr "Vérifiez ces fichiers et réessayez avec des images plus petites ou plus simples."
 
@@ -27191,7 +27080,7 @@ msgid "Role name"
 msgstr "Nom du rôle"
 
 #. Validation modal title when the role-edit form is submitted with an empty role name.
-#: src/features/app/components/alerts/RoleNameBlankModal.tsx:9
+#: src/features/app/components/alerts/RoleNameBlankModal.tsx:8
 msgid "Role name is required"
 msgstr "Le nom du rôle est obligatoire"
 
@@ -27300,7 +27189,7 @@ msgid "Same time as you"
 msgstr "Même fuseau horaire que vous"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:155
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:179
 msgid "Sanitize link"
 msgstr "Nettoyer le lien"
 
@@ -27421,7 +27310,7 @@ msgid "Saved media autocomplete"
 msgstr "Saisie semi-automatique des médias enregistrés"
 
 #. Short label in the max favorite memes modal.
-#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:15
+#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:16
 msgid "Saved media limit reached"
 msgstr "Limite de médias enregistrés atteinte"
 
@@ -27528,7 +27417,7 @@ msgstr "Annonces du lecteur d'écran"
 
 #. Heading in the screen-share picker when macOS screen recording permission is missing.
 #. Title of the modal shown when screen recording permission is denied. Keep tone plain.
-#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:21
+#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:20
 #: src/features/voice/components/modals/screen_share_picker_modal/ScreenSharePickerDisplayPermissionPrompt.tsx:18
 msgid "Screen recording permission required"
 msgstr "Autorisation d'enregistrement d'écran requise"
@@ -27561,7 +27450,7 @@ msgid "Screen share encoder controls"
 msgstr "Commandes de l’encodeur de partage d’écran"
 
 #. Title of a modal shown when an active screen share stops unexpectedly.
-#: src/features/voice/engine/v2/VoiceEngineV2AppScreenShareExecutionAdapter.tsx:111
+#: src/features/voice/engine/v2/VoiceEngineV2AppScreenShareExecutionAdapter.tsx:110
 msgctxt "screen-share"
 msgid "Screen share ended"
 msgstr "Partage d’écran terminé"
@@ -27648,17 +27537,17 @@ msgid "Screen sharing codec"
 msgstr "Codec de partage d'écran"
 
 #. Title of the modal shown when a screen share attempt fails due to a video source error.
-#: src/features/voice/components/alerts/ScreenShareFailedModal.tsx:9
+#: src/features/voice/components/alerts/ScreenShareFailedModal.tsx:8
 msgid "Screen sharing failed"
 msgstr "Échec du partage d’écran"
 
 #. Body of the screen-share-unsupported modal. Mentions specific browsers and OSes; keep all proper nouns intact.
-#: src/features/voice/components/alerts/ScreenShareUnsupportedModal.tsx:13
+#: src/features/voice/components/alerts/ScreenShareUnsupportedModal.tsx:12
 msgid "Screen sharing is not supported on this device or browser. This feature requires a desktop browser that supports screen sharing, such as Chrome, Firefox, or Edge on Windows, macOS, or Linux."
 msgstr "Le partage d'écran n'est pas pris en charge sur cet appareil ou ce navigateur. Cette fonctionnalité nécessite un navigateur de bureau compatible avec le partage d'écran, tel que Chrome, Firefox ou Edge sur Windows, macOS ou Linux."
 
 #. Title of the modal shown when screen sharing is not supported on the current device / browser.
-#: src/features/voice/components/alerts/ScreenShareUnsupportedModal.tsx:9
+#: src/features/voice/components/alerts/ScreenShareUnsupportedModal.tsx:8
 msgid "Screen sharing not supported"
 msgstr "Partage d'écran non pris en charge"
 
@@ -27698,15 +27587,15 @@ msgstr "Faites défiler pour voir tous les avantages inclus avec {premiumProduct
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #. Short label in the whats new modal.
 #: src/features/app/components/whats_new/WhatsNewModal.tsx:28
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:395
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:419
 #: src/features/user/components/settings_utils/section_registry/ChatSettingsSections.ts:178
 msgid "Scroll to bottom"
 msgstr "Faire défiler vers le bas"
 
 #. Settings search entry label. Names the settings search entry in the settings UI.
 #. Short label for an advanced message input preference.
-#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:124
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:391
+#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:128
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:415
 msgid "Scroll to bottom when sending a message"
 msgstr "Faire défiler vers le bas lors de l'envoi d'un message"
 
@@ -27758,7 +27647,7 @@ msgid "Search bans"
 msgstr "Rechercher des bannissements"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:255
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:279
 msgid "Search by image"
 msgstr "Rechercher par image"
 
@@ -27795,17 +27684,17 @@ msgid "Search countries…"
 msgstr "Rechercher des pays…"
 
 #. Button or menu action label in the guild emoji tab. Keep it concise.
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:91
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:92
 msgid "Search emojis"
 msgstr "Rechercher des émojis"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:207
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:231
 msgid "Search engine"
 msgstr "Moteur de recherche"
 
 #. Settings search entry label. Names the settings search entry in the settings UI.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:203
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:227
 msgid "Search engines"
 msgstr "Moteurs de recherche"
 
@@ -27935,7 +27824,7 @@ msgid "Search scope: {label}"
 msgstr "Portée de la recherche : {label}"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:215
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:239
 msgid "Search selected text"
 msgstr "Rechercher le texte sélectionné"
 
@@ -27960,7 +27849,7 @@ msgid "Search shortcuts…"
 msgstr "Rechercher des raccourcis…"
 
 #. Button or menu action label in the guild stickers tab. Keep it concise.
-#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:49
+#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:46
 msgid "Search stickers"
 msgstr "Rechercher des stickers"
 
@@ -28015,7 +27904,7 @@ msgstr "Recherche en cours"
 msgid "Searching people..."
 msgstr "Recherche de personnes..."
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:113
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:112
 msgid "Second option"
 msgstr "Deuxième option"
 
@@ -28032,7 +27921,7 @@ msgstr "Secondaire (désactivé)"
 msgid "Secondary accent color"
 msgstr "Couleur d'accentuation secondaire"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:355
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:354
 msgid "Secondary action"
 msgstr "Action secondaire"
 
@@ -28324,7 +28213,7 @@ msgstr "Sélection : {0}"
 msgid "Selection: {0} (max {1})"
 msgstr "Sélection : {0} (max {1})"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:293
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:292
 msgid "Selections"
 msgstr "Sélections"
 
@@ -28353,16 +28242,6 @@ msgstr "Forcer le mode auto-hébergé"
 #: src/features/app/components/dialogs/components/PurchaseDisclaimer.tsx:36
 msgid "Self-serve refunds available within 3 days of payment, once every 30 days. Refunding a subscription cancels it. EU/EEA buyers waive the 14-day right of withdrawal at checkout to access content immediately. Use the in-app refund button instead of a chargeback. Chargebacks can permanently restrict your account. Stripe handles payment securely. We never see your full card number."
 msgstr "Remboursements en libre-service disponibles dans les 3 jours suivant le paiement, une fois tous les 30 jours. Le remboursement d'un abonnement l'annule. Les acheteurs de l'UE/EEE renoncent à leur droit de rétractation de 14 jours lors du paiement pour accéder immédiatement au contenu. Utilisez le bouton de remboursement intégré à l'application au lieu d'une rétrofacturation. Les rétrofacturations peuvent restreindre définitivement votre compte. Stripe gère les paiements en toute sécurité. Nous ne voyons jamais votre numéro de carte complet."
-
-#. Short label in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:58
-msgid "Semi bold"
-msgstr "Semi-gras"
-
-#. Short label in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:126
-msgid "Semi-bold large"
-msgstr "Semi-gras grand"
 
 #. Button or menu action label in the share theme modal. Keep it concise.
 #. Send-message button label in the voice message composer modal.
@@ -28423,7 +28302,7 @@ msgstr "Envoyer un autre signalement"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:383
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:407
 #: src/features/user/components/settings_utils/section_registry/ChatSettingsSections.ts:170
 msgid "Send button"
 msgstr "Bouton d'envoi"
@@ -28438,6 +28317,13 @@ msgstr "Envoyer le code"
 #: src/features/moderation/components/report/ReportStepDetails.tsx:302
 msgid "Send DSA report"
 msgstr "Envoyer le signalement DSA"
+
+#. Settings search entry label. Names the settings search entry in the settings UI.
+#. Short label for an advanced message input preference.
+#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:112
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:127
+msgid "Send file messages in order"
+msgstr "Envoyer les messages de fichiers dans l'ordre"
 
 #. Button or menu action label in the user profile mobile sheet. Keep it concise.
 #. Button or menu action label in the user profile modal. Keep it concise.
@@ -28631,10 +28517,20 @@ msgstr "a envoyé un aperçu"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:399
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:423
 #: src/features/user/components/settings_utils/section_registry/ChatSettingsSections.ts:182
 msgid "Sent messages"
 msgstr "Messages envoyés"
+
+#. Settings search synonym. Used to match this term when the user types it in the settings search bar.
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:131
+msgid "Sequential send"
+msgstr "Envoi séquentiel"
+
+#. Settings search synonym. Used to match this term when the user types it in the settings search bar.
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:143
+msgid "Serial send"
+msgstr "Envoi en série"
 
 #: src/features/connection/components/modals/AddConnectionModal.tsx:326
 msgid "Serve the token file"
@@ -28919,7 +28815,7 @@ msgstr "Définit le volume de tous les effets sonores. Les réglages individuels
 #. Generic action label / section header that opens settings.
 #: src/features/i18n/utils/CommonMessageDescriptors.ts:262
 #: src/features/user/components/modals/tabs/component_gallery_tab/ComponentGalleryTabButtonsTab.tsx:264
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:126
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:125
 msgid "Settings"
 msgstr "Réglages"
 
@@ -28959,9 +28855,9 @@ msgid "Several people are typing..."
 msgstr "Plusieurs personnes sont en train d'écrire..."
 
 #: src/features/theme_studio/sections/QuickCssSection.tsx:225
-#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:316
+#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:322
 #: src/features/user/components/modals/tabs/component_gallery_tab/ComponentGalleryTabButtonsTab.tsx:279
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:133
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:132
 msgid "Share"
 msgstr "Partager"
 
@@ -28970,7 +28866,7 @@ msgstr "Partager"
 msgid "Share action."
 msgstr "Partager l'action."
 
-#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:322
+#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:328
 msgid "Share active custom theme"
 msgstr "Partager le thème personnalisé actif"
 
@@ -29003,7 +28899,7 @@ msgstr "Partager la source"
 msgid "Share the {premiumProductName} experience with your friends by purchasing a gift subscription."
 msgstr "Offrez l'expérience {premiumProductName} à vos amis en leur achetant un abonnement cadeau."
 
-#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:341
+#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:347
 msgid "Share theme"
 msgstr "Partager le thème"
 
@@ -29098,7 +28994,7 @@ msgid "Shift"
 msgstr "Maj"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:299
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:323
 msgid "Shift expand"
 msgstr "Développer la sélection"
 
@@ -29299,7 +29195,7 @@ msgstr "Afficher les aperçus des liens et les contenus intégrés"
 #. Short label for an advanced message input preference.
 #. Short label in the channel and chat textarea plus menu. Keep it concise.
 #: src/features/channel/components/textarea/TextareaPlusMenu.tsx:55
-#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:116
+#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:120
 msgid "Show emoji button"
 msgstr "Afficher le bouton emoji"
 
@@ -29353,7 +29249,7 @@ msgid "Show icon when collapsed"
 msgstr "Afficher l'icône lorsque le dossier est réduit"
 
 #. Short confirmation button label in advanced settings.
-#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:152
+#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:156
 msgid "Show in all communities"
 msgstr "Afficher dans toutes les communautés"
 
@@ -29543,7 +29439,7 @@ msgstr "Afficher les médias enregistrés dans la saisie semi-automatique des ex
 #. Short label for an advanced message input preference.
 #. Short label in the channel and chat textarea plus menu. Keep it concise.
 #: src/features/channel/components/textarea/TextareaPlusMenu.tsx:59
-#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:120
+#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:124
 msgid "Show send button"
 msgstr "Afficher le bouton d'envoi"
 
@@ -29555,7 +29451,7 @@ msgstr "Afficher le contenu masqué au clic"
 #. Short label for an advanced message input preference.
 #. Short label in the channel and chat textarea plus menu. Keep it concise.
 #: src/features/channel/components/textarea/TextareaPlusMenu.tsx:51
-#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:112
+#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:116
 msgid "Show stickers button"
 msgstr "Afficher le bouton des stickers"
 
@@ -29860,14 +29756,14 @@ msgid "Size selection"
 msgstr "Sélection de la taille"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:427
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:451
 msgid "Skip"
 msgstr "Passer"
 
 #. Settings search entry label. Names the settings search entry in the settings UI.
 #. Short label for an advanced inbox preference.
-#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:128
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:407
+#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:132
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:431
 msgid "Skip \"Mark all as read\" confirmation"
 msgstr "Ignorer la confirmation \" Tout marquer comme lu \""
 
@@ -29881,7 +29777,7 @@ msgid "Skip external link warnings. Less secure."
 msgstr "Ignorer les avertissements de liens externes. Moins sécurisé."
 
 #. Settings search entry description. One-line summary of what the settings search entry controls.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:199
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:223
 msgid "Skip the external link warning for all domains"
 msgstr "Ignorer l'avertissement de lien externe pour tous les domaines"
 
@@ -29931,11 +29827,6 @@ msgstr "Curseur avec valeurs de pas"
 msgid "Sliders"
 msgstr "Curseurs"
 
-#. Short label in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:54
-msgid "Slightly bolder emphasis"
-msgstr "Mise en évidence légèrement plus grasse"
-
 #. Country name. EU member state in the illegal-content report country dropdown.
 #: src/features/moderation/components/report/OptionDescriptors.ts:203
 msgid "Slovakia"
@@ -29954,7 +29845,7 @@ msgid "Slow attachment upload"
 msgstr "Chargement lent des pièces jointes"
 
 #. Short label in the new account guild limit modal. Keep it concise.
-#: src/features/guild/components/alerts/NewAccountGuildLimitModal.tsx:9
+#: src/features/guild/components/alerts/NewAccountGuildLimitModal.tsx:8
 msgid "Slow down"
 msgstr "Du calme"
 
@@ -30004,7 +29895,7 @@ msgstr "Mode lent · attendez {remaining}"
 #. Developer tools debug menu label. Internal-only surface for developers; translators may keep this terse.
 #. Short label in the slowmode rate limited modal. Keep it concise.
 #: src/features/channel/components/channel_header_components/developer_tools/DeveloperOptionLabels.ts:249
-#: src/features/slowmode/components/alerts/SlowmodeRateLimitedModal.tsx:14
+#: src/features/slowmode/components/alerts/SlowmodeRateLimitedModal.tsx:13
 msgid "Slowmode active"
 msgstr "Mode lent activé"
 
@@ -30019,7 +29910,7 @@ msgid "Slowmode is enabled, but you are immune."
 msgstr "Le mode lent est activé, mais vous êtes immunisé."
 
 #. Modal body shown when slowmode blocks sending a message. {duration} is a localized short duration such as "2 minutes".
-#: src/features/slowmode/components/alerts/SlowmodeRateLimitedModal.tsx:18
+#: src/features/slowmode/components/alerts/SlowmodeRateLimitedModal.tsx:17
 msgid "Slowmode is on — wait {duration} before sending another."
 msgstr "Le mode lent est activé — attendez {duration} avant d'envoyer un autre message."
 
@@ -30044,9 +29935,7 @@ msgid "Slurs, dehumanizing language, or attacks on protected groups."
 msgstr "Insultes, langage déshumanisant ou attaques envers des groupes protégés."
 
 #. Short label in the selections tab. Keep it concise.
-#. Short label in the typography tab. Keep it concise.
 #: src/features/user/components/modals/tabs/component_gallery_tab/SelectionsTab.tsx:45
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:78
 msgid "Small"
 msgstr "Petit"
 
@@ -30087,7 +29976,7 @@ msgid "Smaller media size"
 msgstr "Taille de média plus petite"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:355
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:379
 msgid "Smiley face"
 msgstr "Visage souriant"
 
@@ -30129,11 +30018,6 @@ msgstr "S'aligne sur des incréments de 5."
 msgid "Social"
 msgstr "Social"
 
-#. Label in the typography tab.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:30
-msgid "Soft and easy reading experience"
-msgstr "Une lecture douce et agréable"
-
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #: src/features/user/components/settings_utils/search_index/VoiceVideoIndex.ts:148
 msgid "Software encoder"
@@ -30150,12 +30034,12 @@ msgid "Sold out"
 msgstr "Épuisé"
 
 #. Title of the error modal shown after some emoji uploads fail.
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:67
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:68
 msgid "Some emojis couldn't be added"
 msgstr "Certains émojis n'ont pas pu être ajoutés"
 
 #. Body of the file-too-large alert when multiple files exceed the per-file size limit. maxSizeFormatted is the limit formatted with units.
-#: src/features/messaging/components/alerts/FileSizeTooLargeModal.tsx:21
+#: src/features/messaging/components/alerts/FileSizeTooLargeModal.tsx:18
 msgid "Some files you're trying to upload exceed the maximum size limit of {maxSizeFormatted} per file."
 msgstr "Certains fichiers que vous essayez d'envoyer dépassent la limite de taille maximale de {maxSizeFormatted} par fichier."
 
@@ -30283,10 +30167,8 @@ msgstr "Une erreur est survenue."
 #. Body of the generic fallback error modal shown when deleting a custom emoji fails.
 #. Body of the generic fallback error modal shown when generating a shareable theme link fails.
 #. Body of the generic fallback error modal shown when joining a discovery community fails.
-#. Body of the generic fallback error modal shown when joining the canary testers community fails.
 #. Generic fallback body shown in an error modal when an action fails for an unexpected reason.
 #: src/features/app/components/alerts/CommonErrorModalDescriptors.ts:5
-#: src/features/app/components/layout/app_layout/nagbars/CanaryTesterCtaNagbar.tsx:60
 #: src/features/discovery/discovery/DiscoveryGuildCard.tsx:36
 #: src/features/emoji/components/emojis/EmojiListItem.tsx:128
 #: src/features/theme/components/modals/ShareThemeModal.tsx:50
@@ -30794,7 +30676,7 @@ msgid "Start searches with <0>{peoplePrefix}</0> <1>{textChannelPrefix}</1> <2>{
 msgstr "Commencez vos recherches avec <0>{peoplePrefix}</0> <1>{textChannelPrefix}</1> <2>{voiceChannelPrefix}</2> <3>{communityPrefix}</3> pour affiner les résultats."
 
 #. Settings search entry description. One-line summary of what the settings search entry controls.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:127
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:151
 msgid "Start uploading attachments as soon as they are added to the message input"
 msgstr "Commencez à télécharger les pièces jointes dès qu’elles sont ajoutées à la zone de saisie du message"
 
@@ -30845,7 +30727,7 @@ msgstr "Indicateurs de statut"
 msgid "Status page"
 msgstr "Page d'état"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:341
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:340
 msgid "Status slate"
 msgstr "Ardoise de statut"
 
@@ -30923,7 +30805,7 @@ msgid "Sticker attached to the message"
 msgstr "Sticker joint au message"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:331
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:355
 msgid "Sticker autocomplete"
 msgstr "Complétion automatique des autocollants"
 
@@ -30948,7 +30830,7 @@ msgid "Sticker deleted"
 msgstr "Sticker supprimé"
 
 #. Short label in the guild stickers tab. Keep it concise.
-#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:53
+#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:50
 msgid "Sticker density"
 msgstr "Densité des stickers"
 
@@ -30996,7 +30878,7 @@ msgstr "Limite de packs de stickers atteinte"
 msgid "Sticker packs"
 msgstr "Packs de stickers"
 
-#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:283
+#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:278
 msgid "Sticker slots"
 msgstr "Emplacements de stickers"
 
@@ -31032,7 +30914,7 @@ msgid "Stickers"
 msgstr "Autocollants"
 
 #. Description in the community sticker upload section. {maxSize} is the formatted size limit.
-#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:82
+#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:79
 msgid "Stickers are saved at 320x320 pixels and must be under {maxSize}. Static images are resized and compressed automatically. Animated stickers and SVGs must already fit the limit."
 msgstr "Les autocollants sont enregistrés en 320 x 320 pixels et doivent avoir une taille inférieure à {maxSize}. Les images statiques sont redimensionnées et compressées automatiquement. Les autocollants animés et les SVG doivent déjà respecter cette limite."
 
@@ -31077,7 +30959,7 @@ msgid "Stop"
 msgstr "Arrêter"
 
 #. Confirmation prompt in advanced settings.
-#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:148
+#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:152
 msgid "Stop hiding muted channels by default?"
 msgstr "Arrêter de masquer les canaux mis en sourdine par défaut ?"
 
@@ -31228,19 +31110,19 @@ msgid "Strikethrough"
 msgstr "Barré"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:163
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:187
 msgid "Strip parameters"
 msgstr "Supprimer les paramètres"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:159
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:183
 msgid "Strip tracking"
 msgstr "Supprimer le suivi"
 
 #. Label in the links tab.
 #. Settings search entry label. Names the settings search entry in the settings UI.
 #: src/features/user/components/modals/tabs/chat_settings_tab/ChatSettingsTabLinksTab.tsx:43
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:131
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:155
 msgid "Strip tracking parameters from URLs"
 msgstr "Supprimer les paramètres de suivi des URL"
 
@@ -31258,15 +31140,6 @@ msgstr "Stripe a signalé une carte émise en {countryName}. Pour payer dans cet
 #: src/features/voice/utils/ScreenShareCodecPolicy.ts:15
 msgid "Strong quality at moderate CPU cost. Good Chromium fallback for screen sharing."
 msgstr "Bonne qualité avec un coût CPU modéré. Bonne solution de secours Chromium pour le partage d'écran."
-
-#. Short label in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:62
-msgid "Strong visual hierarchy"
-msgstr "Hiérarchie visuelle forte"
-
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:458
-msgid "Style variations"
-msgstr "Variantes de style"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #: src/features/user/components/settings_utils/section_registry/AppearanceSections.ts:130
@@ -31313,11 +31186,6 @@ msgstr "Scénarios d'abonnement"
 #: src/features/user/components/modals/tabs/component_gallery_tab/MarkdownTab.tsx:81
 msgid "Subtext"
 msgstr "Sous-texte"
-
-#. Title in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:90
-msgid "Subtitle"
-msgstr "Sous-titre"
 
 #. Developer tools debug menu label. Internal-only surface for developers; translators may keep this terse.
 #: src/features/channel/components/channel_header_components/developer_tools/OptionPresets.ts:71
@@ -31403,7 +31271,7 @@ msgid "SVC mode"
 msgstr "Mode SVC"
 
 #. Settings search entry description. One-line summary of what the settings search entry controls.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:363
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:387
 msgid "Swap common text faces such as :) and <3 for emoji when sending messages"
 msgstr "Remplacer les émoticônes courantes comme :) et <3 par des emojis lors de l'envoi de messages"
 
@@ -31754,7 +31622,7 @@ msgstr "Onglet"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #. Short label in the FluxerTag change modal. Keep it concise.
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:60
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:61
 #: src/features/user/components/settings_utils/search_index/MyProfileIndex.ts:73
 msgid "Tag"
 msgstr "Tag"
@@ -31862,7 +31730,7 @@ msgid "temporarily unavailable"
 msgstr "temporairement indisponible"
 
 #. Modal body shown when the user tries to accept a temporary invite while the realtime connection is offline.
-#: src/features/app/components/alerts/TemporaryInviteRequiresPresenceModal.tsx:13
+#: src/features/app/components/alerts/TemporaryInviteRequiresPresenceModal.tsx:12
 msgid "Temporary invites need a live connection. Check yours and try again."
 msgstr "Les invitations temporaires nécessitent une connexion active. Vérifiez la vôtre et réessayez."
 
@@ -31872,7 +31740,7 @@ msgid "Temporary membership"
 msgstr "Adhésion temporaire"
 
 #. Developer control label for the terms-acceptance banner.
-#: src/features/devtools/components/NagbarControls.ts:64
+#: src/features/devtools/components/NagbarControls.ts:59
 msgid "Terms acceptance nagbar"
 msgstr "Bannière d'acceptation des conditions d'utilisation"
 
@@ -31903,10 +31771,8 @@ msgstr "Tester les aperçus d’URL et les intégrations rendues"
 
 #. Channel type chip label for a text channel.
 #. Option label for a WebRTC content hint select.
-#. Short label in the typography tab. Keep it concise.
 #: src/features/channel/utils/ChannelUtils.tsx:51
 #: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedVideoControls.tsx:150
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:42
 msgid "Text"
 msgstr "Texte"
 
@@ -31941,9 +31807,13 @@ msgstr "Salons textuels"
 msgid "Text formatting"
 msgstr "Mise en forme du texte"
 
+#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:308
+msgid "Text is rendered with grayscale antialiasing instead of ClearType while transparency is enabled, so it will look softer."
+msgstr "Le texte est rendu avec un antialiasing en niveaux de gris au lieu de ClearType lorsque la transparence est activée, il apparaîtra donc plus doux."
+
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:359
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:383
 #: src/features/user/components/settings_utils/section_registry/ChatSettingsSections.ts:150
 msgid "Text replacement"
 msgstr "Remplacement de texte"
@@ -31982,12 +31852,12 @@ msgid "Text-to-speech"
 msgstr "Text-to-speech"
 
 #. Body of the TTS-unsupported modal. Mentions specific browsers; keep Chrome, Firefox, Edge, and Brave as literal proper nouns.
-#: src/features/voice/components/alerts/TtsUnsupportedModal.tsx:13
+#: src/features/voice/components/alerts/TtsUnsupportedModal.tsx:12
 msgid "Text-to-speech is not supported by your browser. Some browsers like Brave block this feature for privacy reasons. Try using Chrome, Firefox, or Edge, or adjust your browser's privacy settings."
 msgstr "La synthèse vocale n'est pas prise en charge par votre navigateur. Certains navigateurs comme Brave bloquent cette fonctionnalité pour des raisons de confidentialité. Essayez d'utiliser Chrome, Firefox ou Edge, ou modifiez les paramètres de confidentialité de votre navigateur."
 
 #. Title of the modal shown when the browser does not support text-to-speech.
-#: src/features/voice/components/alerts/TtsUnsupportedModal.tsx:9
+#: src/features/voice/components/alerts/TtsUnsupportedModal.tsx:8
 msgid "Text-to-speech not supported"
 msgstr "Synthèse vocale non prise en charge"
 
@@ -32090,7 +31960,7 @@ msgid "That's everything in the queue."
 msgstr "C'est tout ce qui est en attente."
 
 #. Description text in the FluxerTag change modal.
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:68
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:69
 msgid "The #0000 tag is reserved for Visionary subscribers. Visionary is no longer available for purchase."
 msgstr "Le tag #0000 est réservé aux abonnés Visionary. L'abonnement Visionary n'est plus disponible à l'achat."
 
@@ -32129,17 +31999,17 @@ msgid "The community you're looking for may have been deleted or you may not hav
 msgstr "La communauté que vous recherchez a peut-être été supprimée ou vous n'y avez peut-être pas accès."
 
 #. Modal body shown when a desktop update download fails.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:112
+#: src/features/updater/commands/UpdaterModalCommands.tsx:116
 msgid "The desktop update could not be downloaded. Try again from the update button when your connection is stable."
 msgstr "La mise à jour de bureau n’a pas pu être téléchargée. Réessayez à partir du bouton de mise à jour lorsque votre connexion est stable."
 
 #. Desktop updater modal body when the downloaded version is unknown. productName is the app name.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:92
+#: src/features/updater/commands/UpdaterModalCommands.tsx:96
 msgid "The desktop update has been downloaded. Restart {productName} to finish installing."
 msgstr "La mise à jour de la version pour ordinateur a été téléchargée. Redémarrez {productName} pour terminer l’installation."
 
 #. Help text below the Linux package format selector in the desktop updater modal.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:152
+#: src/features/updater/commands/UpdaterModalCommands.tsx:156
 msgid "The downloaded file is saved to your computer. Install it with your normal package manager."
 msgstr "Le fichier téléchargé est enregistré sur votre ordinateur. Installez-le avec votre gestionnaire de paquets habituel."
 
@@ -32148,7 +32018,7 @@ msgid "The file contains the verification token we will fetch from <0>{dnsUrl}</
 msgstr "Le fichier contient le jeton de vérification que nous allons récupérer depuis <0>{dnsUrl}</0>."
 
 #. Body of the file-too-large alert when a single file exceeds the per-file size limit.
-#: src/features/messaging/components/alerts/FileSizeTooLargeModal.tsx:26
+#: src/features/messaging/components/alerts/FileSizeTooLargeModal.tsx:23
 msgid "The file you're trying to upload exceeds the maximum size limit of {maxSizeFormatted}."
 msgstr "Le fichier que vous essayez d'envoyer dépasse la taille maximale autorisée de {maxSizeFormatted}."
 
@@ -32198,7 +32068,7 @@ msgid "The provided redirect_uri must use HTTP or HTTPS."
 msgstr "L'URI de redirection fournie doit utiliser HTTP ou HTTPS."
 
 #. Body of a modal shown when a browser screen share track ends outside the app, for example from the browser sharing controls.
-#: src/features/voice/engine/v2/VoiceEngineV2AppScreenShareExecutionAdapter.tsx:116
+#: src/features/voice/engine/v2/VoiceEngineV2AppScreenShareExecutionAdapter.tsx:115
 msgctxt "screen-share"
 msgid "The screen share source stopped sending video, so your screen share was stopped."
 msgstr "La source de partage d’écran a cessé d’envoyer des vidéos, votre partage d’écran a donc été arrêté."
@@ -32225,7 +32095,7 @@ msgstr "Le service de téléchargement a rejeté cet autocollant car il est plus
 msgid "The URL of the {productName} instance you want to sign in to."
 msgstr "L'URL de l'instance {productName} à laquelle vous souhaitez vous connecter."
 
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:134
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:135
 msgid "The username <0>{fluxerTag}</0> is already taken. Continuing will reroll your tag automatically."
 msgstr "Le nom d'utilisateur <0>{fluxerTag}</0> est déjà pris. Si vous continuez, votre tag sera automatiquement modifié."
 
@@ -32370,7 +32240,7 @@ msgid "There was an error loading the invites. Try again."
 msgstr "Une erreur est survenue lors du chargement des invitations. Veuillez réessayer."
 
 #. Error message in the guild stickers tab.
-#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:78
+#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:75
 msgid "There was an error loading the stickers. Try again."
 msgstr "Une erreur est survenue lors du chargement des autocollants. Veuillez réessayer."
 
@@ -32410,12 +32280,7 @@ msgstr "Cette personne n’accepte peut-être pas vos messages, ou vous ne faite
 msgid "They're not accepting friend requests right now."
 msgstr "Cette personne n'accepte pas les demandes d'amis pour le moment."
 
-#. Short label in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:10
-msgid "Thin"
-msgstr "Fine"
-
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:114
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:113
 msgid "Third option"
 msgstr "Troisième option"
 
@@ -32428,11 +32293,6 @@ msgstr "Tiers"
 #: src/features/relationship/components/alerts/RelationshipErrorModalUtils.tsx:89
 msgid "This account can't be blocked."
 msgstr "Ce compte ne peut pas être bloqué."
-
-#. Body of the error modal shown when a too-new account tries to join the canary testers community.
-#: src/features/app/components/layout/app_layout/nagbars/CanaryTesterCtaNagbar.tsx:42
-msgid "This account is too new to join {testersCommunityName} yet. Try again in a little while."
-msgstr "Ce compte est trop récent pour rejoindre {testersCommunityName} pour l'instant. Réessayez dans quelque temps."
 
 #: src/features/user/components/modals/tabs/applications_tab/ApplicationDetail.tsx:415
 msgid "This action cannot be undone. All associated data, including the bot user, will be permanently deleted."
@@ -32516,7 +32376,7 @@ msgid "This channel is marked for mature content and may contain material that m
 msgstr "Ce salon est désigné pour un public averti et peut contenir du contenu inapproprié pour certains utilisateurs."
 
 #. Label in the mature content rejected modal.
-#: src/features/moderation/components/alerts/MatureContentRejectedModal.tsx:13
+#: src/features/moderation/components/alerts/MatureContentRejectedModal.tsx:12
 msgid "This channel is not marked for mature content. Mature content can only be sent in channels marked for mature content. Ask a moderator to update this channel if appropriate."
 msgstr "Ce salon n'est pas désigné pour le contenu mature. Le contenu mature ne peut être envoyé que dans les salons désignés pour le contenu mature. Demandez à un modérateur de mettre à jour ce salon si nécessaire."
 
@@ -32579,7 +32439,7 @@ msgid "This community has paused invites. You can try again later."
 msgstr "Cette communauté a suspendu les invitations. Vous pourrez réessayer plus tard."
 
 #. Description text in the guild at capacity modal.
-#: src/features/guild/components/alerts/GuildAtCapacityModal.tsx:13
+#: src/features/guild/components/alerts/GuildAtCapacityModal.tsx:12
 msgid "This community has reached its maximum member limit and is not accepting new members at this time."
 msgstr "Cette communauté a atteint sa limite maximale de membres et n'accepte plus de nouvelles adhésions pour le moment."
 
@@ -32657,7 +32517,7 @@ msgid "This doesn't look like a valid template response. Make sure you copied th
 msgstr "Ceci ne ressemble pas à une réponse de modèle valide. Assurez-vous d'avoir copié l'intégralité du document JSON."
 
 #. Generic per-file error text shown when preparing an emoji upload fails.
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:87
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:88
 msgid "This emoji could not be prepared. Try another file or try again in a moment."
 msgstr "Cet emoji n’a pas pu être préparé. Essayez un autre fichier ou réessayez dans un instant."
 
@@ -32674,7 +32534,7 @@ msgid "This expression is gone"
 msgstr "Cette expression n’existe plus"
 
 #. Modal body shown when an instance admin has temporarily disabled a feature. Keep plain.
-#: src/features/app/components/alerts/FeatureTemporarilyDisabledModal.tsx:13
+#: src/features/app/components/alerts/FeatureTemporarilyDisabledModal.tsx:12
 msgid "This feature is paused. Try again later."
 msgstr "Cette fonctionnalité est en pause. Réessayez plus tard."
 
@@ -32684,7 +32544,7 @@ msgid "This field has an error"
 msgstr "Ce champ comporte une erreur"
 
 #. Error text for animated emoji or SVG uploads that exceed the file size limit. {fileSize} and {maxSize} are formatted file sizes.
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:75
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:76
 msgid "This file is {fileSize}, over the {maxSize} limit. Animated emojis and SVGs must already be small enough to upload. Choose a smaller file or shorten the animation."
 msgstr "Ce fichier fait {fileSize}, ce qui dépasse la limite de {maxSize}. Les emojis animés et les SVG doivent déjà être suffisamment petits pour être importés. Choisissez un fichier plus petit ou raccourcissez l'animation."
 
@@ -32833,29 +32693,29 @@ msgid "This is not the community you're looking for."
 msgstr "Ce n'est pas la communauté que vous recherchez."
 
 #. Description text in the too many reactions modal. Keep the tone plain and specific.
-#: src/features/messaging/components/alerts/TooManyReactionsModal.tsx:13
+#: src/features/messaging/components/alerts/TooManyReactionsModal.tsx:12
 msgid "This is one heavy message. Some reactions need to be removed before you can add more."
 msgstr "Ce message est très populaire. Vous devez supprimer certaines réactions avant d'en ajouter de nouvelles."
 
 #. Description text in the index.
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:36
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:35
 msgid "This is some example text in the textarea."
 msgstr "Ceci est un exemple de texte dans la zone de texte."
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:112
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:111
 msgid "This is the first option description"
 msgstr "Ceci est la description de la première option"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:113
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:112
 msgid "This is the second option description"
 msgstr "Ceci est la description de la deuxième option"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:114
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:113
 msgid "This is the third option description"
 msgstr "Ceci est la description de la troisième option"
 
 #. Extra file-too-large alert sentence shown when premium upload-limit upgrades are unavailable.
-#: src/features/messaging/components/alerts/FileSizeTooLargeModal.tsx:42
+#: src/features/messaging/components/alerts/FileSizeTooLargeModal.tsx:39
 msgid "This limit is configured by your instance administrator."
 msgstr "Cette limite est configurée par l'administrateur de votre instance."
 
@@ -33003,8 +32863,8 @@ msgid "This removes every custom shortcut and re-enables all built-in shortcuts.
 msgstr "Cela supprime tous les raccourcis personnalisés et réactive tous les raccourcis intégrés. Cette action est irréversible."
 
 #: src/features/auth/components/pages/ResetPasswordPage.tsx:114
-msgid "This reset link has expired. Reset links last 24 hours. Request a new one."
-msgstr "Ce lien de réinitialisation a expiré. Les liens de réinitialisation sont valides 24 heures. Demandez-en un nouveau."
+msgid "This reset link has expired. Reset links last 1 hour. Please request a new one."
+msgstr "Ce lien de réinitialisation a expiré. Les liens de réinitialisation sont valides pendant 1 heure. Veuillez en demander un nouveau."
 
 #. Fallback role name in a mass-mention warning title.
 #: src/features/channel/components/MentionEveryonePopout.tsx:14
@@ -33030,36 +32890,6 @@ msgstr "Ce bouton est désactivé et ne peut pas être modifié"
 #: src/features/user/components/modals/tabs/component_gallery_tab/SelectionsTab.tsx:93
 msgid "This switch is disabled in the checked state"
 msgstr "Ce bouton est désactivé lorsqu'il est coché"
-
-#. Title in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:138
-msgid "This text demonstrates bold heading styling"
-msgstr "Ce texte illustre le style de titre en gras"
-
-#. Title in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:146
-msgid "This text demonstrates bold title styling"
-msgstr "Ce texte est un exemple de titre en gras"
-
-#. Label in the typography tab.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:118
-msgid "This text demonstrates italic styling"
-msgstr "Ce texte est un exemple de style italique"
-
-#. Label in the typography tab.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:130
-msgid "This text demonstrates large semi-bold styling"
-msgstr "Ce texte illustre le style semi-gras grand format"
-
-#. Label in the typography tab.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:110
-msgid "This text demonstrates normal styling"
-msgstr "Ce texte est un exemple de style normal"
-
-#. Label in the typography tab.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:122
-msgid "This text demonstrates semi-bold styling"
-msgstr "Ce texte est un exemple de style semi-gras"
 
 #: src/features/user/components/modals/tabs/component_gallery_tab/ComponentGalleryTabInputsTab.tsx:299
 msgid "This textarea auto-expands between 4 and 12 rows as you type."
@@ -33385,11 +33215,6 @@ msgstr "Fuseau horaire"
 msgid "Tip"
 msgstr "Astuce"
 
-#. Title in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:98
-msgid "Title"
-msgstr "Titre"
-
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #: src/features/user/components/settings_utils/search_index/DesktopSettingsIndex.ts:178
 msgid "Title bar"
@@ -33570,7 +33395,7 @@ msgid "Too many attempts. Wait a bit, then try again."
 msgstr "Trop de tentatives. Attendez un peu, puis réessayez."
 
 #. Error message in the max guilds modal.
-#: src/features/guild/components/alerts/MaxGuildsModal.tsx:10
+#: src/features/guild/components/alerts/MaxGuildsModal.tsx:9
 msgid "Too many communities"
 msgstr "Trop de communautés"
 
@@ -33627,12 +33452,12 @@ msgid "Track moderator actions across the community."
 msgstr "Suivre les actions des modérateurs dans toute la communauté."
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:135
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:159
 msgid "Tracking"
 msgstr "Suivi"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:139
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:163
 msgid "Tracking parameters"
 msgstr "Paramètres de suivi"
 
@@ -33665,7 +33490,7 @@ msgstr "Propriété transférée à {0}."
 #. Generic action label that translates a message body.
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #: src/features/i18n/utils/CommonMessageDescriptors.ts:583
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:231
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:255
 msgid "Translate"
 msgstr "Traduire"
 
@@ -33684,12 +33509,12 @@ msgid "Translations are automated. Help improve localization by emailing <0>{I18
 msgstr "Les traductions sont automatiques. Aidez-nous à améliorer la localisation en envoyant un e-mail à <0>{I18N_EMAIL}</0>."
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:223
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:247
 msgid "Translator"
 msgstr "Traducteur"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:227
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:251
 msgid "Translators"
 msgstr "Traducteurs"
 
@@ -33746,14 +33571,14 @@ msgstr "vrai ou faux"
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #. Short label in the links tab. Keep it concise.
 #: src/features/user/components/modals/tabs/chat_settings_tab/ChatSettingsTabLinksTab.tsx:27
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:175
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:199
 msgid "Trust all"
 msgstr "Faire confiance à tous"
 
 #. Label in the links tab.
 #. Settings search entry label. Names the settings search entry in the settings UI.
 #: src/features/user/components/modals/tabs/chat_settings_tab/ChatSettingsTabLinksTab.tsx:39
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:171
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:195
 msgid "Trust all external links"
 msgstr "Faire confiance à tous les liens externes"
 
@@ -33763,17 +33588,17 @@ msgid "Trust all external links?"
 msgstr "Faire confiance à tous les liens externes ?"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:179
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:203
 msgid "Trust all links"
 msgstr "Faire confiance à tous les liens"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:187
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:211
 msgid "Trust domain"
 msgstr "Domaine de confiance"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:183
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:207
 msgid "Trusted domains"
 msgstr "Domaines de confiance"
 
@@ -34000,7 +33825,7 @@ msgstr "Activer la confidentialité du streaming"
 #. Label in the input tab.
 #. Settings search entry label. Names the settings search entry in the settings UI.
 #: src/features/user/components/modals/tabs/chat_settings_tab/ChatSettingsTabInputTab.tsx:10
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:339
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:363
 msgid "Turn text smileys into emoji"
 msgstr "Activer la conversion des émoticônes en emojis"
 
@@ -34084,10 +33909,6 @@ msgstr "Saisissez une couleur (hex, rgb(), hsl ou nom) ou utilisez le sélecteur
 msgid "Type a color (hex, rgb(), hsl(), or name) or use the picker."
 msgstr "Saisissez une couleur (hex, rgb(), hsl() ou nom) ou utilisez le sélecteur."
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:403
-msgid "Type scale"
-msgstr "Taille du texte"
-
 #. Label in the inputs tab.
 #: src/features/user/components/modals/tabs/component_gallery_tab/ComponentGalleryTabInputsTab.tsx:89
 msgid "Type your message here…"
@@ -34135,14 +33956,6 @@ msgstr "Seulement l'indicateur de saisie"
 #: src/features/user/components/modals/tabs/component_gallery_tab/IndicatorsTab.tsx:251
 msgid "Typing state"
 msgstr "État de saisie"
-
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:365
-msgid "Typography"
-msgstr "Typographie"
-
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:447
-msgid "Typography scale demonstration"
-msgstr "Démonstration de l'échelle typographique"
 
 #. Developer options group for forcing UI component states.
 #: src/features/devtools/components/DeveloperOptionsToggleGroups.ts:57
@@ -34199,8 +34012,8 @@ msgstr "Impossible de charger l'aperçu."
 msgid "Unable to load profile banner, badges, and bio."
 msgstr "Impossible de charger la bannière de profil, les badges et la bio."
 
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:272
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:328
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:271
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:327
 msgid "Unable to prepare any emojis for upload. The following errors occurred:"
 msgstr "Impossible de préparer des émojis pour l'importation. Les erreurs suivantes sont survenues :"
 
@@ -34312,7 +34125,7 @@ msgid "Unclaimed account"
 msgstr "Compte non réclamé"
 
 #. Developer control label for the unclaimed-account banner.
-#: src/features/devtools/components/NagbarControls.ts:32
+#: src/features/devtools/components/NagbarControls.ts:27
 msgid "Unclaimed account nagbar"
 msgstr "Bannière de compte non réclamé"
 
@@ -34462,7 +34275,7 @@ msgstr "Solution de secours universelle. Qualité la plus basse, mais fonctionne
 #: src/features/i18n/utils/CommonMessageDescriptors.ts:755
 #: src/features/invite/components/InviteListItem.tsx:34
 #: src/features/moderation/components/modals/BanDetailsModal.tsx:114
-#: src/features/updater/commands/UpdaterModalCommands.tsx:140
+#: src/features/updater/commands/UpdaterModalCommands.tsx:144
 msgid "Unknown"
 msgstr "Inconnu"
 
@@ -34617,8 +34430,8 @@ msgstr "Emojis illimités"
 msgid "Unlimited stickers"
 msgstr "Autocollants illimités"
 
-#: src/features/channel/components/EmojiPicker.tsx:163
-#: src/features/channel/components/MobileEmojiPicker.tsx:208
+#: src/features/channel/components/EmojiPicker.tsx:150
+#: src/features/channel/components/MobileEmojiPicker.tsx:195
 msgid "Unlock {lockedEmojiCount, plural, one {# custom emoji} other {# custom emojis}} from {communityCount, plural, one {# community} other {# communities}} with {PREMIUM_PRODUCT_NAME}."
 msgstr "Débloquez {lockedEmojiCount, plural, one {# emoji personnalisé} other {# emojis personnalisés}} de {communityCount, plural, one {# communauté} other {# communautés}} avec {PREMIUM_PRODUCT_NAME}."
 
@@ -34764,7 +34577,7 @@ msgstr "Salon sans nom"
 #. Fallback title in an invite embed for a group DM with no name set.
 #. Short label in the channel display name state. Keep it concise.
 #: src/features/channel/components/InviteEmbed.tsx:72
-#: src/features/channel/state/ChannelDisplayName.ts:17
+#: src/features/channel/state/ChannelDisplayName.ts:18
 #: src/features/channel/utils/ChannelUtils.tsx:59
 msgid "Unnamed group"
 msgstr "Groupe sans nom"
@@ -34932,7 +34745,7 @@ msgid "Unsupported icon format"
 msgstr "Format d’icône non pris en charge"
 
 #. Title of the error modal shown when an unsupported sticker file type is selected.
-#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:87
+#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:84
 msgid "Unsupported sticker file"
 msgstr "Fichier de sticker non pris en charge"
 
@@ -35135,8 +34948,8 @@ msgstr "Mettre à niveau maintenant"
 
 #. Short label in the max bookmarks modal. Preserve {premiumProductName}; it is inserted by code.
 #. Short label in the max favorite memes modal. Preserve {premiumProductName}; it is inserted by code.
-#: src/features/app/components/alerts/MaxBookmarksModal.tsx:35
-#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:29
+#: src/features/app/components/alerts/MaxBookmarksModal.tsx:36
+#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:30
 msgid "Upgrade to {premiumProductName}"
 msgstr "Passer à {premiumProductName}"
 
@@ -35208,7 +35021,7 @@ msgstr "Importer un son personnalisé pour {label}"
 msgid "Upload directly to {displayName}"
 msgstr "Envoyer directement à {displayName}"
 
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:454
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:453
 msgid "Upload emoji"
 msgstr "Importer un emoji"
 
@@ -35252,7 +35065,7 @@ msgstr "Télécharger des images d’aperçu pour les partages d’écran."
 msgid "Upload sound"
 msgstr "Importer un son"
 
-#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:286
+#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:281
 msgid "Upload sticker"
 msgstr "Importer un sticker"
 
@@ -35857,7 +35670,7 @@ msgstr "utilisateur, bot ou webhook"
 #. Settings search entry label. Also used as a search synonym in the settings search bar.
 #: src/features/app/components/setup/SetupWizardSteps.tsx:952
 #: src/features/i18n/utils/CommonMessageDescriptors.ts:567
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:217
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:218
 #: src/features/user/components/modals/tabs/my_profile_tab/MyProfileTabUsernameSection.tsx:55
 #: src/features/user/components/settings_utils/search_index/MyProfileIndex.ts:53
 msgid "Username"
@@ -35869,7 +35682,7 @@ msgid "Username (optional)"
 msgstr "Nom d'utilisateur (facultatif)"
 
 #. Short label in the FluxerTag change modal. Keep it concise.
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:39
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:40
 msgid "Username already taken"
 msgstr "Nom d'utilisateur déjà pris"
 
@@ -35899,11 +35712,11 @@ msgid "Username must be at most 32 characters"
 msgstr "Le nom d'utilisateur doit contenir au maximum 32 caractères"
 
 #. Short label in the FluxerTag change modal. Keep it concise.
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:43
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:44
 msgid "Username updated"
 msgstr "Nom d'utilisateur mis à jour"
 
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:210
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:211
 msgid "Usernames can only contain letters (a-z, A-Z), numbers (0-9), and underscores. Usernames are case-insensitive."
 msgstr "Les noms d'utilisateur ne peuvent contenir que des lettres (a-z, A-Z), des chiffres (0-9) et des tirets bas. Ils ne sont pas sensibles à la casse."
 
@@ -35930,27 +35743,27 @@ msgid "Uses:"
 msgstr "Utilise :"
 
 #. Developer nagbar status: banner follows real account state.
-#: src/features/devtools/components/NagbarControls.ts:101
+#: src/features/devtools/components/NagbarControls.ts:96
 msgid "Using actual account state"
 msgstr "Utilise l'état réel du compte"
 
 #. Developer nagbar status: banner follows real gift inventory state.
-#: src/features/devtools/components/NagbarControls.ts:121
+#: src/features/devtools/components/NagbarControls.ts:116
 msgid "Using actual gift inventory state"
 msgstr "Utilisation de l'état réel des stocks de cadeaux"
 
 #. Developer nagbar status: banner follows real premium subscription state.
-#: src/features/devtools/components/NagbarControls.ts:117
+#: src/features/devtools/components/NagbarControls.ts:112
 msgid "Using actual premium state"
 msgstr "Utilise l'état réel de l'abonnement premium"
 
 #. Developer nagbar status: banner follows the real app state.
-#: src/features/devtools/components/NagbarControls.ts:125
+#: src/features/devtools/components/NagbarControls.ts:120
 msgid "Using actual state"
 msgstr "Utilise l'état réel"
 
 #. Developer nagbar status: banner follows real email verification state.
-#: src/features/devtools/components/NagbarControls.ts:105
+#: src/features/devtools/components/NagbarControls.ts:100
 msgid "Using actual verification state"
 msgstr "Utilisation de l'état de vérification réel"
 
@@ -36219,10 +36032,8 @@ msgstr "Vérifiez votre e-mail avant de modifier votre profil. Vous pouvez toujo
 msgid "Verify your email before sending friend requests."
 msgstr "Vérifiez votre adresse e-mail avant d'envoyer des demandes d'ami."
 
-#. Title of the error modal shown when an unverified account tries to join the canary testers community.
 #. Title of the error modal shown when an unverified account tries to purchase Plutonium.
 #: src/features/app/components/dialogs/components/plutonium/hooks/useCheckoutActions.tsx:106
-#: src/features/app/components/layout/app_layout/nagbars/CanaryTesterCtaNagbar.tsx:30
 msgid "Verify your email first"
 msgstr "Vérifiez d'abord votre adresse e-mail"
 
@@ -36685,7 +36496,7 @@ msgid "Visionary (lifetime {premiumProductName})"
 msgstr "Visionnaire (abonnement {premiumProductName} à vie)"
 
 #. Developer control label for the Visionary two-factor-authentication banner.
-#: src/features/devtools/components/NagbarControls.ts:60
+#: src/features/devtools/components/NagbarControls.ts:55
 msgid "Visionary 2FA nagbar"
 msgstr "Bannière 2FA Visionary"
 
@@ -36948,7 +36759,7 @@ msgid "Voice region"
 msgstr "Région vocale"
 
 #. Developer control label for the voice-session-restore banner.
-#: src/features/devtools/components/NagbarControls.ts:68
+#: src/features/devtools/components/NagbarControls.ts:63
 msgid "Voice session restore nagbar"
 msgstr "Barre de rappel de restauration de session vocale"
 
@@ -36996,7 +36807,7 @@ msgid "Volume sliders"
 msgstr "Curseurs de volume"
 
 #. Description text in the message delete too quick modal. Keep the tone plain and specific.
-#: src/features/messaging/components/alerts/MessageDeleteTooQuickModal.tsx:13
+#: src/features/messaging/components/alerts/MessageDeleteTooQuickModal.tsx:12
 msgid "Wait a moment before deleting more messages."
 msgstr "Attendez un instant avant de supprimer d'autres messages."
 
@@ -37096,11 +36907,6 @@ msgstr "Le sélecteur de Wayland xdg-desktop-portal affiche toutes les fenêtres
 msgid "Wayland's xdg-desktop-portal owns the picker and shows every window and display together. There is no flag that filters it to windows only. Press open system picker, then choose a window there to get per-app audio."
 msgstr "Le xdg-desktop-portal de Wayland gère le sélecteur et affiche toutes les fenêtres et tous les écrans ensemble. Il n'y a pas d'option pour filtrer uniquement les fenêtres. Appuyez sur \" Ouvrir le sélecteur système \", puis choisissez une fenêtre pour obtenir l'audio par application."
 
-#. Title of the error modal shown when a flagged account is blocked from joining the canary testers community.
-#: src/features/app/components/layout/app_layout/nagbars/CanaryTesterCtaNagbar.tsx:46
-msgid "We can't add you right now"
-msgstr "Nous ne pouvons pas vous ajouter pour le moment"
-
 #. Premium checkout error shown when card verification fails unexpectedly. productName is the app name.
 #: src/features/premium/components/pages/PremiumCallbackPage.tsx:44
 msgid "We could not confirm your card right now. Refresh this page or return to {productName} and try again."
@@ -37148,7 +36954,7 @@ msgstr "Nous n'avons pas pu transférer le message pour le moment."
 msgid "We couldn't import that theme library file."
 msgstr "Nous n'avons pas pu importer ce fichier de bibliothèque de thèmes."
 
-#: src/features/messaging/components/alerts/AttachmentUploadConnectivityModal.tsx:24
+#: src/features/messaging/components/alerts/AttachmentUploadConnectivityModal.tsx:23
 msgid "We couldn't reach the attachment upload service. {PRODUCT_NAME} can fall back to the standard upload path for messages up to {fallbackSizeFormatted} total, but these attachments exceed that combined limit and can't be sent until connectivity is restored. Try again later or contact <0>{SUPPORT_EMAIL}</0> if this keeps happening."
 msgstr "Nous n'avons pas pu joindre le service de téléchargement de pièces jointes. {PRODUCT_NAME} peut utiliser le chemin de téléchargement standard pour les messages jusqu'à {fallbackSizeFormatted} au total, mais ces pièces jointes dépassent cette limite combinée et ne peuvent pas être envoyées tant que la connectivité n'est pas rétablie. Réessayez plus tard ou contactez <0>{SUPPORT_EMAIL}</0> si le problème persiste."
 
@@ -37191,7 +36997,7 @@ msgid "We recommend saving these codes now so that you don't get locked out of y
 msgstr "Nous vous recommandons d'enregistrer ces codes maintenant pour ne pas être bloqué(e) hors de votre compte."
 
 #. Error text for static emoji uploads that still exceed the file size limit after resizing. {fileSize} and {maxSize} are formatted file sizes.
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:81
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:82
 msgid "We resized and compressed this emoji to 128x128 pixels, but it is still {fileSize}. The limit is {maxSize}. Try a simpler image, fewer colors, or a smaller source file."
 msgstr "Nous avons redimensionné et compressé cet émoji à 128x128 pixels, mais il fait toujours {fileSize}. La limite est de {maxSize}. Essayez une image plus simple, moins de couleurs ou un fichier source plus petit."
 
@@ -37301,7 +37107,7 @@ msgid "We've updated our policies. Review and accept them to continue."
 msgstr "Nous avons mis à jour nos politiques. Veuillez les consulter et les accepter pour continuer."
 
 #. Client info web build identifier shown after the desktop build when both are present. Example: "Web 2026.518.0". Preserve placeholder.
-#: src/features/app/components/dialogs/components/ClientInfo.tsx:28
+#: src/features/app/components/dialogs/components/ClientInfo.tsx:27
 msgid "Web {buildVersion}"
 msgstr "Web {buildVersion}"
 
@@ -37311,7 +37117,7 @@ msgid "Web authentication"
 msgstr "Authentification web"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:211
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:235
 msgid "Web search"
 msgstr "Recherche web"
 
@@ -37657,8 +37463,8 @@ msgstr "Ouh là, c'est une apocalypse de frappe"
 
 #. Label in the too many attachments modal.
 #. Label in the too many reactions modal.
-#: src/features/messaging/components/alerts/TooManyAttachmentsModal.tsx:10
-#: src/features/messaging/components/alerts/TooManyReactionsModal.tsx:9
+#: src/features/messaging/components/alerts/TooManyAttachmentsModal.tsx:9
+#: src/features/messaging/components/alerts/TooManyReactionsModal.tsx:8
 msgid "Whoa, this is heavy"
 msgstr "Ouh là, c'est lourd"
 
@@ -37741,7 +37547,7 @@ msgid "With {PREMIUM_PRODUCT_NAME}, you can use animated avatars ({ANIMATED_AVAT
 msgstr "Avec {PREMIUM_PRODUCT_NAME}, vous pouvez utiliser des avatars animés ({ANIMATED_AVATAR_FORMATS}), des bannières de profil, personnaliser votre tag et débloquer de nombreux autres avantages {PREMIUM_PRODUCT_NAME}."
 
 #. Premium upsell sentence in the file-too-large alert. premiumProductName is the paid product name; fileSizeLimit is a localized file size.
-#: src/features/messaging/components/alerts/FileSizeTooLargeModal.tsx:46
+#: src/features/messaging/components/alerts/FileSizeTooLargeModal.tsx:43
 msgid "With {premiumProductName}, your per-file upload limit increases to {fileSizeLimit}, plus animated avatars, longer messages, and many other {premiumProductName} perks."
 msgstr "Avec {premiumProductName}, votre limite de téléchargement par fichier passe à {fileSizeLimit}, en plus des avatars animés, des messages plus longs et de nombreux autres avantages {premiumProductName}."
 
@@ -37871,7 +37677,7 @@ msgid "You are about to transfer ownership of this community to <0>{0}</0>. This
 msgstr "Vous êtes sur le point de transférer la propriété de cette communauté à <0>{0}</0>. Cette action est <1>irréversible</1> et vous perdrez tous les privilèges de propriétaire."
 
 #. Error message in the user banned from guild modal. Keep the tone plain and specific.
-#: src/features/moderation/components/alerts/UserBannedFromGuildModal.tsx:13
+#: src/features/moderation/components/alerts/UserBannedFromGuildModal.tsx:12
 msgid "You are banned from this community and cannot join."
 msgstr "Vous avez été banni de cette communauté et ne pouvez pas la rejoindre."
 
@@ -37885,7 +37691,7 @@ msgid "You are editing your per-community profile. This profile will only be vis
 msgstr "Vous modifiez votre profil spécifique à cette communauté. Ce profil ne sera visible que dans cette communauté et remplacera votre profil global."
 
 #. Body text in the settings dialog client info.
-#: src/features/app/components/dialogs/components/ClientInfo.tsx:42
+#: src/features/app/components/dialogs/components/ClientInfo.tsx:41
 msgid "You are now a developer!"
 msgstr "Vous êtes maintenant développeur !"
 
@@ -37994,7 +37800,7 @@ msgid "You can't add new reactions while you're on timeout."
 msgstr "Vous ne pouvez pas ajouter de nouvelles réactions tant que vous êtes en pause."
 
 #. Description text in the attachment permission denied modal. Keep the tone plain and specific.
-#: src/features/messaging/components/alerts/AttachmentPermissionDeniedModal.tsx:20
+#: src/features/messaging/components/alerts/AttachmentPermissionDeniedModal.tsx:17
 msgid "You can't attach files in this channel."
 msgstr "Vous ne pouvez pas joindre de fichiers dans ce canal."
 
@@ -38180,11 +37986,11 @@ msgstr "Vous ne pouvez pas supprimer cette autorisation, car cela vous la retire
 msgid "You changed your nickname in this community from **{previousNickname}** to **{newNickname}**."
 msgstr "Vous avez changé votre pseudo dans cette communauté de **{previousNickname}** à **{newNickname}**."
 
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:362
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:367
 msgid "You changed your tag while on {PREMIUM_PRODUCT_NAME}. It will reroll randomly when your {PREMIUM_PRODUCT_NAME} expires on <0>{premiumExpiresAtLabel}</0>, unless it renews."
 msgstr "Vous avez changé votre tag alors que vous étiez abonné à {PREMIUM_PRODUCT_NAME}. Il sera relancé aléatoirement à l'expiration de votre abonnement {PREMIUM_PRODUCT_NAME} le <0>{premiumExpiresAtLabel}</0>, sauf si celui-ci est renouvelé."
 
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:369
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:374
 msgid "You changed your tag while on {PREMIUM_PRODUCT_NAME}. It will reroll randomly when your {PREMIUM_PRODUCT_NAME} expires, unless it renews."
 msgstr "Vous avez changé votre tag alors que vous étiez abonné à {PREMIUM_PRODUCT_NAME}. Il sera modifié aléatoirement à l'expiration de votre abonnement {PREMIUM_PRODUCT_NAME}, sauf s'il est renouvelé."
 
@@ -38283,12 +38089,6 @@ msgstr "Vous n'avez bloqué personne pour l'instant."
 #: src/features/user/components/modals/tabs/ExpressionPacksTab.tsx:343
 msgid "You haven't created any packs yet."
 msgstr "Vous n'avez pas encore créé de packs."
-
-#. Toast success shown after joining the canary testers community. {testersCommunityName} is the community name and {canaryReleaseName} is the release channel name.
-#: src/features/app/components/layout/app_layout/nagbars/CanaryTesterCtaNagbar.tsx:25
-#: src/features/channel/components/direct_message/CanaryTesterDmItem.tsx:69
-msgid "You joined {testersCommunityName}. Thanks for testing {canaryReleaseName}!"
-msgstr "Vous avez rejoint {testersCommunityName}. Merci de tester {canaryReleaseName} !"
 
 #. Intro copy in the keyboard navigation modal. {productName} is the app name.
 #: src/features/input/components/modals/KeyboardModeIntroModal.tsx:26
@@ -38425,11 +38225,6 @@ msgstr "Vous devez vérifier votre adresse e-mail avant de pouvoir envoyer des d
 msgid "You need to verify your email address before you can start a direct message."
 msgstr "Vous devez vérifier votre adresse e-mail avant de pouvoir démarrer un message direct."
 
-#. Body of the error modal shown when an unverified account tries to join the canary testers community.
-#: src/features/app/components/layout/app_layout/nagbars/CanaryTesterCtaNagbar.tsx:34
-msgid "You need to verify your email before you can join {testersCommunityName}."
-msgstr "Vous devez vérifier votre adresse e-mail avant de pouvoir rejoindre {testersCommunityName}."
-
 #. Body of the error modal shown when the account email is unverified and the user tries to purchase Plutonium. Product name is interpolated.
 #: src/features/app/components/dialogs/components/plutonium/hooks/useCheckoutActions.tsx:110
 msgid "You need to verify your email before you can purchase {premiumProductFullName}."
@@ -38502,17 +38297,17 @@ msgid "You're already Visionary"
 msgstr "Vous êtes déjà Visionnaire"
 
 #. Modal body shown when the bookmarks limit is reached on a self-hosted instance with no upgrade path. Limit count is interpolated.
-#: src/features/app/components/alerts/MaxBookmarksModal.tsx:19
+#: src/features/app/components/alerts/MaxBookmarksModal.tsx:20
 msgid "You're at {bookmarksText} — your instance admin sets this cap. Remove one to add another."
 msgstr "Vous avez atteint la limite de {bookmarksText} — c'est votre administrateur d'instance qui a défini ce plafond. Supprimez-en un pour en ajouter un autre."
 
 #. Modal body shown when the bookmarks limit is reached and Plutonium is unavailable on this instance. Limit count is interpolated.
-#: src/features/app/components/alerts/MaxBookmarksModal.tsx:24
+#: src/features/app/components/alerts/MaxBookmarksModal.tsx:25
 msgid "You're at {bookmarksText}. Remove one to add another."
 msgstr "Vous avez atteint la limite de {bookmarksText}. Supprimez-en un pour en ajouter un autre."
 
 #. Modal body shown when the favorite-memes limit is reached on a self-hosted instance with no Plutonium upgrade path. Limit text is interpolated.
-#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:19
+#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:20
 msgid "You're at the cap of {freeItemsText} — your instance admin sets this limit."
 msgstr "Vous avez atteint la limite de {freeItemsText} — l'administrateur de votre instance définit cette limite."
 
@@ -38524,12 +38319,12 @@ msgid "You're at the creation limit. Delete one to create another."
 msgstr "Vous avez atteint la limite de création. Supprimez-en un pour en créer un autre."
 
 #. Modal body shown when the free bookmarks limit is reached and Plutonium would increase it. Free and Plutonium limits are interpolated.
-#: src/features/app/components/alerts/MaxBookmarksModal.tsx:29
+#: src/features/app/components/alerts/MaxBookmarksModal.tsx:30
 msgid "You're at the free cap of {bookmarksText}. {premiumProductName} bumps you up to {premiumBookmarksText} — or remove one to add another."
 msgstr "Vous avez atteint la limite gratuite de {bookmarksText}. {premiumProductName} vous permet d'aller jusqu'à {premiumBookmarksText} — ou supprimez-en un pour en ajouter un autre."
 
 #. Modal body shown when the free favorite-memes limit is reached and Plutonium would increase it. Free and Plutonium limits are interpolated.
-#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:24
+#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:25
 msgid "You're at the free cap of {freeItemsText}. {premiumProductName} bumps you up to {premiumItemsText}."
 msgstr "Vous avez atteint la limite gratuite de {freeItemsText}. {premiumProductName} vous permet d'aller jusqu'à {premiumItemsText}."
 
@@ -38541,7 +38336,7 @@ msgid "You're at the install limit. Remove one to add another."
 msgstr "Vous avez atteint la limite d'installation. Supprimez-en un pour en ajouter un autre."
 
 #. Short label in the user banned from guild modal. Keep it concise. Keep the tone plain and specific.
-#: src/features/moderation/components/alerts/UserBannedFromGuildModal.tsx:9
+#: src/features/moderation/components/alerts/UserBannedFromGuildModal.tsx:8
 msgid "You're banned"
 msgstr "Vous êtes banni(e)"
 
@@ -38566,7 +38361,7 @@ msgid "You're deafened"
 msgstr "Vous êtes coupé du son."
 
 #. Label in the message delete too quick modal. Keep the tone plain and specific.
-#: src/features/messaging/components/alerts/MessageDeleteTooQuickModal.tsx:9
+#: src/features/messaging/components/alerts/MessageDeleteTooQuickModal.tsx:8
 msgid "You're deleting messages too quickly"
 msgstr "Vous supprimez les messages trop rapidement"
 
@@ -38623,11 +38418,6 @@ msgstr "Vous avez atteint le nombre maximal de communautés. Quittez-en une et r
 #: src/features/voice/components/bottomsheets/VoiceLobbyBottomSheet.tsx:76
 msgid "You're in the voice channel"
 msgstr "Vous êtes dans le salon vocal"
-
-#. Nagbar body inviting canary release users to join the testers community. {canaryReleaseName} is the release channel name and {testersCommunityName} is the community name.
-#: src/features/app/components/layout/app_layout/nagbars/CanaryTesterCtaNagbar.tsx:102
-msgid "You're on {canaryReleaseName}. Join {testersCommunityName} to submit bug reports and feedback about upcoming builds."
-msgstr "Vous utilisez {canaryReleaseName}. Rejoignez {testersCommunityName} pour envoyer des rapports de bugs et des commentaires sur les prochaines versions."
 
 #. Plutonium subscription card tooltip shown when the user is on a grandfathered price that is no longer offered.
 #: src/features/app/components/dialogs/components/plutonium/SubscriptionCard.tsx:37
@@ -38725,12 +38515,12 @@ msgid "You've reached the group DM limit"
 msgstr "Vous avez atteint la limite de MP de groupe"
 
 #. Emoji upload limit message in community emoji settings. Do not suggest that communities can be upgraded.
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:50
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:51
 msgid "You've reached the maximum number of emojis. Delete some existing emojis to make room."
 msgstr "Vous avez atteint le nombre maximal d'emojis. Supprimez des emojis existants pour libérer de l'espace."
 
 #. Sticker upload limit message in community sticker settings. Do not suggest that communities can be upgraded.
-#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:65
+#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:62
 msgid "You've reached the maximum number of stickers. Delete some existing stickers to make room."
 msgstr "Vous avez atteint le nombre maximal de stickers. Supprimez des stickers existants pour faire de la place."
 
@@ -38771,11 +38561,6 @@ msgstr "Votre session {productName} a expiré. Connectez-vous à nouveau pour co
 msgid "Your account"
 msgstr "Votre compte"
 
-#. Body of the error modal shown when a flagged account is blocked from joining the canary testers community.
-#: src/features/app/components/layout/app_layout/nagbars/CanaryTesterCtaNagbar.tsx:51
-msgid "Your account can't join {testersCommunityName} at the moment. Contact support if you think this is a mistake."
-msgstr "Votre compte ne peut pas rejoindre {testersCommunityName} pour le moment. Contactez l'assistance si vous pensez qu'il s'agit d'une erreur."
-
 #: src/features/connection/components/pages/ConnectionCallbackPage.tsx:29
 msgid "Your account has been linked successfully. You can now close this tab and return to the app."
 msgstr "Votre compte a été lié avec succès. Vous pouvez maintenant fermer cet onglet et retourner à l'application."
@@ -38783,11 +38568,6 @@ msgstr "Votre compte a été lié avec succès. Vous pouvez maintenant fermer ce
 #: src/features/app/components/dialogs/components/UnclaimedAccountAlert.tsx:26
 msgid "Your account is not yet claimed. Without an email and password, you won't be able to sign in from other devices and you could lose access to your account. Claim your account now to secure it."
 msgstr "Votre compte n'est pas encore réclamé. Sans e-mail ni mot de passe, vous ne pourrez pas vous connecter depuis d'autres appareils et vous risquez de perdre l'accès à votre compte. Réclamez votre compte maintenant pour le sécuriser."
-
-#. Title of the error modal shown when a too-new account tries to join the canary testers community.
-#: src/features/app/components/layout/app_layout/nagbars/CanaryTesterCtaNagbar.tsx:38
-msgid "Your account is too new"
-msgstr "Votre compte est trop récent"
 
 #: src/features/channel/components/barriers/BarrierComponents.tsx:195
 msgid "Your account is too new to send messages in this community."
@@ -38803,7 +38583,7 @@ msgid "Your account requires multi-factor authentication, but no supported metho
 msgstr "Votre compte nécessite une authentification multifacteur, mais aucune méthode prise en charge n'est configurée sur cet appareil. Connectez-vous sur un appareil doté de votre application d'authentification ou de votre clé de sécurité, ou contactez l'assistance."
 
 #. Modal body shown when the safety system blocks the requested action. Keep plain and calm; offer support path.
-#: src/features/auth/components/ContentBlockedHandler.tsx:15
+#: src/features/auth/components/ContentBlockedHandler.tsx:14
 msgid "Your action could not be completed because it was flagged by our safety systems. If you believe this is a mistake, please contact support."
 msgstr "Votre action n'a pas pu être effectuée, car elle a été signalée par nos systèmes de sécurité. Si vous pensez qu'il s'agit d'une erreur, veuillez contacter l'assistance."
 
@@ -38928,12 +38708,12 @@ msgid "Your IP address has been successfully authorized."
 msgstr "Votre adresse IP a été autorisée."
 
 #. Error message in the user ip banned from guild modal. Keep the tone plain and specific.
-#: src/features/moderation/components/alerts/UserIpBannedFromGuildModal.tsx:13
+#: src/features/moderation/components/alerts/UserIpBannedFromGuildModal.tsx:12
 msgid "Your IP address is banned from this community and you cannot join."
 msgstr "Votre adresse IP est bannie de cette communauté et vous ne pouvez pas la rejoindre."
 
 #. Label in the user ip banned from guild modal. Keep the tone plain and specific.
-#: src/features/moderation/components/alerts/UserIpBannedFromGuildModal.tsx:9
+#: src/features/moderation/components/alerts/UserIpBannedFromGuildModal.tsx:8
 msgid "Your IP is banned"
 msgstr "Votre adresse IP est bannie"
 

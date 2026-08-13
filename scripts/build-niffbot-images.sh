@@ -17,7 +17,7 @@ REGISTRY_PREFIX="${NIFFBOT_REGISTRY:-ghcr.io/nfb04}"
 
 if [[ $# -lt 1 ]]; then
   echo "Usage: $0 <service> [service...]" >&2
-  echo "Common: app-proxy-self-hosted api gateway media-proxy admin messages users snowflakes unfurl" >&2
+  echo "Common: app-proxy-self-hosted api gateway media-proxy admin messages users snowflakes unfurl gifs" >&2
   exit 1
 fi
 
@@ -32,6 +32,7 @@ declare -A DOCKERFILE_BY_SERVICE=(
   [snowflakes]="fluxer_snowflakes/Dockerfile"
   [unfurl]="fluxer_unfurl/Dockerfile"
   [static]="fluxer_static/Dockerfile"
+  [gifs]="fluxer_gifs/Dockerfile"
 )
 
 for service in "$@"; do

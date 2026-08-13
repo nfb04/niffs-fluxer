@@ -345,8 +345,8 @@ msgstr "{count, plural, one {# 个附件} other {# 个附件}}"
 msgid "{count, plural, one {# blocked message} other {# blocked messages}}"
 msgstr "{count, plural, one {# 条被屏蔽的消息} other {# 条被屏蔽的消息}}"
 
-#: src/features/app/components/alerts/MaxBookmarksModal.tsx:50
-#: src/features/app/components/alerts/MaxBookmarksModal.tsx:83
+#: src/features/app/components/alerts/MaxBookmarksModal.tsx:51
+#: src/features/app/components/alerts/MaxBookmarksModal.tsx:76
 msgid "{count, plural, one {# bookmark} other {# bookmarks}}"
 msgstr "{count, plural, one {# 条书签} other {# 条书签}}"
 
@@ -420,8 +420,8 @@ msgstr "{count, plural, one {# 条回应} other {# 条回应}}"
 msgid "{count, plural, one {# reactor} other {# reactors}}"
 msgstr "{count, plural, one {# 位回应者} other {# 位回应者}}"
 
-#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:44
-#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:82
+#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:45
+#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:79
 msgid "{count, plural, one {# saved media item} other {# saved media items}}"
 msgstr "{count, plural, one {# 个收藏的媒体文件} other {# 个收藏的媒体文件}}"
 
@@ -500,7 +500,7 @@ msgstr "{count, plural, one {退出 # 台设备} other {退出 # 台设备}}"
 msgid "{count, plural, one {Used # time.} other {Used # times.}}"
 msgstr "{count, plural, one {使用过 # 次} other {使用过 # 次}}"
 
-#: src/features/messaging/components/alerts/TooManyAttachmentsModal.tsx:21
+#: src/features/messaging/components/alerts/TooManyAttachmentsModal.tsx:20
 msgid "{count, plural, one {You can only upload # file at a time. Try again with fewer files.} other {You can only upload # files at a time. Try again with fewer files.}}"
 msgstr "{count, plural, one {你一次只能上传 # 个文件。请减少文件数量后重试。} other {你一次只能上传 # 个文件。请减少文件数量后重试。}}"
 
@@ -525,7 +525,7 @@ msgstr "{count, plural, one {你已通过其他设备连接到此语音频道。
 msgid "{count, plural, one {You're already using the one allowed connection for this voice channel. Switch to this device or cancel.} other {You're already using all # allowed connections for this voice channel. Switch to this device or cancel.}}"
 msgstr "{count, plural, one {你已在使用此语音频道允许的唯一连接。切换到此设备或取消。} other {你已在使用此语音频道允许的所有 # 个连接。切换到此设备或取消。}}"
 
-#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:65
+#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:62
 msgid "{count, plural, one {You're at the cap of # saved media item. Remove one to add another.} other {You're at the cap of # saved media items. Remove one to add another.}}"
 msgstr "{count, plural, one {您已达到保存媒体项目的上限。请移除一个以添加另一个。} other {您已达到保存媒体项目的上限。请移除一个以添加另一个。}}"
 
@@ -545,7 +545,7 @@ msgstr "{count, plural, one {你已达到贴纸包安装数量上限。请移除
 msgid "{count, plural, one {You're at the limit of # sticker pack. Delete one to create another.} other {You're at the limit of # sticker packs. Delete one to create another.}}"
 msgstr "{count, plural, one {你已达到贴纸包数量上限。请删除一个后再创建。} other {你已达到贴纸包数量上限。请删除一个后再创建。}}"
 
-#: src/features/guild/components/alerts/MaxGuildsModal.tsx:25
+#: src/features/guild/components/alerts/MaxGuildsModal.tsx:24
 msgid "{count, plural, one {You've reached the maximum number of communities you can join (# community). Leave a community before joining another one.} other {You've reached the maximum number of communities you can join (# communities). Leave a community before joining another one.}}"
 msgstr "{count, plural, one {您已达到可加入社群的最大数量（# 个社群）。请先退出一个社群，然后再加入其他社群。} other {您已达到可加入社群的最大数量（# 个社群）。请先退出一个社群，然后再加入其他社群。}}"
 
@@ -618,7 +618,7 @@ msgid "{defaultDeviceLabel} ({endpointLabel})"
 msgstr "{defaultDeviceLabel}（{endpointLabel}）"
 
 #. Client info desktop build identifier line. Example: "Canary Desktop 2026.419.3". Preserve placeholders.
-#: src/features/app/components/dialogs/components/ClientInfo.tsx:38
+#: src/features/app/components/dialogs/components/ClientInfo.tsx:37
 msgid "{desktopChannel} Desktop {desktopVersion}"
 msgstr "{desktopChannel} 桌面版 {desktopVersion}"
 
@@ -1089,12 +1089,12 @@ msgid "{productName} Community Team"
 msgstr "{productName}社区团队"
 
 #. Modal body shown when a user-initiated update check fails. productName is the app name.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:104
+#: src/features/updater/commands/UpdaterModalCommands.tsx:108
 msgid "{productName} could not reach the update service. Check your connection and try again."
 msgstr "{productName} 无法连接到更新服务。请检查您的网络连接，然后重试。"
 
 #. Modal body shown when starting installation of a downloaded desktop update fails. productName is the app name.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:121
+#: src/features/updater/commands/UpdaterModalCommands.tsx:125
 msgid "{productName} could not restart into the downloaded update. Try again from the update button."
 msgstr "{productName} 无法重启到已下载的更新版本。请从“更新”按钮再次尝试。"
 
@@ -1124,22 +1124,22 @@ msgid "{productName} member since"
 msgstr "{productName} 成员加入于"
 
 #. Body of the camera-permission-denied modal on web. {productName} is Fluxer.
-#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:40
+#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:39
 msgid "{productName} needs access to your camera to enable video chat. Grant camera permission in your browser settings and try again."
 msgstr "要启用视频聊天，{productName} 需要访问您的摄像头。请在浏览器设置中授予摄像头权限，然后重试。"
 
 #. Body of the camera-permission-denied modal on Windows and Linux. {productName} is Fluxer.
-#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:35
+#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:34
 msgid "{productName} needs access to your camera. Allow camera access in your operating system privacy settings and restart the app."
 msgstr "{productName}需要访问您的摄像头。请在操作系统隐私设置中允许摄像头访问，然后重启应用。"
 
 #. Body of the microphone-permission-denied modal on web. {productName} is Fluxer.
-#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:30
+#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:29
 msgid "{productName} needs access to your microphone to enable voice chat. Grant microphone permission in your browser settings and try again."
 msgstr "{productName} 需要访问您的麦克风才能启用语音聊天。请在浏览器设置中授予麦克风权限，然后重试。"
 
 #. Body of the microphone-permission-denied modal on Windows and Linux. {productName} is Fluxer.
-#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:25
+#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:24
 msgid "{productName} needs access to your microphone. Allow microphone access in your operating system privacy settings and restart the app."
 msgstr "{productName} 需要访问你的麦克风。请在操作系统的隐私设置中允许麦克风访问，然后重启应用。"
 
@@ -1154,7 +1154,7 @@ msgid "{productName} needs microphone access to list your devices."
 msgstr "{productName} 需要麦克风权限才能列出你的设备。"
 
 #. Body of the screen-permission-denied modal on non-mac desktop platforms. {productName} is Fluxer.
-#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:45
+#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:44
 msgid "{productName} needs screen recording access. Allow screen recording in your operating system privacy settings and restart the app."
 msgstr "{productName} 需要屏幕录制权限。请在您的操作系统隐私设置中允许屏幕录制，然后重启应用。"
 
@@ -1179,7 +1179,7 @@ msgid "{productName} spellcheck settings…"
 msgstr "{productName} 拼写检查设置…"
 
 #. Label in the invites disabled modal.
-#: src/features/invite/components/alerts/InvitesDisabledModal.tsx:14
+#: src/features/invite/components/alerts/InvitesDisabledModal.tsx:13
 msgid "{productName} spotted a possible raid here. Invites are paused — try again later."
 msgstr "{productName} 检测到此处可能存在恶意攻击。邀请已暂停，请稍后重试。"
 
@@ -1210,8 +1210,8 @@ msgstr "{productName} 标志"
 
 #. Client info web build identifier line. Example: "Canary Web 2026.518.0". Preserve placeholders.
 #. Client info web build identifier shown after the desktop build when the web and desktop channels differ. Example: "Stable Web 2026.518.0". Preserve placeholders.
-#: src/features/app/components/dialogs/components/ClientInfo.tsx:24
-#: src/features/app/components/dialogs/components/ClientInfo.tsx:33
+#: src/features/app/components/dialogs/components/ClientInfo.tsx:23
+#: src/features/app/components/dialogs/components/ClientInfo.tsx:32
 msgid "{releaseChannel} Web {buildVersion}"
 msgstr "{releaseChannel} Web {buildVersion}"
 
@@ -1242,7 +1242,7 @@ msgid "{renderedPresenceCount} online"
 msgstr "{renderedPresenceCount} 在线"
 
 #. Short label in the channel display name state. Keep it concise. Preserve {resolvedName}; it is inserted by code.
-#: src/features/channel/state/ChannelDisplayName.ts:12
+#: src/features/channel/state/ChannelDisplayName.ts:13
 msgid "{resolvedName}'s group"
 msgstr "{resolvedName}的群组"
 
@@ -1302,11 +1302,6 @@ msgstr "{streamerDisplayName}的屏幕"
 #: src/features/app/config/TimeWindowPresets.ts:6
 msgid "{tenSeconds} seconds"
 msgstr "{tenSeconds} 秒"
-
-#. Label in the channel and chat canary tester dm item. Preserve {testersCommunityName} and {canaryReleaseName}; they are inserted by code.
-#: src/features/channel/components/direct_message/CanaryTesterDmItem.tsx:33
-msgid "{testersCommunityName} is a community for {canaryReleaseName} users to share bug reports and feedback that helps shape upcoming releases. Join to chat with the team and other testers."
-msgstr "{testersCommunityName} 是一个供 {canaryReleaseName} 用户分享错误报告和反馈的社群，有助于改进即将发布的版本。加入即可与团队和其他测试人员聊天。"
 
 #. Template preview summary listing how many text channels, voice channels, categories, and roles will be imported.
 #: src/features/guild/components/modals/add_guild_modal/TemplateImportForm.tsx:147
@@ -1961,7 +1956,7 @@ msgid "a hostname, e.g. {exampleDomain}"
 msgstr "主机名，例如 {exampleDomain}"
 
 #. Linux desktop updater modal body shown before version details and package format selector. productName is the app name.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:126
+#: src/features/updater/commands/UpdaterModalCommands.tsx:130
 msgid "A Linux desktop update is available. Choose the package format for this system and {productName} will save it locally."
 msgstr "Linux 桌面更新已发布。请选择此系统的软件包格式，{productName} 将会将其保存到本地。"
 
@@ -1990,7 +1985,7 @@ msgstr "投票"
 msgid "A redirect_uri is required when the bot scope is not the only scope."
 msgstr "当 bot 范围不是唯一范围时，需要一个 redirect_uri。"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:342
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:341
 msgid "A reusable component for empty states, errors, and status messages."
 msgstr "用于空状态、错误和状态消息的可复用组件。"
 
@@ -2247,7 +2242,7 @@ msgid "Action"
 msgstr "操作"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:283
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:307
 msgid "Action bar"
 msgstr "操作栏"
 
@@ -2557,7 +2552,7 @@ msgstr "从电脑添加文件，以便在自定义 CSS 中引用，而无需上�
 msgid "Add friend"
 msgstr "添加好友"
 
-#: src/features/channel/components/direct_message/DirectMessageList.tsx:311
+#: src/features/channel/components/direct_message/DirectMessageList.tsx:307
 msgid "Add friends"
 msgstr "添加朋友"
 
@@ -2844,7 +2839,7 @@ msgid "Administrator"
 msgstr "管理员"
 
 #. Error message in the invites disabled modal.
-#: src/features/invite/components/alerts/InvitesDisabledModal.tsx:18
+#: src/features/invite/components/alerts/InvitesDisabledModal.tsx:17
 msgid "Admins paused invites — you can't join right now."
 msgstr "管理员已暂停邀请，你暂时无法加入。"
 
@@ -3253,7 +3248,7 @@ msgid "Already set to cancel"
 msgstr "已设为取消"
 
 #. Toggle-switch label in the moderator delete-message confirmation dialog. When enabled, the message is reported (category: other) before being deleted. {productName} is the product name (e.g., Fluxer).
-#: src/features/messaging/commands/MessageCommands.tsx:75
+#: src/features/messaging/commands/MessageCommands.tsx:76
 msgid "Also report this message to the {productName} Safety Team"
 msgstr "同时将此消息举报给 {productName} 安全团队"
 
@@ -3423,12 +3418,12 @@ msgstr "另有 1 个通话"
 msgid "Animate on interaction"
 msgstr "互动时播放动画"
 
-#: src/features/expressions/utils/AnimatedAvifModalUtils.tsx:27
+#: src/features/expressions/utils/AnimatedAvifModalUtils.tsx:26
 msgid "Animated {AVIF_FORMAT_LABEL} files aren't supported. Upload a static {AVIF_FORMAT_LABEL} file instead."
 msgstr "不支持动效{AVIF_FORMAT_LABEL}文件。请上传静态{AVIF_FORMAT_LABEL}文件。"
 
 #. Modal title shown when an animated AVIF upload is rejected by the client.
-#: src/features/expressions/utils/AnimatedAvifModalUtils.tsx:12
+#: src/features/expressions/utils/AnimatedAvifModalUtils.tsx:11
 msgid "Animated {avifFormatLabel} not supported"
 msgstr "不支持动效 {avifFormatLabel}"
 
@@ -3476,7 +3471,7 @@ msgid "Animated emoji"
 msgstr "动态表情"
 
 #. Section heading for animated emoji in community emoji settings.
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:104
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:105
 msgid "Animated emoji ({emojiCount})"
 msgstr "动态表情 ({emojiCount})"
 
@@ -3861,7 +3856,7 @@ msgid "Apply theme"
 msgstr "应用主题"
 
 #. Short confirmation button label in advanced settings.
-#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:140
+#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:144
 msgid "Apply to all communities"
 msgstr "应用于所有社群"
 
@@ -3891,7 +3886,7 @@ msgstr "应用"
 msgid "Arabic"
 msgstr "阿拉伯语"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:227
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:226
 msgid "Archive"
 msgstr "归档"
 
@@ -3914,7 +3909,7 @@ msgid "Are you sure you want to delete <0>{0}</0>? This cannot be undone."
 msgstr "确定要删除<0>{0}</0>吗？此操作无法撤销。"
 
 #. Body of the destructive purge-personal-notes confirmation alert. Keep tone serious and explicit about irreversibility.
-#: src/features/channel/components/direct_message/DirectMessageList.tsx:72
+#: src/features/channel/components/direct_message/DirectMessageList.tsx:68
 msgid "Are you sure you want to delete every message in your personal notes? This will permanently remove all messages and their attachments. This action cannot be undone."
 msgstr "确定要删除个人笔记中的所有消息吗？此操作将永久删除所有消息及其附件，且无法撤销。"
 
@@ -4019,7 +4014,7 @@ msgid "asc or desc"
 msgstr "升序或降序"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:351
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:375
 msgid "ASCII smileys"
 msgstr "ASCII 表情符号"
 
@@ -4119,7 +4114,7 @@ msgid "Attachment upload"
 msgstr "附件上传"
 
 #. Short label in the attachment upload connectivity modal. Keep it concise.
-#: src/features/messaging/components/alerts/AttachmentUploadConnectivityModal.tsx:13
+#: src/features/messaging/components/alerts/AttachmentUploadConnectivityModal.tsx:12
 msgid "Attachment upload unavailable"
 msgstr "无法上传附件"
 
@@ -4619,7 +4614,7 @@ msgid "Automatically remove tracking parameters (like utm_source, fbclid, gclid)
 msgstr "自动移除您发送消息中网址的跟踪参数（例如 utm_source、fbclid、gclid）。在链接发送给其他人之前进行清理。"
 
 #. Settings search entry description. One-line summary of what the settings search entry controls.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:167
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:191
 msgid "Automatically remove tracking parameters from URLs in messages you send"
 msgstr "自动移除你发送消息中网址的跟踪参数"
 
@@ -4667,7 +4662,7 @@ msgid "Autoscrolling"
 msgstr "自动滚动"
 
 #. Label for the available desktop version in the Linux update modal.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:136
+#: src/features/updater/commands/UpdaterModalCommands.tsx:140
 msgid "Available"
 msgstr "可用"
 
@@ -4685,8 +4680,8 @@ msgstr "可在桌面应用中使用。"
 #. Form label for a webhook avatar image.
 #. Settings search entry label. Also used as a search synonym in the settings search bar.
 #: src/features/ui/components/BaseAvatar.tsx:17
-#: src/features/user/components/modals/tabs/my_profile_tab/AvatarUploader.tsx:374
-#: src/features/user/components/modals/tabs/my_profile_tab/AvatarUploader.tsx:422
+#: src/features/user/components/modals/tabs/my_profile_tab/AvatarUploader.tsx:372
+#: src/features/user/components/modals/tabs/my_profile_tab/AvatarUploader.tsx:420
 #: src/features/user/components/settings_utils/search_index/MyProfileIndex.ts:13
 #: src/features/webhook/components/WebhookListItem.tsx:251
 msgid "Avatar"
@@ -5243,26 +5238,6 @@ msgstr "模糊"
 msgid "Blur strength"
 msgstr "模糊强度"
 
-#. Short label in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:82
-msgid "Body"
-msgstr "正文"
-
-#. Short label in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:66
-msgid "Bold"
-msgstr "粗体"
-
-#. Title in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:134
-msgid "Bold heading"
-msgstr "粗体标题"
-
-#. Title in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:142
-msgid "Bold title"
-msgstr "粗体标题"
-
 #. Folder icon option in the community-folder settings modal: a bookmark shape. Refers to the bookmark icon glyph, not the saved-message bookmarks feature.
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #. Short label in the buttons tab. Keep it concise.
@@ -5273,7 +5248,7 @@ msgid "Bookmark"
 msgstr "书签"
 
 #. Short label in the max bookmarks modal.
-#: src/features/app/components/alerts/MaxBookmarksModal.tsx:15
+#: src/features/app/components/alerts/MaxBookmarksModal.tsx:16
 msgid "Bookmark limit reached"
 msgstr "已达书签上限"
 
@@ -5590,7 +5565,7 @@ msgstr "按钮样式"
 msgid "Button with context menu"
 msgstr "带上下文菜单的按钮"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:252
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:251
 msgid "Buttons"
 msgstr "按钮"
 
@@ -5761,7 +5736,7 @@ msgid "Camera on"
 msgstr "摄像头已开启"
 
 #. Title of the modal shown when camera permission is denied. Keep tone plain.
-#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:17
+#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:16
 msgid "Camera permission required"
 msgstr "需要相机权限"
 
@@ -5805,19 +5780,14 @@ msgid "Can't access that email?"
 msgstr "无法访问该邮箱？"
 
 #. Error message in the attachment permission denied modal. Keep the tone plain and specific.
-#: src/features/messaging/components/alerts/AttachmentPermissionDeniedModal.tsx:12
+#: src/features/messaging/components/alerts/AttachmentPermissionDeniedModal.tsx:9
 msgid "Can't paste image here"
 msgstr "无法在此处粘贴图片"
 
 #. Error message in the attachment permission denied modal. Keep the tone plain and specific.
-#: src/features/messaging/components/alerts/AttachmentPermissionDeniedModal.tsx:16
+#: src/features/messaging/components/alerts/AttachmentPermissionDeniedModal.tsx:13
 msgid "Can't upload files here"
 msgstr "无法在此上传文件"
-
-#. Developer / debug surface — keep terse and technical. Label in the developer Nagbar controls panel for the canary-tester CTA banner.
-#: src/features/devtools/components/NagbarControls.ts:27
-msgid "Canary tester CTA nagbar"
-msgstr "金丝雀测试员行动号召提示条"
 
 #. Action label for dismissing a mass-mention warning.
 #. Button label on a scheduled message row that cancels (deletes) the scheduled send.
@@ -5872,7 +5842,7 @@ msgstr "金丝雀测试员行动号召提示条"
 #: src/features/user/components/modals/EmailChangeModal.tsx:289
 #: src/features/user/components/modals/EmailChangeModal.tsx:311
 #: src/features/user/components/modals/EmailChangeModal.tsx:326
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:389
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:394
 #: src/features/user/components/modals/PasswordChangeModal.tsx:226
 #: src/features/user/components/modals/PasswordChangeModal.tsx:237
 #: src/features/user/components/modals/PasswordChangeModal.tsx:255
@@ -5899,7 +5869,7 @@ msgstr "取消编辑定时消息"
 msgid "Cancel friend request"
 msgstr "取消好友请求"
 
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:144
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:145
 msgid "Cancel if you want to choose a different username instead."
 msgstr "如果要选择其他用户名，请取消。"
 
@@ -5988,11 +5958,6 @@ msgstr "无法安装贴纸包"
 #: src/features/auth/components/CaptchaInterceptor.tsx:14
 msgid "Captcha verification failed. Try again."
 msgstr "验证码验证失败。请重试。"
-
-#. Short label in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:74
-msgid "Caption"
-msgstr "说明文字"
 
 #. Section header in the Linux audio source picker. Lists capture-target options (entire system / specific apps).
 #: src/features/voice/components/AudioSourcePickerLinux.tsx:48
@@ -6142,8 +6107,8 @@ msgstr "居中"
 
 #. Title of the modal where the user picks an avatar source (file upload or GIF provider). Keep it concise.
 #: src/features/user/components/modals/tabs/my_profile_tab/AvatarUploader.tsx:110
-#: src/features/user/components/modals/tabs/my_profile_tab/AvatarUploader.tsx:396
-#: src/features/user/components/modals/tabs/my_profile_tab/AvatarUploader.tsx:432
+#: src/features/user/components/modals/tabs/my_profile_tab/AvatarUploader.tsx:394
+#: src/features/user/components/modals/tabs/my_profile_tab/AvatarUploader.tsx:430
 msgid "Change avatar"
 msgstr "更换头像"
 
@@ -6289,7 +6254,7 @@ msgid "Change username"
 msgstr "修改用户名"
 
 #. Short label in the FluxerTag change modal. Keep it concise.
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:47
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:48
 msgid "Change username form"
 msgstr "更改用户名表单"
 
@@ -6339,7 +6304,7 @@ msgstr "更改头像"
 
 #. Settings search entry description. One-line summary of what the settings search entry controls.
 #. Short label in the FluxerTag change modal. Keep it concise.
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:51
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:52
 #: src/features/user/components/settings_utils/search_index/MyProfileIndex.ts:77
 msgid "Change your username"
 msgstr "更改用户名"
@@ -6851,7 +6816,7 @@ msgid "Choose hCaptcha or Cloudflare Turnstile for signup challenges."
 msgstr "选择 hCaptcha 或 Cloudflare Turnstile 作为注册挑战。"
 
 #. Settings search entry description. One-line summary of what the settings search entry controls.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:403
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:427
 msgid "Choose how chat moves after you send a message"
 msgstr "选择发送消息后聊天窗口的滚动方式"
 
@@ -7139,7 +7104,7 @@ msgid "Claiming to be another person, brand, or organization."
 msgstr "冒充他人、品牌或组织。"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:151
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:175
 msgid "Clean link"
 msgstr "清理链接"
 
@@ -7179,7 +7144,7 @@ msgstr "清除所有生效的覆盖"
 msgid "Clear all attachment mocks"
 msgstr "清除所有附件模拟"
 
-#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:378
+#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:384
 msgid "Clear all token overrides"
 msgstr "清除所有令牌覆盖"
 
@@ -7215,7 +7180,7 @@ msgstr "清除此附件的模拟数据"
 msgid "Clear nickname"
 msgstr "清除昵称"
 
-#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:401
+#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:407
 msgid "Clear overrides"
 msgstr "清除覆盖"
 
@@ -7299,7 +7264,7 @@ msgstr "清除了话题。"
 msgid "Clearing trusted domains..."
 msgstr "正在清除信任域名…"
 
-#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:359
+#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:365
 msgid "Clears quick CSS, imported themes, uploaded assets, and local file references on this device."
 msgstr "清除此设备上的快速 CSS、导入主题、上传资产和本地文件引用。"
 
@@ -7341,7 +7306,7 @@ msgid "Click to claim your gift!"
 msgstr "点击领取礼物！"
 
 #. Short label in the settings dialog client info.
-#: src/features/app/components/dialogs/components/ClientInfo.tsx:46
+#: src/features/app/components/dialogs/components/ClientInfo.tsx:45
 msgid "Click to copy"
 msgstr "点击复制"
 
@@ -7687,7 +7652,7 @@ msgstr "冒号"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:323
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:347
 #: src/features/user/components/settings_utils/section_registry/ChatSettingsSections.ts:154
 msgid "Colon autocomplete"
 msgstr "冒号自动补全"
@@ -7829,7 +7794,7 @@ msgid "Community"
 msgstr "社群"
 
 #. Short label in the guild at capacity modal. Keep it concise.
-#: src/features/guild/components/alerts/GuildAtCapacityModal.tsx:9
+#: src/features/guild/components/alerts/GuildAtCapacityModal.tsx:8
 msgid "Community at capacity"
 msgstr "社群人数已满"
 
@@ -7933,7 +7898,7 @@ msgid "Community message notifications"
 msgstr "社群消息通知"
 
 #. Developer control label for the community MFA requirement banner.
-#: src/features/devtools/components/NagbarControls.ts:76
+#: src/features/devtools/components/NagbarControls.ts:71
 msgid "Community MFA requirement nagbar"
 msgstr "社群 MFA 要求提醒栏"
 
@@ -8042,7 +8007,7 @@ msgid "Community-wide"
 msgstr "Community-wide"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:276
+#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:271
 #: src/features/user/components/settings_utils/section_registry/AppearanceSections.ts:242
 msgid "Compact"
 msgstr "紧凑"
@@ -8126,7 +8091,7 @@ msgstr "输入框按钮"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:371
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:395
 #: src/features/user/components/settings_utils/section_registry/ChatSettingsSections.ts:190
 msgid "Composer buttons"
 msgstr "输入框按钮"
@@ -8138,7 +8103,7 @@ msgstr "输入框聚焦"
 
 #. Button label that opens a dedicated advanced settings modal for configuring screen-share encoder controls.
 #. Button label that opens a dedicated advanced settings modal.
-#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:156
+#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:160
 #: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedVideoControls.tsx:162
 msgid "Configure"
 msgstr "配置"
@@ -8179,7 +8144,7 @@ msgid "Configure role settings and permissions"
 msgstr "配置角色设置和权限"
 
 #. Settings search entry description. One-line summary of what the settings search entry controls.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:239
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:263
 msgid "Configure search engines used from selected text"
 msgstr "配置从选定文本中使用的搜索引擎"
 
@@ -8189,7 +8154,7 @@ msgid "Configure spellcheck, dictionaries, and personal words"
 msgstr "配置拼写检查、词典和个人词库"
 
 #. Settings search entry description. One-line summary of what the settings search entry controls.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:271
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:295
 msgid "Configure translator providers used from selected text"
 msgstr "配置从选定文本使用的翻译提供程序"
 
@@ -8212,7 +8177,7 @@ msgstr "配置你的个人资料徽章"
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #: src/features/channel/components/MentionEveryonePopout.tsx:180
 #: src/features/user/components/modals/EmailChangeModal.tsx:340
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:419
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:443
 msgid "Confirm"
 msgstr "确认"
 
@@ -8264,7 +8229,7 @@ msgid "Confirm voice join"
 msgstr "确认语音加入"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:415
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:439
 msgid "Confirmation"
 msgstr "确认"
 
@@ -8449,7 +8414,7 @@ msgid "Contact support"
 msgstr "联系客服"
 
 #. Short label in the authentication content blocked handler. Keep the tone plain and specific.
-#: src/features/auth/components/ContentBlockedHandler.tsx:11
+#: src/features/auth/components/ContentBlockedHandler.tsx:10
 msgid "Content blocked"
 msgstr "内容已屏蔽"
 
@@ -8515,7 +8480,7 @@ msgstr "左键点击（按钮）或右键点击（其他元素）可打开上下
 #: src/features/auth/flow/HandoffApprovalFlow.tsx:118
 #: src/features/connection/components/modals/AddConnectionModal.tsx:383
 #: src/features/i18n/utils/CommonMessageDescriptors.ts:711
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:392
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:397
 #: src/features/user/components/modals/tabs/AuthorizedAppsTab.tsx:181
 msgid "Continue"
 msgstr "继续"
@@ -8825,7 +8790,7 @@ msgstr "复制邀请链接"
 #. Generic action label that copies a URL to the clipboard.
 #: src/features/i18n/utils/CommonMessageDescriptors.ts:739
 #: src/features/user/components/modals/tabs/component_gallery_tab/ComponentGalleryTabButtonsTab.tsx:310
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:146
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:145
 msgid "Copy link"
 msgstr "复制链接"
 
@@ -8980,16 +8945,6 @@ msgstr "安装损坏提示栏"
 msgid "Could not decode this audio file."
 msgstr "无法解码此音频文件。"
 
-#. Title of the error modal shown when joining the canary testers community fails. Preserve {testersCommunityName}; it is inserted by code.
-#: src/features/channel/components/direct_message/CanaryTesterDmItem.tsx:44
-msgid "Could not join {testersCommunityName}"
-msgstr "无法加入{testersCommunityName}"
-
-#. Description text in the channel and chat canary tester dm item. Preserve {testersCommunityName}; it is inserted by code.
-#: src/features/channel/components/direct_message/CanaryTesterDmItem.tsx:39
-msgid "Could not join {testersCommunityName}. Try again later."
-msgstr "无法加入\"{testersCommunityName}\"。请稍后重试。"
-
 #. Error shown when the setup wizard fails to load the instance configuration.
 #: src/features/app/components/setup/SelfHostedSetupWizardGate.tsx:91
 msgid "Could not load the instance configuration. Try reloading the page."
@@ -9000,7 +8955,7 @@ msgid "Could not load this page"
 msgstr "无法加载此页面"
 
 #. Body of the modal shown when a screen share attempt fails. Advises the user to try sharing the full screen.
-#: src/features/voice/components/alerts/ScreenShareFailedModal.tsx:13
+#: src/features/voice/components/alerts/ScreenShareFailedModal.tsx:12
 msgid "Could not start the screen share. The selected source may no longer be available or may have blocked capture. Try sharing your entire screen or monitor instead of a specific window."
 msgstr "无法开始屏幕共享。所选来源可能不再可用或已阻止捕获。请尝试共享整个屏幕或显示器，而不是特定窗口。"
 
@@ -9065,7 +9020,7 @@ msgid "Couldn't change your billing cycle"
 msgstr "无法更改您的账单周期"
 
 #. Modal title shown when a user-initiated update check fails.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:100
+#: src/features/updater/commands/UpdaterModalCommands.tsx:104
 msgid "Couldn't check for updates"
 msgstr "无法检查更新"
 
@@ -9172,7 +9127,7 @@ msgid "Couldn't delete your messages"
 msgstr "无法删除你的消息"
 
 #. Modal title shown when a desktop update download fails.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:108
+#: src/features/updater/commands/UpdaterModalCommands.tsx:112
 msgid "Couldn't download the desktop update"
 msgstr "无法下载桌面版更新"
 
@@ -9210,11 +9165,6 @@ msgstr "无法安装此表情包。请稍后重试。"
 #: src/features/invite/commands/InviteCommands.tsx:111
 msgid "Couldn't install this sticker pack. Try again later."
 msgstr "无法安装此贴纸包。请稍后重试。"
-
-#. Title of the generic fallback error modal shown when joining the canary testers community fails.
-#: src/features/app/components/layout/app_layout/nagbars/CanaryTesterCtaNagbar.tsx:56
-msgid "Couldn't join {testersCommunityName}"
-msgstr "无法加入{testersCommunityName}"
 
 #. Error modal title shown when accepting a community invite fails.
 #: src/features/invite/components/alerts/InviteAcceptFailedModal.tsx:9
@@ -9426,7 +9376,7 @@ msgid "Couldn't start the connection"
 msgstr "无法开始连接"
 
 #. Modal title shown when starting installation of a downloaded desktop update fails.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:117
+#: src/features/updater/commands/UpdaterModalCommands.tsx:121
 msgid "Couldn't start the desktop update"
 msgstr "无法启动桌面版更新"
 
@@ -9558,7 +9508,7 @@ msgid "Cover"
 msgstr "封面"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:267
+#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:262
 #: src/features/user/components/settings_utils/section_registry/AppearanceSections.ts:246
 msgid "Cozy"
 msgstr "温馨"
@@ -9662,7 +9612,7 @@ msgstr "创建社群表单"
 
 #. Accessible label for the create-DM trigger in the DM list header.
 #. Button or menu action label in the create dm modal utils helper. Keep it concise.
-#: src/features/channel/components/direct_message/DirectMessageList.tsx:98
+#: src/features/channel/components/direct_message/DirectMessageList.tsx:94
 #: src/features/channel/utils/CreateDMModalUtils.tsx:35
 msgid "Create DM"
 msgstr "创建私聊"
@@ -9988,12 +9938,12 @@ msgid "Current uses:"
 msgstr "当前用途："
 
 #. Developer nagbar status: the banner is dismissed in the current real state.
-#: src/features/devtools/components/NagbarControls.ts:109
+#: src/features/devtools/components/NagbarControls.ts:104
 msgid "Currently dismissed"
 msgstr "当前已忽略"
 
 #. Developer nagbar status: the banner is showing in the current real state.
-#: src/features/devtools/components/NagbarControls.ts:113
+#: src/features/devtools/components/NagbarControls.ts:108
 msgid "Currently showing"
 msgstr "当前显示"
 
@@ -10034,7 +9984,7 @@ msgid "Custom date range"
 msgstr "自定义日期范围"
 
 #. Error message in the FluxerTag change modal.
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:64
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:65
 msgid "Custom discriminators are not available on this instance"
 msgstr "此实例不支持自定义识别码"
 
@@ -10099,7 +10049,7 @@ msgid "Custom ringtone"
 msgstr "自定义铃声"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:219
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:243
 msgid "Custom search engine"
 msgstr "自定义搜索引擎"
 
@@ -10168,7 +10118,7 @@ msgid "Custom title bar"
 msgstr "自定义标题栏"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:235
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:259
 msgid "Custom translator"
 msgstr "自定义翻译器"
 
@@ -10227,7 +10177,7 @@ msgid "Customize interface elements and behaviors."
 msgstr "自定义界面元素和行为."
 
 #. Settings search entry description. One-line summary of what the settings search entry controls.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:315
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:339
 msgid "Customize the action bar that appears when hovering over messages"
 msgstr "自定义鼠标悬停在消息上时显示的操作栏"
 
@@ -10251,7 +10201,7 @@ msgstr "自定义个人资料横幅"
 msgid "Customize your tag ({discriminatorLabel}) to your liking with {premiumProductName}"
 msgstr "使用{premiumProductName}自定义你的标签（{discriminatorLabel}）"
 
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:381
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:386
 msgid "Customize your tag or keep it when changing your username"
 msgstr "更改用户名时，可自定义标签或保留现有标签"
 
@@ -10302,7 +10252,7 @@ msgid "Danger button clicked."
 msgstr "已点击“危险”按钮。"
 
 #. Short label in the account security tab. Keep it concise. Keep the tone plain and specific.
-#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:350
+#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:356
 #: src/features/user/components/modals/tabs/account_security_tab/AccountSecuritySections.tsx:39
 #: src/features/user/components/modals/tabs/applications_tab/ApplicationDetail.tsx:697
 msgid "Danger zone"
@@ -10663,13 +10613,13 @@ msgstr "移动设备上默认关闭，以节省电量和流量。"
 #: src/features/emoji/components/emojis/EmojiListItem.tsx:203
 #: src/features/emoji/components/emojis/EmojiListItem.tsx:215
 #: src/features/emoji/components/stickers/StickerGridItem.tsx:34
-#: src/features/messaging/commands/MessageCommands.tsx:71
+#: src/features/messaging/commands/MessageCommands.tsx:72
 #: src/features/moderation/components/report_modal/IARModalCopy.ts:135
 #: src/features/theme_studio/sections/LibrarySection.tsx:514
 #: src/features/user/components/modals/tabs/account_security_tab/SecurityTab.tsx:399
 #: src/features/user/components/modals/tabs/component_gallery_tab/ComponentGalleryTabButtonsTab.tsx:116
 #: src/features/user/components/modals/tabs/component_gallery_tab/ComponentGalleryTabButtonsTab.tsx:272
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:239
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:238
 #: src/features/user/components/modals/tabs/ExpressionPacksTab.tsx:49
 #: src/features/user/components/settings_utils/search_index/AccountSecurityIndex.ts:154
 #: src/features/user/components/settings_utils/section_registry/SharedDescriptors.ts:190
@@ -10908,7 +10858,7 @@ msgid "Delete this message"
 msgstr "删除此消息"
 
 #. Error message in the messaging commands. Keep the tone plain and specific.
-#: src/features/messaging/commands/MessageCommands.tsx:67
+#: src/features/messaging/commands/MessageCommands.tsx:68
 msgid "Delete this message? Can't be undone."
 msgstr "删除这条消息？此操作无法撤消。"
 
@@ -10963,11 +10913,6 @@ msgstr "已删除你的消息。"
 #: src/features/user/components/modals/tabs/component_gallery_tab/ComponentGalleryTabButtonsTab.tsx:120
 msgid "Deleted."
 msgstr "已删除。"
-
-#. Label in the typography tab.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:14
-msgid "Delicate and light typography"
-msgstr "纤细轻巧的字体"
 
 #. Status chip for a denied macOS permission.
 #: src/features/permissions/system/components/modals/MacPermissionsModal.tsx:59
@@ -11116,7 +11061,7 @@ msgid "Desktop inactivity before mobile push"
 msgstr "在移动设备上推送通知之前，桌面应用处于非活动状态的时间。"
 
 #. Developer control label for the desktop-notification banner.
-#: src/features/devtools/components/NagbarControls.ts:40
+#: src/features/devtools/components/NagbarControls.ts:35
 msgid "Desktop notification nagbar"
 msgstr "桌面通知提示栏"
 
@@ -11145,12 +11090,12 @@ msgid "Desktop update available. Choose a Linux package."
 msgstr "有可用的桌面更新。请选择一个 Linux 软件包。"
 
 #. Modal title shown when a desktop app update has finished downloading.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:83
+#: src/features/updater/commands/UpdaterModalCommands.tsx:87
 msgid "Desktop update ready"
 msgstr "桌面版更新已就绪"
 
 #. Desktop updater modal body. The version placeholder is the downloaded app version; productName is the app name.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:87
+#: src/features/updater/commands/UpdaterModalCommands.tsx:91
 msgid "Desktop version {version} has been downloaded. Restart {productName} to finish installing."
 msgstr "桌面版 {version} 已下载。重启 {productName} 以完成安装。"
 
@@ -11384,7 +11329,7 @@ msgstr "私信预览"
 #. Generic section heading / label for the direct messages area.
 #. Summary row label for the direct messages choice in the setup wizard.
 #: src/features/app/components/setup/SetupWizardSteps.tsx:347
-#: src/features/channel/components/direct_message/DirectMessageList.tsx:598
+#: src/features/channel/components/direct_message/DirectMessageList.tsx:592
 #: src/features/i18n/utils/CommonMessageDescriptors.ts:218
 #: src/features/user/components/modals/tabs/privacy_safety_tab/ConnectionsTab.tsx:255
 msgid "Direct messages"
@@ -11753,11 +11698,9 @@ msgstr "忽略提及"
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #. Short label in the chat settings tab. Keep it concise.
 #. Short label in the inline. Keep it concise.
-#. Short label in the typography tab. Keep it concise.
 #: src/features/guild/components/modals/guild_tabs/guild_roles_tab/RoleEditor.tsx:175
 #: src/features/user/components/modals/tabs/chat_settings_tab/ChatSettingsTabInline.tsx:14
 #: src/features/user/components/modals/tabs/ChatSettingsTab.tsx:14
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:102
 #: src/features/user/components/settings_utils/section_registry/AppearanceSections.ts:154
 #: src/features/voice/components/modals/ScreenSharePickerModal.tsx:116
 msgid "Display"
@@ -12197,7 +12140,7 @@ msgstr "草稿"
 msgid "Drag and drop"
 msgstr "拖放"
 
-#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:295
+#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:290
 msgid "Drag and drop a sticker file here (one at a time)"
 msgstr "拖放贴纸文件到这里（一次一个）"
 
@@ -12206,7 +12149,7 @@ msgstr "拖放贴纸文件到这里（一次一个）"
 msgid "Drag and drop area for file upload"
 msgstr "拖放文件到此处上传"
 
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:471
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:470
 msgid "Drag and drop emoji files here"
 msgstr "将表情文件拖放到此处"
 
@@ -12305,7 +12248,7 @@ msgid "Due to mature content laws in {regionName}, this media is not available f
 msgstr "由于{regionName}的成人内容法律限制，此媒体内容在您当前地区不可用。"
 
 #: src/features/theme_studio/sections/LibrarySection.tsx:503
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:221
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:220
 msgid "Duplicate"
 msgstr "复制"
 
@@ -12590,7 +12533,7 @@ msgid "Edit your profile bio"
 msgstr "编辑个人简介"
 
 #. Button or menu action label in the index. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:40
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:39
 msgid "Editable text"
 msgstr "可编辑文本"
 
@@ -12693,7 +12636,7 @@ msgid "Email update required"
 msgstr "需要更新邮箱"
 
 #. Developer control label for the email-verification banner.
-#: src/features/devtools/components/NagbarControls.ts:36
+#: src/features/devtools/components/NagbarControls.ts:31
 msgid "Email verification nagbar"
 msgstr "邮箱验证提醒栏"
 
@@ -12808,12 +12751,12 @@ msgid "Emoji & sticker packs"
 msgstr "表情和贴纸包"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:327
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:351
 msgid "Emoji autocomplete"
 msgstr "表情符号自动补全"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:379
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:403
 msgid "Emoji button"
 msgstr "表情按钮"
 
@@ -12848,7 +12791,7 @@ msgid "Emoji name must be at most 32 characters long"
 msgstr "表情名称最多32个字符"
 
 #. Description in the community emoji upload section. {maxSize} is the formatted size limit.
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:95
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:96
 msgid "Emoji names need at least 2 characters and can use letters, numbers, and underscores. Emojis must be under {maxSize}. Static images are resized to 128x128 pixels and compressed automatically. Animated emojis and SVGs must already fit the limit."
 msgstr "表情符号名称至少需要 2 个字符，并且可以使用字母、数字和下划线。表情符号的大小必须小于 {maxSize}。静态图像将自动调整为 128x128 像素并进行压缩。动画表情符号和 SVG 必须已经符合大小限制。"
 
@@ -12896,7 +12839,7 @@ msgstr "表情包"
 msgid "Emoji picker"
 msgstr "表情符号选择器"
 
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:451
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:450
 msgid "Emoji slots"
 msgstr "表情槽位"
 
@@ -12921,13 +12864,13 @@ msgid "Emojis"
 msgstr "表情"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:347
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:371
 msgid "Emoticon"
 msgstr "表情符号"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:343
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:367
 #: src/features/user/components/settings_utils/section_registry/ChatSettingsSections.ts:142
 msgid "Emoticons"
 msgstr "表情符号"
@@ -13001,7 +12944,7 @@ msgstr "启用附件到期"
 msgid "Enable audio"
 msgstr "开启音频"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:172
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:171
 msgid "Enable beta feature"
 msgstr "启用测试功能"
 
@@ -13038,7 +12981,7 @@ msgstr "启用开发者模式"
 msgid "Enable email delivery"
 msgstr "启用邮件发送"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:158
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:157
 msgid "Enable extra option"
 msgstr "启用额外选项"
 
@@ -13337,6 +13280,11 @@ msgstr "增强"
 msgctxt "noise-suppression-option"
 msgid "Enhanced"
 msgstr "增强"
+
+#. Settings search entry description. One-line summary of what the settings search entry controls.
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:147
+msgid "Ensures file messages appear in the order you sent them"
+msgstr "确保文件消息按您发送的顺序显示"
 
 #. Keyboard key label for confirming a mass-mention warning.
 #. Keyboard shortcut keycap label for Enter. Keep it short.
@@ -13655,7 +13603,7 @@ msgstr "错误"
 msgid "error code {code}"
 msgstr "错误代码 {code}"
 
-#: src/features/messaging/components/markdown/index.tsx:39
+#: src/features/messaging/components/markdown/index.tsx:40
 msgid "Error rendering content"
 msgstr "内容渲染出错"
 
@@ -13816,7 +13764,7 @@ msgid "Expand"
 msgstr "展开"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:303
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:327
 msgid "Expand action bar"
 msgstr "展开操作栏"
 
@@ -14019,7 +13967,7 @@ msgstr "在个人资料设置中显示仅供员工访问的时区部分。"
 
 #. Settings search entry label. Names the settings search entry in the settings UI.
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:319
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:343
 #: src/features/user/components/settings_utils/section_registry/ChatSettingsSections.ts:158
 msgid "Expression autocomplete"
 msgstr "表情自动补全"
@@ -14073,7 +14021,7 @@ msgstr "外部"
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #. Warning text in the external link warning modal. Keep the tone plain and specific.
 #: src/features/messaging/components/modals/ExternalLinkWarningModal.tsx:17
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:191
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:215
 msgid "External link warning"
 msgstr "外部链接警告"
 
@@ -14089,11 +14037,6 @@ msgstr "外部链接可能存在风险，请谨慎点击。"
 #: src/features/user/components/modals/tabs/component_gallery_tab/SelectionsTab.tsx:57
 msgid "Extra large"
 msgstr "特大"
-
-#. Short label in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:18
-msgid "Extra light"
-msgstr "特细"
 
 #. Report category label for a community organized around extremist content or ideology.
 #: src/features/moderation/components/report/OptionDescriptors.ts:90
@@ -14219,7 +14162,7 @@ msgstr "加载失败"
 msgid "Failed to load authorized applications"
 msgstr "授权应用加载失败"
 
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:444
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:443
 msgid "Failed to load emojis. Try again later."
 msgstr "表情符号加载失败。请稍后重试。"
 
@@ -14243,7 +14186,7 @@ msgid "Failed to load shareable sources."
 msgstr "无法加载可共享的来源。"
 
 #. Error message in the guild stickers tab.
-#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:74
+#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:71
 msgid "Failed to load stickers"
 msgstr "贴图加载失败"
 
@@ -14293,7 +14236,7 @@ msgid "Failed to pin message"
 msgstr "置顶消息失败"
 
 #. Error message in the guild emoji tab.
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:54
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:55
 msgid "Failed to prepare emojis"
 msgstr "表情准备失败"
 
@@ -14439,12 +14382,12 @@ msgid "Failed to upload custom sound"
 msgstr "上传自定义提示音失败"
 
 #. Error message in the emoji upload failure modal. startLabel is a chunk label like "#1"; errorMsg is the server error.
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:62
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:63
 msgid "Failed to upload emojis starting at {startLabel}: {errorMsg}"
 msgstr "从 {startLabel} 开始的表情符号上传失败：{errorMsg}"
 
 #. Error message in the guild emoji tab.
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:58
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:59
 msgid "Failed to upload emojis. Try again."
 msgstr "表情包上传失败。请重试。"
 
@@ -14538,7 +14481,7 @@ msgid "Feature"
 msgstr "功能"
 
 #. Short label in the feature temporarily disabled modal.
-#: src/features/app/components/alerts/FeatureTemporarilyDisabledModal.tsx:9
+#: src/features/app/components/alerts/FeatureTemporarilyDisabledModal.tsx:8
 msgid "Feature temporarily disabled"
 msgstr "功能暂时停用"
 
@@ -14580,13 +14523,18 @@ msgstr "文件过大。最大文件大小为 {maxSize}。"
 msgid "File options"
 msgstr "文件选项"
 
+#. Settings search synonym. Used to match this term when the user types it in the settings search bar.
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:135
+msgid "File ordering"
+msgstr "文件排序"
+
 #. Title of the file-too-large alert variant that offers a Plutonium upsell.
-#: src/features/messaging/components/alerts/FileSizeTooLargeModal.tsx:38
+#: src/features/messaging/components/alerts/FileSizeTooLargeModal.tsx:35
 msgid "File size limit exceeded"
 msgstr "文件大小超出限制"
 
 #. Title of the file-too-large alert.
-#: src/features/messaging/components/alerts/FileSizeTooLargeModal.tsx:34
+#: src/features/messaging/components/alerts/FileSizeTooLargeModal.tsx:31
 msgid "File size too large"
 msgstr "文件过大"
 
@@ -14781,7 +14729,7 @@ msgstr "首次点击"
 msgid "First click pass-through when unfocused"
 msgstr "未聚焦时首次点击穿透"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:112
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:111
 msgid "First option"
 msgstr "第一个选项"
 
@@ -14907,10 +14855,6 @@ msgstr "跟随主设置 • {effectiveValue}%"
 msgid "Font"
 msgstr "字体"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:344
-msgid "Font weights"
-msgstr "字重"
-
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #: src/features/user/components/settings_utils/section_registry/SharedDescriptors.ts:9
 msgid "Fonts"
@@ -14985,12 +14929,12 @@ msgid "For your security, please confirm it's you to continue."
 msgstr "为保障你的账号安全，请先验证身份。"
 
 #. Developer nagbar override status: the banner is forced to hide.
-#: src/features/devtools/components/NagbarControls.ts:97
+#: src/features/devtools/components/NagbarControls.ts:92
 msgid "Force disabled"
 msgstr "强制禁用"
 
 #. Developer nagbar override status: the banner is forced to show.
-#: src/features/devtools/components/NagbarControls.ts:93
+#: src/features/devtools/components/NagbarControls.ts:88
 msgid "Force enabled"
 msgstr "强制启用"
 
@@ -15267,7 +15211,7 @@ msgstr "友好机器人"
 #. Profile timezone privacy option label. Allows friends to see local time.
 #. Quick switcher tab label that lists friends.
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/channel/components/direct_message/DirectMessageList.tsx:523
+#: src/features/channel/components/direct_message/DirectMessageList.tsx:518
 #: src/features/connection/components/modals/EditConnectionModal.tsx:86
 #: src/features/search/utils/QuickSwitcherModalUtils.tsx:47
 #: src/features/user/components/modals/tabs/my_profile_tab/TimezoneProfileSettings.tsx:63
@@ -15354,7 +15298,7 @@ msgid "From {start}"
 msgstr "从 {start} 开始"
 
 #. placeholder {0}: sourceGuild.name
-#: src/features/channel/components/emoji_picker/EmojiPickerInspector.tsx:104
+#: src/features/channel/components/emoji_picker/EmojiPickerInspector.tsx:102
 msgid "from <0>{0}</0>"
 msgstr "来自<0>{0}</0>"
 
@@ -15436,7 +15380,7 @@ msgid "Gap"
 msgstr "间隔"
 
 #. Short label in the temporary invite requires presence modal.
-#: src/features/app/components/alerts/TemporaryInviteRequiresPresenceModal.tsx:9
+#: src/features/app/components/alerts/TemporaryInviteRequiresPresenceModal.tsx:8
 msgid "Gateway connection required"
 msgstr "需要网关连接"
 
@@ -15450,7 +15394,7 @@ msgstr "GDPR"
 msgid "General"
 msgstr "通用"
 
-#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:325
+#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:331
 msgid "Generate a shareable link or copy your combined custom CSS."
 msgstr "生成可分享的链接或复制组合的自定义 CSS。"
 
@@ -15470,11 +15414,6 @@ msgstr "生成新验证码"
 #: src/features/auth/flow/HandoffCodeDisplay.tsx:70
 msgid "Generating code…"
 msgstr "正在生成验证码…"
-
-#. Label in the typography tab.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:22
-msgid "Gentle and airy text display"
-msgstr "文字显示柔和轻盈"
 
 #. Developer tools debug menu label. Internal-only surface for developers; translators may keep this terse.
 #: src/features/channel/components/channel_header_components/developer_tools/DeveloperOptionLabels.ts:209
@@ -15512,7 +15451,7 @@ msgid "Get {premiumProductName} to customize your tag"
 msgstr "获取 {premiumProductName} 以自定义你的标签"
 
 #. Description text in the FluxerTag change modal. Preserve {premiumProductName}; it is inserted by code. Keep the tone plain and specific.
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:55
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:56
 msgid "Get {premiumProductName} to customize your tag or keep it when changing your username"
 msgstr "获取 {premiumProductName} 以自定义你的标签，或在更改用户名时保留它"
 
@@ -15550,7 +15489,7 @@ msgid "GIF"
 msgstr "GIF"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:375
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:399
 msgid "GIF button"
 msgstr "GIF 按钮"
 
@@ -15661,7 +15600,7 @@ msgid "Gift inventory flow"
 msgstr "礼物库存流程"
 
 #. Developer control label for the gift-inventory banner.
-#: src/features/devtools/components/NagbarControls.ts:56
+#: src/features/devtools/components/NagbarControls.ts:51
 msgid "Gift inventory nagbar"
 msgstr "礼物库存提示栏"
 
@@ -15753,7 +15692,7 @@ msgid "Give everyone on this instance the highest premium limits."
 msgstr "为本实例上的所有人提供最高的高级限制。"
 
 #. Modal body shown when the role-edit form is submitted with an empty role name.
-#: src/features/app/components/alerts/RoleNameBlankModal.tsx:13
+#: src/features/app/components/alerts/RoleNameBlankModal.tsx:12
 msgid "Give the role a name before saving."
 msgstr "保存前请先给角色命名。"
 
@@ -15884,7 +15823,7 @@ msgid "Go to third community"
 msgstr "前往第三个社群"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:263
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:287
 msgid "Google lens"
 msgstr "Google 智能镜头"
 
@@ -16257,11 +16196,6 @@ msgstr "他"
 msgid "Header"
 msgstr "标题"
 
-#. Title in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:94
-msgid "Heading"
-msgstr "标题"
-
 #. Title in the markdown tab. Keep it concise.
 #: src/features/user/components/modals/tabs/component_gallery_tab/MarkdownTab.tsx:25
 msgid "Headings"
@@ -16395,7 +16329,7 @@ msgid "Hide avatars"
 msgstr "隐藏头像"
 
 #. Settings search entry description. One-line summary of what the settings search entry controls.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:455
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:479
 msgid "Hide channels you've muted from community sidebars"
 msgstr "在社群侧边栏中隐藏你已静音的频道"
 
@@ -16447,7 +16381,7 @@ msgid "Hide members"
 msgstr "隐藏成员"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:447
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:471
 msgid "Hide muted"
 msgstr "隐藏已静音的对话"
 
@@ -16458,13 +16392,13 @@ msgstr "隐藏已静音频道"
 
 #. Settings search entry label. Names the settings search entry in the settings UI.
 #. Short label for an advanced sidebar preference.
-#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:132
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:435
+#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:136
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:459
 msgid "Hide muted channels by default"
 msgstr "默认隐藏已静音的频道"
 
 #. Confirmation prompt in advanced settings.
-#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:136
+#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:140
 msgid "Hide muted channels by default?"
 msgstr "默认隐藏已静音频道？"
 
@@ -16637,7 +16571,7 @@ msgid "Hours"
 msgstr "小时"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:291
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:315
 msgid "Hover buttons"
 msgstr "悬浮按钮"
 
@@ -16910,11 +16844,11 @@ msgstr "如果使用波兰兹罗提支付，银行卡也必须在波兰发行，
 msgid "If you prefer, you can switch to standard USD pricing instead."
 msgstr "如果你愿意，也可以切换到标准美元定价。"
 
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:349
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:354
 msgid "If you save this username, your tag will reroll randomly when your {PREMIUM_PRODUCT_NAME} expires on <0>{premiumExpiresAtLabel}</0>, unless it renews."
 msgstr "如果您保存此用户名，您的标签将在您的 {PREMIUM_PRODUCT_NAME} 于 <0>{premiumExpiresAtLabel}</0> 到期时随机重新生成，除非它续订。"
 
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:356
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:361
 msgid "If you save this username, your tag will reroll randomly when your {PREMIUM_PRODUCT_NAME} expires, unless it renews."
 msgstr "如果你保存此用户名，你的标签将在 {PREMIUM_PRODUCT_NAME} 到期时随机重新生成，除非它续订。"
 
@@ -17045,7 +16979,7 @@ msgid "Image dimensions must be between {min}x{min2} and {max}x{max2} pixels."
 msgstr "图片尺寸必须介于 {min}x{min2} 和 {max}x{max2} 像素之间。"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:259
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:283
 msgid "Image lookup"
 msgstr "图片查找"
 
@@ -17060,12 +16994,12 @@ msgid "Image preview"
 msgstr "图片预览"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:251
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:275
 msgid "Image search"
 msgstr "图片搜索"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:267
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:291
 msgid "Image search provider"
 msgstr "图片搜索提供方"
 
@@ -17088,7 +17022,7 @@ msgstr "图片上传"
 msgid "Images"
 msgstr "图片"
 
-#: src/features/messaging/components/alerts/AttachmentPermissionDeniedModal.tsx:38
+#: src/features/messaging/components/alerts/AttachmentPermissionDeniedModal.tsx:35
 msgid "Images pasted from your clipboard are sent as attachments, and you don't have permission to attach files in this channel."
 msgstr "从剪贴板粘贴的图片将作为附件发送，但您没有在该频道中附加文件的权限。"
 
@@ -17419,7 +17353,7 @@ msgstr "正在索引频道"
 msgid "Indicator"
 msgstr "指示器"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:334
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:333
 msgid "Indicators & status"
 msgstr "指示器与状态"
 
@@ -17547,7 +17481,7 @@ msgstr "输入状态"
 msgid "Input volume"
 msgstr "输入音量"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:260
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:259
 msgid "Inputs & text"
 msgstr "输入与文本"
 
@@ -17580,7 +17514,7 @@ msgid "Install sticker pack"
 msgstr "安装贴纸包"
 
 #. Label for the installed desktop version in the Linux update modal.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:132
+#: src/features/updater/commands/UpdaterModalCommands.tsx:136
 msgid "Installed"
 msgstr "已安装"
 
@@ -18008,13 +17942,13 @@ msgid "Invites disabled"
 msgstr "邀请已禁用"
 
 #. Developer control label for the invites-disabled banner.
-#: src/features/devtools/components/NagbarControls.ts:72
+#: src/features/devtools/components/NagbarControls.ts:67
 msgid "Invites disabled nagbar"
 msgstr "邀请已禁用提示栏"
 
 #. Button or menu action label in the invite accept modal. Keep it concise.
 #. Button or menu action label in the invites disabled modal. Keep it concise.
-#: src/features/invite/components/alerts/InvitesDisabledModal.tsx:10
+#: src/features/invite/components/alerts/InvitesDisabledModal.tsx:9
 #: src/features/invite/components/modals/InviteAcceptModal.tsx:49
 msgid "Invites paused"
 msgstr "邀请已暂停"
@@ -18084,15 +18018,6 @@ msgstr "暂时很安静…"
 msgid "Italian"
 msgstr "意大利语"
 
-#. Short label in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:114
-msgid "Italic"
-msgstr "斜体"
-
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:392
-msgid "Italic style demonstration"
-msgstr "斜体样式示例"
-
 #. Country name. EU member state in the illegal-content report country dropdown.
 #: src/features/moderation/components/report/OptionDescriptors.ts:167
 msgid "Italy"
@@ -18131,13 +18056,6 @@ msgstr "加入 {communityName}"
 #: src/features/app/components/layout/app_layout/nagbars/GuildMembershipCtaNagbar.tsx:24
 msgid "Join {communityName} to chat with the team and stay up to date."
 msgstr "加入 {communityName}，与团队聊天并获取最新资讯。"
-
-#. Button or menu action label in the channel and chat canary tester dm item. Keep it concise. Preserve {testersCommunityName}; it is inserted by code.
-#. CTA button label for joining the canary testers community. testersCommunityName is a community name.
-#: src/features/app/components/layout/app_layout/nagbars/CanaryTesterCtaNagbar.tsx:98
-#: src/features/channel/components/direct_message/CanaryTesterDmItem.tsx:28
-msgid "Join {testersCommunityName}"
-msgstr "加入{testersCommunityName}"
 
 #. Action button label in the add community modal. Starts the join-by-invite-code flow.
 #: src/features/guild/components/modals/add_guild_modal/shared.ts:101
@@ -18522,10 +18440,6 @@ msgstr "语言"
 msgid "Language settings"
 msgstr "语言设置"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:285
-msgid "Language support"
-msgstr "语言支持"
-
 #. Submenu label in the textarea spellcheck submenu listing manual language overrides.
 #. Subsection title for spellcheck language settings. Keep it concise.
 #: src/features/channel/components/textarea/TextareaContextMenu.tsx:86
@@ -18534,9 +18448,7 @@ msgid "Languages"
 msgstr "语言"
 
 #. Short label in the selections tab. Keep it concise.
-#. Short label in the typography tab. Keep it concise.
 #: src/features/user/components/modals/tabs/component_gallery_tab/SelectionsTab.tsx:53
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:86
 msgid "Large"
 msgstr "大"
 
@@ -18812,9 +18724,7 @@ msgid "Lifetime {premiumProductName}"
 msgstr "终身版{premiumProductName}"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#. Short label in the typography tab. Keep it concise.
 #: src/features/expressions/components/modals/sticker_form/StickerPreview.tsx:48
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:26
 #: src/features/user/components/settings_utils/section_registry/AppearanceSections.ts:54
 msgid "Light"
 msgstr "浅色"
@@ -18954,7 +18864,7 @@ msgid "Link underline"
 msgstr "链接下划线"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:195
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:219
 msgid "Link warnings"
 msgstr "链接安全提示"
 
@@ -19002,7 +18912,7 @@ msgid "Linux default"
 msgstr "Linux 默认"
 
 #. Select label for choosing the Linux desktop package format to download.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:148
+#: src/features/updater/commands/UpdaterModalCommands.tsx:152
 msgid "Linux package"
 msgstr "Linux 安装包"
 
@@ -19511,7 +19421,7 @@ msgstr "手动更新桌面版"
 #. Action label in the inbox popout overflow menu. Marks every inbox channel as read.
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #: src/features/messaging/components/popouts/InboxPopout.tsx:42
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:411
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:435
 msgid "Mark all as read"
 msgstr "全部标为已读"
 
@@ -19533,7 +19443,7 @@ msgid "Mark all inbox channels as read"
 msgstr "将收件箱中的所有频道标记为已读"
 
 #. Settings search entry description. One-line summary of what the settings search entry controls.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:431
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:455
 msgid "Mark all unread inbox channels as read immediately, without asking to confirm"
 msgstr "将所有未读收件箱频道标记为已读，无需确认"
 
@@ -19603,7 +19513,7 @@ msgid "Mark top inbox channel as read"
 msgstr "将收件箱顶部频道标为已读"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:372
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:364
 #: src/features/user/components/settings_utils/section_registry/SharedDescriptors.ts:122
 msgid "Markdown"
 msgstr "Markdown"
@@ -19634,7 +19544,7 @@ msgid "Markers below slider"
 msgstr "滑块下方标记"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:143
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:167
 msgid "Marketing parameters"
 msgstr "营销参数"
 
@@ -19741,7 +19651,7 @@ msgid "Mature content media gate"
 msgstr "成人内容媒体门控"
 
 #. Error message in the mature content rejected modal.
-#: src/features/moderation/components/alerts/MatureContentRejectedModal.tsx:9
+#: src/features/moderation/components/alerts/MatureContentRejectedModal.tsx:8
 msgid "Mature content not allowed"
 msgstr "不允许发布成人内容"
 
@@ -19837,7 +19747,7 @@ msgid "Maximum screen share bitrate"
 msgstr "屏幕共享最大比特率"
 
 #. Short label in the max favorite memes modal.
-#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:33
+#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:34
 #: src/features/expressions/components/modals/GiftAcceptModal.tsx:220
 #: src/features/expressions/components/modals/GiftAcceptModal.tsx:277
 msgid "Maybe later"
@@ -19935,10 +19845,8 @@ msgstr "媒体大小"
 
 #. Member verification level option in the community moderation settings tab. Short standalone severity label.
 #. Short label in the selections tab. Keep it concise.
-#. Short label in the typography tab. Keep it concise.
 #: src/features/guild/components/modals/guild_tabs/GuildModerationTab.tsx:65
 #: src/features/user/components/modals/tabs/component_gallery_tab/SelectionsTab.tsx:49
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:50
 msgid "Medium"
 msgstr "中"
 
@@ -20221,7 +20129,7 @@ msgid "Message @"
 msgstr "消息 @"
 
 #. Settings search entry label. Also used as a search synonym in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:279
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:303
 msgid "Message action bar"
 msgstr "消息操作栏"
 
@@ -20243,7 +20151,7 @@ msgid "Message badge"
 msgstr "消息角标"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:311
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:335
 msgid "Message buttons"
 msgstr "消息按钮"
 
@@ -20319,7 +20227,7 @@ msgid "Message history threshold updated"
 msgstr "消息历史记录阈值已更新"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:287
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:311
 msgid "Message hover"
 msgstr "消息悬停"
 
@@ -20332,7 +20240,7 @@ msgstr "消息输入"
 
 #. Settings search entry label. Names the settings search entry in the settings UI.
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:367
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:391
 #: src/features/user/components/settings_utils/section_registry/ChatSettingsSections.ts:194
 msgid "Message input buttons"
 msgstr "消息输入按钮"
@@ -20445,7 +20353,7 @@ msgstr "消息：{0}。"
 #. Short label in the inline. Keep it concise.
 #. Short label in the keybinds tab. Keep it concise.
 #: src/features/channel/components/ChannelChatLayout.tsx:16
-#: src/features/channel/components/direct_message/DirectMessageList.tsx:280
+#: src/features/channel/components/direct_message/DirectMessageList.tsx:276
 #: src/features/input/components/modals/KeyboardShortcutsCheatsheetModal.tsx:28
 #: src/features/user/components/modals/tabs/appearance_tab/AppearanceTabInline.tsx:31
 #: src/features/user/components/modals/tabs/AppearanceTab.tsx:39
@@ -20533,7 +20441,7 @@ msgid "Microphone gain"
 msgstr "麦克风增益"
 
 #. Title of the modal shown when microphone permission is denied. Keep tone plain.
-#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:13
+#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:12
 msgid "Microphone permission required"
 msgstr "需要麦克风权限"
 
@@ -20810,7 +20718,7 @@ msgstr "更多"
 
 #. Short label in the index. Keep it concise.
 #. Short label in the user profile modal. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:48
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:47
 #: src/features/user/components/modals/UserProfileModal.tsx:114
 msgid "More actions"
 msgstr "更多操作"
@@ -20821,7 +20729,7 @@ msgid "More actions for {displayName}"
 msgstr "更多关于{displayName}的操作"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:307
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:331
 msgid "More button"
 msgstr "更多按钮"
 
@@ -20982,10 +20890,6 @@ msgstr "多重身份验证"
 #: src/features/user/components/modals/tabs/component_gallery_tab/MarkdownTab.tsx:57
 msgid "Multi-line"
 msgstr "Multi-line"
-
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:497
-msgid "Multilingual content"
-msgstr "多语言内容"
 
 #. Discovery category dropdown option in the community Discovery settings tab.
 #: src/features/guild/components/modals/guild_tabs/GuildDiscoveryTab.tsx:79
@@ -21170,7 +21074,7 @@ msgstr "已静音"
 #: src/features/app/components/layout/sidebar_nav/GuildListItem.tsx:80
 #: src/features/app/components/layout/VoiceStateIcons.tsx:19
 #: src/features/ui/avatars/AvatarWithPresence.tsx:15
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:439
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:463
 #: src/features/user/components/settings_utils/section_registry/SharedDescriptors.ts:73
 #: src/features/voice/components/voice_participant_tile/shared.ts:75
 #: src/lib/overlay/OverlayContextMenu.tsx:24
@@ -21184,7 +21088,7 @@ msgstr "被管理员禁言"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:443
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:467
 #: src/features/user/components/settings_utils/section_registry/SharedDescriptors.ts:69
 msgid "Muted channels"
 msgstr "已静音频道"
@@ -21539,7 +21443,7 @@ msgid "NEW"
 msgstr "NEW"
 
 #. Description text in the new account guild limit modal.
-#: src/features/guild/components/alerts/NewAccountGuildLimitModal.tsx:13
+#: src/features/guild/components/alerts/NewAccountGuildLimitModal.tsx:12
 msgid "New accounts can join up to 10 communities in the first 24 hours. Try again later."
 msgstr "新注册的帐户在最初 24 小时内最多可加入 10 个社群。请稍后再试。"
 
@@ -21556,20 +21460,20 @@ msgid "New category"
 msgstr "新建分类"
 
 #. Short confirmation button label in advanced settings.
-#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:144
+#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:148
 msgid "New communities only"
 msgstr "仅新社群"
 
-#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:618
+#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:635
 msgid "New communities you join will automatically have muted channels hidden. Would you also like to apply this setting to all your existing communities?"
 msgstr "你新加入的社群将自动隐藏静音频道。是否也将此设置应用于所有现有社群？"
 
-#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:649
+#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:666
 msgid "New communities you join will no longer have muted channels hidden automatically. Would you also like to show muted channels in all your existing communities?"
 msgstr "您加入的新社群将不再自动隐藏已静音频道。是否也要在所有现有社群中显示已静音频道？"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:451
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:475
 msgid "New community muted"
 msgstr "新社群已静音"
 
@@ -21596,7 +21500,7 @@ msgstr "新建群聊"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #. Tooltip on the new message button at the top of the DM list.
-#: src/features/channel/components/direct_message/DirectMessageList.tsx:94
+#: src/features/channel/components/direct_message/DirectMessageList.tsx:90
 #: src/features/user/components/settings_utils/section_registry/NotificationsSections.ts:159
 msgid "New message"
 msgstr "新消息"
@@ -21643,7 +21547,7 @@ msgid "New users can't join right now. You can still create an account or sign i
 msgstr "新用户暂时无法加入。您可以先创建帐户或登录，稍后再试此链接。"
 
 #. Fallback version label when the available desktop version is unknown.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:144
+#: src/features/updater/commands/UpdaterModalCommands.tsx:148
 msgid "New version"
 msgstr "新版本"
 
@@ -21902,16 +21806,16 @@ msgid "No embeds returned"
 msgstr "未返回内嵌内容"
 
 #. Empty-state text in the guild emoji tab.
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:46
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:47
 msgid "No emoji slots available"
 msgstr "没有可用的表情符号栏位"
 
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:479
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:478
 msgid "No emojis found matching your search."
 msgstr "没有找到符合搜索条件的表情符号。"
 
 #. Empty-state text in the channel and chat emoji picker.
-#: src/features/channel/components/EmojiPicker.tsx:43
+#: src/features/channel/components/EmojiPicker.tsx:41
 msgid "No emojis match that search"
 msgstr "没有匹配的表情"
 
@@ -22157,7 +22061,7 @@ msgid "No scheduled messages"
 msgstr "没有已排期的消息"
 
 #. Body of the screen-share-unsupported modal shown when xdg-desktop-portal returns no capturable sources.
-#: src/features/voice/components/alerts/ScreenShareUnsupportedModal.tsx:19
+#: src/features/voice/components/alerts/ScreenShareUnsupportedModal.tsx:18
 msgid "No screens or windows were returned by the Linux screen sharing portal. Try again after checking that your desktop environment allows screen capture."
 msgstr "Linux 屏幕共享门户未返回任何屏幕或窗口。请在确认您的桌面环境允许屏幕捕获后重试。"
 
@@ -22185,17 +22089,17 @@ msgid "No specific scopes requested."
 msgstr "未请求特定权限。"
 
 #. Empty-state text in the guild stickers tab.
-#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:61
+#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:58
 msgid "No sticker slots available"
 msgstr "没有可用的贴纸栏位"
 
 #. Empty-state text in the guild stickers tab.
-#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:57
+#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:54
 msgid "No stickers found"
 msgstr "未找到表情包"
 
 #. Empty-state text in the guild stickers tab.
-#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:70
+#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:67
 msgid "No stickers found matching your search."
 msgstr "没有找到符合搜索条件的贴纸。"
 
@@ -22322,7 +22226,7 @@ msgid "Noise suppression: {noiseSuppressionLabel}"
 msgstr "降噪：{noiseSuppressionLabel}"
 
 #. Section heading for static emoji in community emoji settings.
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:100
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:101
 msgid "Non-animated emoji ({emojiCount})"
 msgstr "非动态表情 ({emojiCount})"
 
@@ -22352,11 +22256,6 @@ msgstr "无"
 #: src/features/channel/components/channel_header_components/developer_tools/OptionPresets.ts:27
 msgid "None (normal behavior)"
 msgstr "无（正常行为）"
-
-#. Short label in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:106
-msgid "Normal"
-msgstr "正常"
 
 #. Short label in the language and locale names. Keep it concise.
 #: src/features/user/utils/LocaleUtils.ts:100
@@ -22640,7 +22539,7 @@ msgid "One or more attachments couldn't be read or uploaded. The file may have b
 msgstr "一个或多个附件无法读取或上传。文件可能已被移动或删除。请重新添加并重试。"
 
 #. Body of the file-too-large alert for ambiguous count (single or multiple) over the per-file size limit.
-#: src/features/messaging/components/alerts/FileSizeTooLargeModal.tsx:30
+#: src/features/messaging/components/alerts/FileSizeTooLargeModal.tsx:27
 msgid "One or more files you're trying to upload exceed the maximum size limit of {maxSizeFormatted} per file."
 msgstr "您尝试上传的一个或多个文件超出 {maxSizeFormatted} 的单个文件大小上限。"
 
@@ -22782,7 +22681,7 @@ msgid "Only you can see this message. <0>Dismiss</0>"
 msgstr "只有您能看到这条消息。<0>忽略</0>"
 
 #. Short label in the index. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:44
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:43
 msgid "Opacity"
 msgstr "不透明度"
 
@@ -22960,7 +22859,7 @@ msgid "Open date picker"
 msgstr "打开日期选择器"
 
 #. Button label that opens the Fluxer desktop downloads page in a browser.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:79
+#: src/features/updater/commands/UpdaterModalCommands.tsx:83
 msgid "Open desktop downloads"
 msgstr "打开桌面版下载页面"
 
@@ -23144,7 +23043,7 @@ msgid "Open profile for {nickname}"
 msgstr "查看 {nickname} 的个人资料"
 
 #. Accessible label and tooltip for the search field at the top of the DM list. Opens the quick switcher.
-#: src/features/channel/components/direct_message/DirectMessageList.tsx:90
+#: src/features/channel/components/direct_message/DirectMessageList.tsx:86
 msgid "Open quick switcher"
 msgstr "打开快捷切换"
 
@@ -23154,6 +23053,11 @@ msgstr "打开快捷切换"
 #: src/features/permissions/system/components/modals/MacPermissionsModal.tsx:75
 msgid "Open settings"
 msgstr "打开设置"
+
+#. Button label that opens the software center via appstream protocol.
+#: src/features/updater/commands/UpdaterModalCommands.tsx:79
+msgid "Open software center"
+msgstr "打开软件中心"
 
 #. Action that opens the sticker URL in an external browser.
 #: src/features/ui/action_menu/items/StickerContextMenuItems.tsx:40
@@ -23301,11 +23205,6 @@ msgstr "操作系统"
 msgid "Opt into experimental per-community and per-channel unread badge controls"
 msgstr "启用实验性的社区和频道级别的未读消息徽章控制功能"
 
-#. Label in the typography tab.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:46
-msgid "Optimized for longer reading passages"
-msgstr "为长篇阅读优化"
-
 #: src/features/voice/components/modals/CameraPreviewModal.tsx:906
 msgid "Optimizing camera..."
 msgstr "正在优化相机…"
@@ -23372,6 +23271,11 @@ msgstr "或将礼物链接发送给好友："
 #: src/features/user/components/modals/tabs/component_gallery_tab/MarkdownTab.tsx:41
 msgid "Ordered"
 msgstr "已排序"
+
+#. Settings search synonym. Used to match this term when the user types it in the settings search bar.
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:139
+msgid "Ordered upload"
+msgstr "按顺序上传"
 
 #. Error message in the channel and chat reply preview.
 #: src/features/channel/components/ReplyPreview.tsx:29
@@ -23468,7 +23372,7 @@ msgstr "已超出退款期限"
 msgid "Overlapping avatar groups showing multiple users with automatic overflow counts."
 msgstr "重叠头像组，显示多位用户，超出部分自动计数。"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:327
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:326
 msgid "Overlays & menus"
 msgstr "浮窗与菜单"
 
@@ -23871,11 +23775,6 @@ msgstr "单条提示音量"
 msgid "Per-window audio isn't available on this build of macOS."
 msgstr "此 macOS 版本不支持按窗口共享音频。"
 
-#. Label in the typography tab.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:38
-msgid "Perfect for everyday content"
-msgstr "日常内容分享优选"
-
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #: src/features/user/components/settings_utils/search_index/DesktopSettingsIndex.ts:86
 msgid "Performance"
@@ -23950,7 +23849,7 @@ msgid "Personal notes"
 msgstr "个人笔记"
 
 #. Toast shown when triggering the purge personal notes flow on an already empty self-DM.
-#: src/features/channel/components/direct_message/DirectMessageList.tsx:86
+#: src/features/channel/components/direct_message/DirectMessageList.tsx:82
 msgid "Personal notes were already empty"
 msgstr "个人笔记已清空"
 
@@ -24078,12 +23977,12 @@ msgid "Pick the rule to review."
 msgstr "选择要查看的规则."
 
 #. Settings search entry description. One-line summary of what the settings search entry controls.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:335
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:359
 msgid "Pick what appears when you type a colon in the message input"
 msgstr "选择在消息输入框中键入冒号时显示的内容"
 
 #. Settings search entry description. One-line summary of what the settings search entry controls.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:387
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:411
 msgid "Pick which buttons show in the message input"
 msgstr "选择要在消息输入框中显示的按钮"
 
@@ -24402,11 +24301,6 @@ msgstr "职位"
 msgid "Power saving"
 msgstr "省电模式"
 
-#. Short label in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:70
-msgid "Powerful and attention-grabbing"
-msgstr "强大吸睛"
-
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:111
 msgid "Pre-upload attachments"
@@ -24469,12 +24363,12 @@ msgid "Premium badge"
 msgstr "高级版徽章"
 
 #. Developer control label for the premium-expired banner.
-#: src/features/devtools/components/NagbarControls.ts:48
+#: src/features/devtools/components/NagbarControls.ts:43
 msgid "Premium expired nagbar"
 msgstr "高级会员过期提示栏"
 
 #. Developer control label for the premium grace-period banner.
-#: src/features/devtools/components/NagbarControls.ts:44
+#: src/features/devtools/components/NagbarControls.ts:39
 msgid "Premium grace period nagbar"
 msgstr "高级版宽限期提示栏"
 
@@ -24484,7 +24378,7 @@ msgid "Premium model"
 msgstr "高级模型"
 
 #. Developer control label for the premium-onboarding banner.
-#: src/features/devtools/components/NagbarControls.ts:52
+#: src/features/devtools/components/NagbarControls.ts:47
 msgid "Premium onboarding nagbar"
 msgstr "高级版引导提示栏"
 
@@ -24676,7 +24570,7 @@ msgstr "主按钮（已禁用）"
 msgid "Primary accent color"
 msgstr "主题色"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:351
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:350
 msgid "Primary action"
 msgstr "主要操作"
 
@@ -24921,7 +24815,7 @@ msgid "Promotion or instructions encouraging self-harm or eating disorders."
 msgstr "宣传或指导自残或饮食失调。"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:423
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:447
 msgid "Prompt"
 msgstr "提示"
 
@@ -25040,7 +24934,7 @@ msgstr "无法购买"
 
 #. Confirm button label on the purge-personal-notes destructive alert.
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/channel/components/direct_message/DirectMessageList.tsx:78
+#: src/features/channel/components/direct_message/DirectMessageList.tsx:74
 #: src/features/user/components/settings_utils/section_registry/PrivacySafetySections.ts:248
 msgid "Purge"
 msgstr "清除"
@@ -25051,7 +24945,7 @@ msgid "Purge messages"
 msgstr "清除消息"
 
 #. Title of the destructive confirmation alert when wiping the personal notes self-DM. Keep tone serious.
-#: src/features/channel/components/direct_message/DirectMessageList.tsx:68
+#: src/features/channel/components/direct_message/DirectMessageList.tsx:64
 #: src/features/ui/action_menu/PersonalNotesContextMenu.tsx:26
 msgid "Purge personal notes"
 msgstr "清除个人笔记"
@@ -25067,7 +24961,7 @@ msgid "Purge this sticker from storage and CDN"
 msgstr "从存储和CDN中清除此贴纸"
 
 #. Toast confirmation after wiping personal notes. deletedCount is the number of messages removed.
-#: src/features/channel/components/direct_message/DirectMessageList.tsx:82
+#: src/features/channel/components/direct_message/DirectMessageList.tsx:78
 msgid "Purged {deletedCount} messages from personal notes"
 msgstr "已从个人笔记中清除 {deletedCount} 条消息"
 
@@ -25197,13 +25091,13 @@ msgid "Quick CSS replaced from {fileName}."
 msgstr "快速 CSS 已从 {fileName} 替换。"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:295
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:319
 msgid "Quick reactions"
 msgstr "快捷回应"
 
 #. Accessible label for the desktop quick switcher modal.
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/channel/components/direct_message/DirectMessageList.tsx:484
+#: src/features/channel/components/direct_message/DirectMessageList.tsx:479
 #: src/features/search/components/quick_switcher/QuickSwitcherModal.tsx:77
 #: src/features/user/components/settings_utils/search_index/KeybindsIndex.ts:50
 msgid "Quick switcher"
@@ -25621,7 +25515,7 @@ msgid "Reference copied."
 msgstr "参考已复制."
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:147
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:171
 msgid "Referral parameters"
 msgstr "引荐参数"
 
@@ -25708,11 +25602,6 @@ msgstr "注册"
 #: src/features/auth/flow/AuthRegisterFormCore.tsx:312
 msgid "Registration is currently closed. Use a registration link from an admin to create an account."
 msgstr "当前已关闭注册。请使用管理员提供的注册链接创建账号。"
-
-#. Short label in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:34
-msgid "Regular"
-msgstr "常规"
 
 #: src/features/user/components/modals/tabs/component_gallery_tab/ComponentGalleryTabButtonsTab.tsx:226
 msgid "Regular button"
@@ -25918,8 +25807,8 @@ msgstr "移除附件"
 msgid "Remove authenticator app"
 msgstr "移除身份验证器应用"
 
-#: src/features/user/components/modals/tabs/my_profile_tab/AvatarUploader.tsx:406
-#: src/features/user/components/modals/tabs/my_profile_tab/AvatarUploader.tsx:442
+#: src/features/user/components/modals/tabs/my_profile_tab/AvatarUploader.tsx:404
+#: src/features/user/components/modals/tabs/my_profile_tab/AvatarUploader.tsx:440
 msgid "Remove avatar"
 msgstr "移除头像"
 
@@ -26183,7 +26072,7 @@ msgstr "已移除用户上限。"
 msgid "Removed timeout from {0}"
 msgstr "已将 {0} 移出禁言列表"
 
-#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:381
+#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:387
 msgid "Removes every per-variable override but keeps your library and assets intact."
 msgstr "移除所有变量覆盖，但保留你的库和素材。"
 
@@ -26688,7 +26577,7 @@ msgstr "重置应用数据"
 msgid "Reset app data and restart"
 msgstr "重置应用数据并重启"
 
-#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:356
+#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:362
 msgid "Reset custom theme data"
 msgstr "重置自定义主题数据"
 
@@ -26699,7 +26588,7 @@ msgstr "重置自定义主题数据？"
 
 #. Button or menu action label in the theme studio settings section. Keep it concise.
 #: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:76
-#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:371
+#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:377
 msgid "Reset data"
 msgstr "重置数据"
 
@@ -26839,7 +26728,7 @@ msgid "Restart {appName}"
 msgstr "重启 {appName}"
 
 #. Button label that restarts the app to apply a desktop update. productName is the app name.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:96
+#: src/features/updater/commands/UpdaterModalCommands.tsx:100
 msgid "Restart {productName}"
 msgstr "重启 {productName}"
 
@@ -26938,14 +26827,14 @@ msgid "Reverify your phone number to continue using {productName}."
 msgstr "请重新验证您的电话号码，以继续使用 {productName}。"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:247
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:271
 msgid "Reverse image"
 msgstr "搜图"
 
 #. Generic action label that runs a reverse-image search on the selected media.
 #. Settings search entry label. Also used as a search synonym in the settings search bar.
 #: src/features/i18n/utils/CommonMessageDescriptors.ts:603
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:243
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:267
 msgid "Reverse image search"
 msgstr "搜图"
 
@@ -26955,7 +26844,7 @@ msgid "Reverse image search provider"
 msgstr "反向图片搜索提供方"
 
 #. Settings search entry description. One-line summary of what the settings search entry controls.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:275
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:299
 msgid "Reverse image search providers"
 msgstr "反向图像搜索提供程序"
 
@@ -27020,7 +26909,7 @@ msgid "Review the permissions {productName} uses for voice, video, screen sharin
 msgstr "查看 {productName} 用于语音、视频、屏幕共享和快捷方式的权限。"
 
 #. Intro text in the error modal shown after some emoji uploads fail.
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:71
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:72
 msgid "Review these files and try again with smaller or simpler images."
 msgstr "请检查这些文件，然后尝试使用更小或更简单的图片。"
 
@@ -27191,7 +27080,7 @@ msgid "Role name"
 msgstr "角色名称"
 
 #. Validation modal title when the role-edit form is submitted with an empty role name.
-#: src/features/app/components/alerts/RoleNameBlankModal.tsx:9
+#: src/features/app/components/alerts/RoleNameBlankModal.tsx:8
 msgid "Role name is required"
 msgstr "角色名称为必填项"
 
@@ -27300,7 +27189,7 @@ msgid "Same time as you"
 msgstr "与您时区相同"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:155
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:179
 msgid "Sanitize link"
 msgstr "净化链接"
 
@@ -27421,7 +27310,7 @@ msgid "Saved media autocomplete"
 msgstr "已保存媒体自动填充"
 
 #. Short label in the max favorite memes modal.
-#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:15
+#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:16
 msgid "Saved media limit reached"
 msgstr "已达收藏上限"
 
@@ -27528,7 +27417,7 @@ msgstr "屏幕阅读器播报"
 
 #. Heading in the screen-share picker when macOS screen recording permission is missing.
 #. Title of the modal shown when screen recording permission is denied. Keep tone plain.
-#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:21
+#: src/features/permissions/system/components/MediaPermissionBlockedModal.tsx:20
 #: src/features/voice/components/modals/screen_share_picker_modal/ScreenSharePickerDisplayPermissionPrompt.tsx:18
 msgid "Screen recording permission required"
 msgstr "需要屏幕录制权限"
@@ -27561,7 +27450,7 @@ msgid "Screen share encoder controls"
 msgstr "屏幕共享编码器设置"
 
 #. Title of a modal shown when an active screen share stops unexpectedly.
-#: src/features/voice/engine/v2/VoiceEngineV2AppScreenShareExecutionAdapter.tsx:111
+#: src/features/voice/engine/v2/VoiceEngineV2AppScreenShareExecutionAdapter.tsx:110
 msgctxt "screen-share"
 msgid "Screen share ended"
 msgstr "屏幕共享已结束"
@@ -27648,17 +27537,17 @@ msgid "Screen sharing codec"
 msgstr "屏幕共享编解码器"
 
 #. Title of the modal shown when a screen share attempt fails due to a video source error.
-#: src/features/voice/components/alerts/ScreenShareFailedModal.tsx:9
+#: src/features/voice/components/alerts/ScreenShareFailedModal.tsx:8
 msgid "Screen sharing failed"
 msgstr "屏幕共享失败"
 
 #. Body of the screen-share-unsupported modal. Mentions specific browsers and OSes; keep all proper nouns intact.
-#: src/features/voice/components/alerts/ScreenShareUnsupportedModal.tsx:13
+#: src/features/voice/components/alerts/ScreenShareUnsupportedModal.tsx:12
 msgid "Screen sharing is not supported on this device or browser. This feature requires a desktop browser that supports screen sharing, such as Chrome, Firefox, or Edge on Windows, macOS, or Linux."
 msgstr "此设备或浏览器不支持屏幕共享。此功能需要支持屏幕共享的桌面浏览器，例如 Windows、macOS 或 Linux 上的 Chrome、Firefox 或 Edge。"
 
 #. Title of the modal shown when screen sharing is not supported on the current device / browser.
-#: src/features/voice/components/alerts/ScreenShareUnsupportedModal.tsx:9
+#: src/features/voice/components/alerts/ScreenShareUnsupportedModal.tsx:8
 msgid "Screen sharing not supported"
 msgstr "不支持屏幕共享"
 
@@ -27698,15 +27587,15 @@ msgstr "向下滚动，查看 {premiumProductName} 包含的所有特权"
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #. Short label in the whats new modal.
 #: src/features/app/components/whats_new/WhatsNewModal.tsx:28
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:395
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:419
 #: src/features/user/components/settings_utils/section_registry/ChatSettingsSections.ts:178
 msgid "Scroll to bottom"
 msgstr "滑到底部"
 
 #. Settings search entry label. Names the settings search entry in the settings UI.
 #. Short label for an advanced message input preference.
-#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:124
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:391
+#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:128
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:415
 msgid "Scroll to bottom when sending a message"
 msgstr "发送消息后滚动到底部"
 
@@ -27758,7 +27647,7 @@ msgid "Search bans"
 msgstr "搜索封禁用户"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:255
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:279
 msgid "Search by image"
 msgstr "图片搜索"
 
@@ -27795,17 +27684,17 @@ msgid "Search countries…"
 msgstr "搜索国家…"
 
 #. Button or menu action label in the guild emoji tab. Keep it concise.
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:91
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:92
 msgid "Search emojis"
 msgstr "搜索表情"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:207
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:231
 msgid "Search engine"
 msgstr "搜索引擎"
 
 #. Settings search entry label. Names the settings search entry in the settings UI.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:203
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:227
 msgid "Search engines"
 msgstr "搜索引擎"
 
@@ -27935,7 +27824,7 @@ msgid "Search scope: {label}"
 msgstr "搜索范围：{label}"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:215
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:239
 msgid "Search selected text"
 msgstr "搜索选中文字"
 
@@ -27960,7 +27849,7 @@ msgid "Search shortcuts…"
 msgstr "搜索快捷键…"
 
 #. Button or menu action label in the guild stickers tab. Keep it concise.
-#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:49
+#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:46
 msgid "Search stickers"
 msgstr "搜索贴纸"
 
@@ -28015,7 +27904,7 @@ msgstr "正在搜索"
 msgid "Searching people..."
 msgstr "正在搜索用户…"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:113
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:112
 msgid "Second option"
 msgstr "第二个选项"
 
@@ -28032,7 +27921,7 @@ msgstr "次要（已禁用）"
 msgid "Secondary accent color"
 msgstr "辅助强调色"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:355
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:354
 msgid "Secondary action"
 msgstr "次要操作"
 
@@ -28324,7 +28213,7 @@ msgstr "已选择：{0}"
 msgid "Selection: {0} (max {1})"
 msgstr "已选：{0}（最长{1}）"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:293
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:292
 msgid "Selections"
 msgstr "选择"
 
@@ -28353,16 +28242,6 @@ msgstr "自托管模式覆盖"
 #: src/features/app/components/dialogs/components/PurchaseDisclaimer.tsx:36
 msgid "Self-serve refunds available within 3 days of payment, once every 30 days. Refunding a subscription cancels it. EU/EEA buyers waive the 14-day right of withdrawal at checkout to access content immediately. Use the in-app refund button instead of a chargeback. Chargebacks can permanently restrict your account. Stripe handles payment securely. We never see your full card number."
 msgstr "付款后 3 天内可自助退款，每 30 天限一次。退款订阅将取消订阅。欧盟/欧洲经济区买家在结账时放弃 14 天撤回权，以立即访问内容。请使用应用内退款按钮，而不是申请退单。退单可能会永久限制您的帐户。Stripe 安全处理付款。我们绝不会看到您的完整卡号。"
-
-#. Short label in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:58
-msgid "Semi bold"
-msgstr "半粗体"
-
-#. Short label in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:126
-msgid "Semi-bold large"
-msgstr "半粗体大号"
 
 #. Button or menu action label in the share theme modal. Keep it concise.
 #. Send-message button label in the voice message composer modal.
@@ -28423,7 +28302,7 @@ msgstr "发送其他举报"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:383
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:407
 #: src/features/user/components/settings_utils/section_registry/ChatSettingsSections.ts:170
 msgid "Send button"
 msgstr "发送按钮"
@@ -28438,6 +28317,13 @@ msgstr "发送验证码"
 #: src/features/moderation/components/report/ReportStepDetails.tsx:302
 msgid "Send DSA report"
 msgstr "发送 DSA 报告"
+
+#. Settings search entry label. Names the settings search entry in the settings UI.
+#. Short label for an advanced message input preference.
+#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:112
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:127
+msgid "Send file messages in order"
+msgstr "按顺序发送文件消息"
 
 #. Button or menu action label in the user profile mobile sheet. Keep it concise.
 #. Button or menu action label in the user profile modal. Keep it concise.
@@ -28631,10 +28517,20 @@ msgstr "发送了嵌入消息"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:399
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:423
 #: src/features/user/components/settings_utils/section_registry/ChatSettingsSections.ts:182
 msgid "Sent messages"
 msgstr "已发送消息"
+
+#. Settings search synonym. Used to match this term when the user types it in the settings search bar.
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:131
+msgid "Sequential send"
+msgstr "顺序发送"
+
+#. Settings search synonym. Used to match this term when the user types it in the settings search bar.
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:143
+msgid "Serial send"
+msgstr "序列发送"
 
 #: src/features/connection/components/modals/AddConnectionModal.tsx:326
 msgid "Serve the token file"
@@ -28919,7 +28815,7 @@ msgstr "设置所有音效的音量。单独音效设置会覆盖此项。"
 #. Generic action label / section header that opens settings.
 #: src/features/i18n/utils/CommonMessageDescriptors.ts:262
 #: src/features/user/components/modals/tabs/component_gallery_tab/ComponentGalleryTabButtonsTab.tsx:264
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:126
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:125
 msgid "Settings"
 msgstr "设置"
 
@@ -28959,9 +28855,9 @@ msgid "Several people are typing..."
 msgstr "多人正在输入..."
 
 #: src/features/theme_studio/sections/QuickCssSection.tsx:225
-#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:316
+#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:322
 #: src/features/user/components/modals/tabs/component_gallery_tab/ComponentGalleryTabButtonsTab.tsx:279
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:133
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:132
 msgid "Share"
 msgstr "分享"
 
@@ -28970,7 +28866,7 @@ msgstr "分享"
 msgid "Share action."
 msgstr "分享操作."
 
-#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:322
+#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:328
 msgid "Share active custom theme"
 msgstr "分享当前自定义主题"
 
@@ -29003,7 +28899,7 @@ msgstr "分享来源"
 msgid "Share the {premiumProductName} experience with your friends by purchasing a gift subscription."
 msgstr "购买礼品订阅，与好友共享{premiumProductName}体验。"
 
-#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:341
+#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:347
 msgid "Share theme"
 msgstr "分享主题"
 
@@ -29098,7 +28994,7 @@ msgid "Shift"
 msgstr "班次"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:299
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:323
 msgid "Shift expand"
 msgstr "展开"
 
@@ -29299,7 +29195,7 @@ msgstr "显示嵌入内容和网站链接预览"
 #. Short label for an advanced message input preference.
 #. Short label in the channel and chat textarea plus menu. Keep it concise.
 #: src/features/channel/components/textarea/TextareaPlusMenu.tsx:55
-#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:116
+#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:120
 msgid "Show emoji button"
 msgstr "显示表情按钮"
 
@@ -29353,7 +29249,7 @@ msgid "Show icon when collapsed"
 msgstr "折叠时显示图标"
 
 #. Short confirmation button label in advanced settings.
-#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:152
+#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:156
 msgid "Show in all communities"
 msgstr "在所有社群中显示"
 
@@ -29543,7 +29439,7 @@ msgstr "在表情自动填充中显示已保存的媒体"
 #. Short label for an advanced message input preference.
 #. Short label in the channel and chat textarea plus menu. Keep it concise.
 #: src/features/channel/components/textarea/TextareaPlusMenu.tsx:59
-#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:120
+#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:124
 msgid "Show send button"
 msgstr "显示发送按钮"
 
@@ -29555,7 +29451,7 @@ msgstr "点击后显示剧透内容"
 #. Short label for an advanced message input preference.
 #. Short label in the channel and chat textarea plus menu. Keep it concise.
 #: src/features/channel/components/textarea/TextareaPlusMenu.tsx:51
-#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:112
+#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:116
 msgid "Show stickers button"
 msgstr "显示贴纸按钮"
 
@@ -29860,14 +29756,14 @@ msgid "Size selection"
 msgstr "选择尺寸"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:427
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:451
 msgid "Skip"
 msgstr "跳过"
 
 #. Settings search entry label. Names the settings search entry in the settings UI.
 #. Short label for an advanced inbox preference.
-#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:128
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:407
+#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:132
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:431
 msgid "Skip \"Mark all as read\" confirmation"
 msgstr "跳过\"全部标为已读\"确认"
 
@@ -29881,7 +29777,7 @@ msgid "Skip external link warnings. Less secure."
 msgstr "跳过外部链接警告。安全性较低。"
 
 #. Settings search entry description. One-line summary of what the settings search entry controls.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:199
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:223
 msgid "Skip the external link warning for all domains"
 msgstr "跳过所有域名的外部链接警告"
 
@@ -29931,11 +29827,6 @@ msgstr "带步进值的滑块"
 msgid "Sliders"
 msgstr "滑块"
 
-#. Short label in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:54
-msgid "Slightly bolder emphasis"
-msgstr "略粗的强调"
-
 #. Country name. EU member state in the illegal-content report country dropdown.
 #: src/features/moderation/components/report/OptionDescriptors.ts:203
 msgid "Slovakia"
@@ -29954,7 +29845,7 @@ msgid "Slow attachment upload"
 msgstr "慢速附件上传"
 
 #. Short label in the new account guild limit modal. Keep it concise.
-#: src/features/guild/components/alerts/NewAccountGuildLimitModal.tsx:9
+#: src/features/guild/components/alerts/NewAccountGuildLimitModal.tsx:8
 msgid "Slow down"
 msgstr "慢一点"
 
@@ -30004,7 +29895,7 @@ msgstr "慢速模式 · 等待 {remaining}"
 #. Developer tools debug menu label. Internal-only surface for developers; translators may keep this terse.
 #. Short label in the slowmode rate limited modal. Keep it concise.
 #: src/features/channel/components/channel_header_components/developer_tools/DeveloperOptionLabels.ts:249
-#: src/features/slowmode/components/alerts/SlowmodeRateLimitedModal.tsx:14
+#: src/features/slowmode/components/alerts/SlowmodeRateLimitedModal.tsx:13
 msgid "Slowmode active"
 msgstr "慢速模式已开启"
 
@@ -30019,7 +29910,7 @@ msgid "Slowmode is enabled, but you are immune."
 msgstr "慢速模式已开启，但你免疫此限制。"
 
 #. Modal body shown when slowmode blocks sending a message. {duration} is a localized short duration such as "2 minutes".
-#: src/features/slowmode/components/alerts/SlowmodeRateLimitedModal.tsx:18
+#: src/features/slowmode/components/alerts/SlowmodeRateLimitedModal.tsx:17
 msgid "Slowmode is on — wait {duration} before sending another."
 msgstr "慢速模式已开启 — 请等待 {duration} 后再发送消息。"
 
@@ -30044,9 +29935,7 @@ msgid "Slurs, dehumanizing language, or attacks on protected groups."
 msgstr "辱骂、非人化言论或攻击受保护群体。"
 
 #. Short label in the selections tab. Keep it concise.
-#. Short label in the typography tab. Keep it concise.
 #: src/features/user/components/modals/tabs/component_gallery_tab/SelectionsTab.tsx:45
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:78
 msgid "Small"
 msgstr "小"
 
@@ -30087,7 +29976,7 @@ msgid "Smaller media size"
 msgstr "更小的媒体文件"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:355
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:379
 msgid "Smiley face"
 msgstr "笑脸"
 
@@ -30129,11 +30018,6 @@ msgstr "以 5 为增量对齐."
 msgid "Social"
 msgstr "社交"
 
-#. Label in the typography tab.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:30
-msgid "Soft and easy reading experience"
-msgstr "柔和舒适的阅读体验"
-
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #: src/features/user/components/settings_utils/search_index/VoiceVideoIndex.ts:148
 msgid "Software encoder"
@@ -30150,12 +30034,12 @@ msgid "Sold out"
 msgstr "已售罄"
 
 #. Title of the error modal shown after some emoji uploads fail.
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:67
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:68
 msgid "Some emojis couldn't be added"
 msgstr "部分表情符号无法添加"
 
 #. Body of the file-too-large alert when multiple files exceed the per-file size limit. maxSizeFormatted is the limit formatted with units.
-#: src/features/messaging/components/alerts/FileSizeTooLargeModal.tsx:21
+#: src/features/messaging/components/alerts/FileSizeTooLargeModal.tsx:18
 msgid "Some files you're trying to upload exceed the maximum size limit of {maxSizeFormatted} per file."
 msgstr "您尝试上传的部分文件超出大小限制，每个文件不能超过 {maxSizeFormatted}。"
 
@@ -30283,10 +30167,8 @@ msgstr "出错了。"
 #. Body of the generic fallback error modal shown when deleting a custom emoji fails.
 #. Body of the generic fallback error modal shown when generating a shareable theme link fails.
 #. Body of the generic fallback error modal shown when joining a discovery community fails.
-#. Body of the generic fallback error modal shown when joining the canary testers community fails.
 #. Generic fallback body shown in an error modal when an action fails for an unexpected reason.
 #: src/features/app/components/alerts/CommonErrorModalDescriptors.ts:5
-#: src/features/app/components/layout/app_layout/nagbars/CanaryTesterCtaNagbar.tsx:60
 #: src/features/discovery/discovery/DiscoveryGuildCard.tsx:36
 #: src/features/emoji/components/emojis/EmojiListItem.tsx:128
 #: src/features/theme/components/modals/ShareThemeModal.tsx:50
@@ -30794,7 +30676,7 @@ msgid "Start searches with <0>{peoplePrefix}</0> <1>{textChannelPrefix}</1> <2>{
 msgstr "从 <0>{peoplePrefix}</0>、<1>{textChannelPrefix}</1>、<2>{voiceChannelPrefix}</2> 和 <3>{communityPrefix}</3> 开始搜索，以缩小结果范围。"
 
 #. Settings search entry description. One-line summary of what the settings search entry controls.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:127
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:151
 msgid "Start uploading attachments as soon as they are added to the message input"
 msgstr "添加附件到消息输入框后，立即开始上传"
 
@@ -30845,7 +30727,7 @@ msgstr "状态指示"
 msgid "Status page"
 msgstr "状态页面"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:341
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:340
 msgid "Status slate"
 msgstr "状态"
 
@@ -30923,7 +30805,7 @@ msgid "Sticker attached to the message"
 msgstr "消息中包含贴纸"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:331
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:355
 msgid "Sticker autocomplete"
 msgstr "表情包自动补全"
 
@@ -30948,7 +30830,7 @@ msgid "Sticker deleted"
 msgstr "贴纸已删除"
 
 #. Short label in the guild stickers tab. Keep it concise.
-#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:53
+#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:50
 msgid "Sticker density"
 msgstr "贴纸密度"
 
@@ -30996,7 +30878,7 @@ msgstr "贴纸包数量已达上限"
 msgid "Sticker packs"
 msgstr "贴纸包"
 
-#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:283
+#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:278
 msgid "Sticker slots"
 msgstr "贴纸栏位"
 
@@ -31032,7 +30914,7 @@ msgid "Stickers"
 msgstr "贴纸"
 
 #. Description in the community sticker upload section. {maxSize} is the formatted size limit.
-#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:82
+#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:79
 msgid "Stickers are saved at 320x320 pixels and must be under {maxSize}. Static images are resized and compressed automatically. Animated stickers and SVGs must already fit the limit."
 msgstr "贴纸以 320x320 像素保存，并且大小必须小于 {maxSize}。静态图像将自动调整大小并进行压缩。动画贴纸和 SVG 必须已经符合大小限制。"
 
@@ -31077,7 +30959,7 @@ msgid "Stop"
 msgstr "停止"
 
 #. Confirmation prompt in advanced settings.
-#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:148
+#: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls.tsx:152
 msgid "Stop hiding muted channels by default?"
 msgstr "要停止默认隐藏已静音的频道吗？"
 
@@ -31228,19 +31110,19 @@ msgid "Strikethrough"
 msgstr "删除线"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:163
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:187
 msgid "Strip parameters"
 msgstr "移除参数"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:159
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:183
 msgid "Strip tracking"
 msgstr "移除追踪"
 
 #. Label in the links tab.
 #. Settings search entry label. Names the settings search entry in the settings UI.
 #: src/features/user/components/modals/tabs/chat_settings_tab/ChatSettingsTabLinksTab.tsx:43
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:131
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:155
 msgid "Strip tracking parameters from URLs"
 msgstr "移除链接跟踪参数"
 
@@ -31258,15 +31140,6 @@ msgstr "Stripe 报告此卡在 {countryName} 发行。如需以当地货币支�
 #: src/features/voice/utils/ScreenShareCodecPolicy.ts:15
 msgid "Strong quality at moderate CPU cost. Good Chromium fallback for screen sharing."
 msgstr "中等CPU占用，画质佳。屏幕共享时，Chromium的良好备用方案。"
-
-#. Short label in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:62
-msgid "Strong visual hierarchy"
-msgstr "强烈的视觉层次感"
-
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:458
-msgid "Style variations"
-msgstr "样式变体"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #: src/features/user/components/settings_utils/section_registry/AppearanceSections.ts:130
@@ -31313,11 +31186,6 @@ msgstr "订阅场景"
 #: src/features/user/components/modals/tabs/component_gallery_tab/MarkdownTab.tsx:81
 msgid "Subtext"
 msgstr "副文本"
-
-#. Title in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:90
-msgid "Subtitle"
-msgstr "副标题"
 
 #. Developer tools debug menu label. Internal-only surface for developers; translators may keep this terse.
 #: src/features/channel/components/channel_header_components/developer_tools/OptionPresets.ts:71
@@ -31403,7 +31271,7 @@ msgid "SVC mode"
 msgstr "SVC 模式"
 
 #. Settings search entry description. One-line summary of what the settings search entry controls.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:363
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:387
 msgid "Swap common text faces such as :) and <3 for emoji when sending messages"
 msgstr "将常见的文本表情（如 :) 和 <3）在发送消息时替换为表情符号"
 
@@ -31754,7 +31622,7 @@ msgstr "标签页"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #. Short label in the FluxerTag change modal. Keep it concise.
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:60
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:61
 #: src/features/user/components/settings_utils/search_index/MyProfileIndex.ts:73
 msgid "Tag"
 msgstr "标签"
@@ -31862,7 +31730,7 @@ msgid "temporarily unavailable"
 msgstr "暂时不可用"
 
 #. Modal body shown when the user tries to accept a temporary invite while the realtime connection is offline.
-#: src/features/app/components/alerts/TemporaryInviteRequiresPresenceModal.tsx:13
+#: src/features/app/components/alerts/TemporaryInviteRequiresPresenceModal.tsx:12
 msgid "Temporary invites need a live connection. Check yours and try again."
 msgstr "临时邀请需要实时连接。请检查你的连接并重试。"
 
@@ -31872,7 +31740,7 @@ msgid "Temporary membership"
 msgstr "临时成员"
 
 #. Developer control label for the terms-acceptance banner.
-#: src/features/devtools/components/NagbarControls.ts:64
+#: src/features/devtools/components/NagbarControls.ts:59
 msgid "Terms acceptance nagbar"
 msgstr "条款接受提示栏"
 
@@ -31903,10 +31771,8 @@ msgstr "测试 URL 展开和渲染的嵌入内容"
 
 #. Channel type chip label for a text channel.
 #. Option label for a WebRTC content hint select.
-#. Short label in the typography tab. Keep it concise.
 #: src/features/channel/utils/ChannelUtils.tsx:51
 #: src/features/user/components/modals/tabs/advanced_settings_tab/AdvancedVideoControls.tsx:150
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:42
 msgid "Text"
 msgstr "文本"
 
@@ -31941,9 +31807,13 @@ msgstr "文字频道"
 msgid "Text formatting"
 msgstr "文本格式"
 
+#: src/features/theme_studio/sections/ThemeStudioSettingsSection.tsx:308
+msgid "Text is rendered with grayscale antialiasing instead of ClearType while transparency is enabled, so it will look softer."
+msgstr "启用透明度时，文本将使用灰度抗锯齿而非 ClearType 进行渲染，因此看起来会更柔和。"
+
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:359
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:383
 #: src/features/user/components/settings_utils/section_registry/ChatSettingsSections.ts:150
 msgid "Text replacement"
 msgstr "文本替换"
@@ -31982,12 +31852,12 @@ msgid "Text-to-speech"
 msgstr "Text-to-speech"
 
 #. Body of the TTS-unsupported modal. Mentions specific browsers; keep Chrome, Firefox, Edge, and Brave as literal proper nouns.
-#: src/features/voice/components/alerts/TtsUnsupportedModal.tsx:13
+#: src/features/voice/components/alerts/TtsUnsupportedModal.tsx:12
 msgid "Text-to-speech is not supported by your browser. Some browsers like Brave block this feature for privacy reasons. Try using Chrome, Firefox, or Edge, or adjust your browser's privacy settings."
 msgstr "您的浏览器不支持文本转语音功能。出于隐私保护，部分浏览器（如 Brave）会阻止此功能。请尝试使用 Chrome、Firefox 或 Edge 浏览器，或调整您的浏览器隐私设置。"
 
 #. Title of the modal shown when the browser does not support text-to-speech.
-#: src/features/voice/components/alerts/TtsUnsupportedModal.tsx:9
+#: src/features/voice/components/alerts/TtsUnsupportedModal.tsx:8
 msgid "Text-to-speech not supported"
 msgstr "不支持文本转语音"
 
@@ -32090,7 +31960,7 @@ msgid "That's everything in the queue."
 msgstr "队列中的消息都显示在这里了。"
 
 #. Description text in the FluxerTag change modal.
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:68
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:69
 msgid "The #0000 tag is reserved for Visionary subscribers. Visionary is no longer available for purchase."
 msgstr "#0000 标签是 Visionary 订阅者专属。Visionary 已停止购买。"
 
@@ -32129,17 +31999,17 @@ msgid "The community you're looking for may have been deleted or you may not hav
 msgstr "您要找的社群可能已被删除，或者您没有访问权限。"
 
 #. Modal body shown when a desktop update download fails.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:112
+#: src/features/updater/commands/UpdaterModalCommands.tsx:116
 msgid "The desktop update could not be downloaded. Try again from the update button when your connection is stable."
 msgstr "桌面版更新未能下载。请在网络连接稳定后，通过更新按钮重试。"
 
 #. Desktop updater modal body when the downloaded version is unknown. productName is the app name.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:92
+#: src/features/updater/commands/UpdaterModalCommands.tsx:96
 msgid "The desktop update has been downloaded. Restart {productName} to finish installing."
 msgstr "桌面更新已下载。重启 {productName} 以完成安装。"
 
 #. Help text below the Linux package format selector in the desktop updater modal.
-#: src/features/updater/commands/UpdaterModalCommands.tsx:152
+#: src/features/updater/commands/UpdaterModalCommands.tsx:156
 msgid "The downloaded file is saved to your computer. Install it with your normal package manager."
 msgstr "下载的文件已保存到你的电脑。请使用你的常规软件包管理器进行安装。"
 
@@ -32148,7 +32018,7 @@ msgid "The file contains the verification token we will fetch from <0>{dnsUrl}</
 msgstr "此文件包含我们将从 <0>{dnsUrl}</0> 获取的验证令牌。"
 
 #. Body of the file-too-large alert when a single file exceeds the per-file size limit.
-#: src/features/messaging/components/alerts/FileSizeTooLargeModal.tsx:26
+#: src/features/messaging/components/alerts/FileSizeTooLargeModal.tsx:23
 msgid "The file you're trying to upload exceeds the maximum size limit of {maxSizeFormatted}."
 msgstr "您要上传的文件大小超过了 {maxSizeFormatted} 的上限。"
 
@@ -32198,7 +32068,7 @@ msgid "The provided redirect_uri must use HTTP or HTTPS."
 msgstr "提供的 redirect_uri 必须使用 HTTP 或 HTTPS。"
 
 #. Body of a modal shown when a browser screen share track ends outside the app, for example from the browser sharing controls.
-#: src/features/voice/engine/v2/VoiceEngineV2AppScreenShareExecutionAdapter.tsx:116
+#: src/features/voice/engine/v2/VoiceEngineV2AppScreenShareExecutionAdapter.tsx:115
 msgctxt "screen-share"
 msgid "The screen share source stopped sending video, so your screen share was stopped."
 msgstr "屏幕共享源已停止发送视频，因此您的屏幕共享已停止。"
@@ -32225,7 +32095,7 @@ msgstr "上传服务拒绝了此贴纸，因为它大于 {maxSize}。请尝试�
 msgid "The URL of the {productName} instance you want to sign in to."
 msgstr "您要登录的 {productName} 实例的网址。"
 
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:134
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:135
 msgid "The username <0>{fluxerTag}</0> is already taken. Continuing will reroll your tag automatically."
 msgstr "用户名 <0>{fluxerTag}</0> 已被占用。继续操作将自动重新生成你的标签。"
 
@@ -32370,7 +32240,7 @@ msgid "There was an error loading the invites. Try again."
 msgstr "加载邀请时出错。请重试。"
 
 #. Error message in the guild stickers tab.
-#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:78
+#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:75
 msgid "There was an error loading the stickers. Try again."
 msgstr "加载贴纸时出错。请重试。"
 
@@ -32410,12 +32280,7 @@ msgstr "对方可能不接受你的消息，或者你们不再共享社群。"
 msgid "They're not accepting friend requests right now."
 msgstr "对方暂时不接受好友请求。"
 
-#. Short label in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:10
-msgid "Thin"
-msgstr "细"
-
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:114
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:113
 msgid "Third option"
 msgstr "第三个选项"
 
@@ -32428,11 +32293,6 @@ msgstr "第三方"
 #: src/features/relationship/components/alerts/RelationshipErrorModalUtils.tsx:89
 msgid "This account can't be blocked."
 msgstr "此账号无法被屏蔽。"
-
-#. Body of the error modal shown when a too-new account tries to join the canary testers community.
-#: src/features/app/components/layout/app_layout/nagbars/CanaryTesterCtaNagbar.tsx:42
-msgid "This account is too new to join {testersCommunityName} yet. Try again in a little while."
-msgstr "此账号太新，暂时无法加入{testersCommunityName}。请稍后再试。"
 
 #: src/features/user/components/modals/tabs/applications_tab/ApplicationDetail.tsx:415
 msgid "This action cannot be undone. All associated data, including the bot user, will be permanently deleted."
@@ -32516,7 +32376,7 @@ msgid "This channel is marked for mature content and may contain material that m
 msgstr "此频道标记为成人内容，可能包含不适合某些用户观看的材料。"
 
 #. Label in the mature content rejected modal.
-#: src/features/moderation/components/alerts/MatureContentRejectedModal.tsx:13
+#: src/features/moderation/components/alerts/MatureContentRejectedModal.tsx:12
 msgid "This channel is not marked for mature content. Mature content can only be sent in channels marked for mature content. Ask a moderator to update this channel if appropriate."
 msgstr "此频道未标记为成人内容。成人内容只能发送到标记为成人内容的频道。如果合适，请请求管理员更新此频道。"
 
@@ -32579,7 +32439,7 @@ msgid "This community has paused invites. You can try again later."
 msgstr "该社群已暂停邀请。请稍后重试。"
 
 #. Description text in the guild at capacity modal.
-#: src/features/guild/components/alerts/GuildAtCapacityModal.tsx:13
+#: src/features/guild/components/alerts/GuildAtCapacityModal.tsx:12
 msgid "This community has reached its maximum member limit and is not accepting new members at this time."
 msgstr "该社群已达成员上限，暂时无法加入新成员。"
 
@@ -32657,7 +32517,7 @@ msgid "This doesn't look like a valid template response. Make sure you copied th
 msgstr "这似乎不是有效的模板回复。请确保您复制了完整的 JSON 文档。"
 
 #. Generic per-file error text shown when preparing an emoji upload fails.
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:87
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:88
 msgid "This emoji could not be prepared. Try another file or try again in a moment."
 msgstr "无法准备此表情符号。请尝试其他文件或稍后再试。"
 
@@ -32674,7 +32534,7 @@ msgid "This expression is gone"
 msgstr "此表情已失效"
 
 #. Modal body shown when an instance admin has temporarily disabled a feature. Keep plain.
-#: src/features/app/components/alerts/FeatureTemporarilyDisabledModal.tsx:13
+#: src/features/app/components/alerts/FeatureTemporarilyDisabledModal.tsx:12
 msgid "This feature is paused. Try again later."
 msgstr "此功能已暂停。请稍后再试。"
 
@@ -32684,7 +32544,7 @@ msgid "This field has an error"
 msgstr "此字段有误"
 
 #. Error text for animated emoji or SVG uploads that exceed the file size limit. {fileSize} and {maxSize} are formatted file sizes.
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:75
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:76
 msgid "This file is {fileSize}, over the {maxSize} limit. Animated emojis and SVGs must already be small enough to upload. Choose a smaller file or shorten the animation."
 msgstr "此文件大小为 {fileSize}，超过了 {maxSize} 的限制。动图表情和 SVG 必须足够小才能上传。请选择较小的文件或缩短动画。"
 
@@ -32833,29 +32693,29 @@ msgid "This is not the community you're looking for."
 msgstr "此社群并非您要寻找的社群。"
 
 #. Description text in the too many reactions modal. Keep the tone plain and specific.
-#: src/features/messaging/components/alerts/TooManyReactionsModal.tsx:13
+#: src/features/messaging/components/alerts/TooManyReactionsModal.tsx:12
 msgid "This is one heavy message. Some reactions need to be removed before you can add more."
 msgstr "消息太重了。您需要先移除一些反应，然后才能添加更多。"
 
 #. Description text in the index.
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:36
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:35
 msgid "This is some example text in the textarea."
 msgstr "这是文本框中的一些示例文字。"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:112
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:111
 msgid "This is the first option description"
 msgstr "这是第一个选项的描述"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:113
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:112
 msgid "This is the second option description"
 msgstr "这是第二个选项的描述"
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:114
+#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:113
 msgid "This is the third option description"
 msgstr "这是第三个选项的描述"
 
 #. Extra file-too-large alert sentence shown when premium upload-limit upgrades are unavailable.
-#: src/features/messaging/components/alerts/FileSizeTooLargeModal.tsx:42
+#: src/features/messaging/components/alerts/FileSizeTooLargeModal.tsx:39
 msgid "This limit is configured by your instance administrator."
 msgstr "此限制由您的实例管理员配置。"
 
@@ -33003,8 +32863,8 @@ msgid "This removes every custom shortcut and re-enables all built-in shortcuts.
 msgstr "这将移除所有自定义快捷方式，并重新启用所有内置快捷方式。此操作无法撤销。"
 
 #: src/features/auth/components/pages/ResetPasswordPage.tsx:114
-msgid "This reset link has expired. Reset links last 24 hours. Request a new one."
-msgstr "此重置链接已过期。重置链接的有效期为 24 小时。请申请一个新链接。"
+msgid "This reset link has expired. Reset links last 1 hour. Please request a new one."
+msgstr "此重置链接已过期。重置链接有效期为 1 小时。请重新请求一个。"
 
 #. Fallback role name in a mass-mention warning title.
 #: src/features/channel/components/MentionEveryonePopout.tsx:14
@@ -33030,36 +32890,6 @@ msgstr "此开关已禁用，无法切换"
 #: src/features/user/components/modals/tabs/component_gallery_tab/SelectionsTab.tsx:93
 msgid "This switch is disabled in the checked state"
 msgstr "此开关在选中状态下禁用"
-
-#. Title in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:138
-msgid "This text demonstrates bold heading styling"
-msgstr "此文本展示粗体标题样式"
-
-#. Title in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:146
-msgid "This text demonstrates bold title styling"
-msgstr "此文本展示粗体标题样式"
-
-#. Label in the typography tab.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:118
-msgid "This text demonstrates italic styling"
-msgstr "这段文字展示了斜体样式"
-
-#. Label in the typography tab.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:130
-msgid "This text demonstrates large semi-bold styling"
-msgstr "此文本展示了大号半粗体样式"
-
-#. Label in the typography tab.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:110
-msgid "This text demonstrates normal styling"
-msgstr "此文本展示了常规样式"
-
-#. Label in the typography tab.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:122
-msgid "This text demonstrates semi-bold styling"
-msgstr "此文本演示半粗体样式"
 
 #: src/features/user/components/modals/tabs/component_gallery_tab/ComponentGalleryTabInputsTab.tsx:299
 msgid "This textarea auto-expands between 4 and 12 rows as you type."
@@ -33385,11 +33215,6 @@ msgstr "时区"
 msgid "Tip"
 msgstr "提示"
 
-#. Title in the typography tab. Keep it concise.
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:98
-msgid "Title"
-msgstr "标题"
-
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #: src/features/user/components/settings_utils/search_index/DesktopSettingsIndex.ts:178
 msgid "Title bar"
@@ -33570,7 +33395,7 @@ msgid "Too many attempts. Wait a bit, then try again."
 msgstr "尝试次数过多。请稍等片刻，然后重试。"
 
 #. Error message in the max guilds modal.
-#: src/features/guild/components/alerts/MaxGuildsModal.tsx:10
+#: src/features/guild/components/alerts/MaxGuildsModal.tsx:9
 msgid "Too many communities"
 msgstr "社群数量过多"
 
@@ -33627,12 +33452,12 @@ msgid "Track moderator actions across the community."
 msgstr "追踪社区内的管理员操作。"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:135
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:159
 msgid "Tracking"
 msgstr "追踪"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:139
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:163
 msgid "Tracking parameters"
 msgstr "跟踪参数"
 
@@ -33665,7 +33490,7 @@ msgstr "已将所有权转让给 {0}。"
 #. Generic action label that translates a message body.
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #: src/features/i18n/utils/CommonMessageDescriptors.ts:583
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:231
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:255
 msgid "Translate"
 msgstr "翻译"
 
@@ -33684,12 +33509,12 @@ msgid "Translations are automated. Help improve localization by emailing <0>{I18
 msgstr "翻译由机器自动完成。发送邮件至<0>{I18N_EMAIL}</0>，帮助我们改进本地化。"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:223
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:247
 msgid "Translator"
 msgstr "翻译"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:227
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:251
 msgid "Translators"
 msgstr "翻译人员"
 
@@ -33746,14 +33571,14 @@ msgstr "是或否"
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
 #. Short label in the links tab. Keep it concise.
 #: src/features/user/components/modals/tabs/chat_settings_tab/ChatSettingsTabLinksTab.tsx:27
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:175
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:199
 msgid "Trust all"
 msgstr "全部信任"
 
 #. Label in the links tab.
 #. Settings search entry label. Names the settings search entry in the settings UI.
 #: src/features/user/components/modals/tabs/chat_settings_tab/ChatSettingsTabLinksTab.tsx:39
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:171
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:195
 msgid "Trust all external links"
 msgstr "信任所有外部链接"
 
@@ -33763,17 +33588,17 @@ msgid "Trust all external links?"
 msgstr "信任所有外部链接？"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:179
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:203
 msgid "Trust all links"
 msgstr "信任所有链接"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:187
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:211
 msgid "Trust domain"
 msgstr "信任域"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:183
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:207
 msgid "Trusted domains"
 msgstr "信任的域名"
 
@@ -34000,7 +33825,7 @@ msgstr "开启直播隐私模式"
 #. Label in the input tab.
 #. Settings search entry label. Names the settings search entry in the settings UI.
 #: src/features/user/components/modals/tabs/chat_settings_tab/ChatSettingsTabInputTab.tsx:10
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:339
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:363
 msgid "Turn text smileys into emoji"
 msgstr "启用文本表情符号转换为表情符号"
 
@@ -34084,10 +33909,6 @@ msgstr "输入颜色（十六进制、RGB、HSL 或颜色名称），或使用�
 msgid "Type a color (hex, rgb(), hsl(), or name) or use the picker."
 msgstr "输入颜色（十六进制、RGB、HSL 或颜色名称），或使用取色器."
 
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:403
-msgid "Type scale"
-msgstr "字号大小"
-
 #. Label in the inputs tab.
 #: src/features/user/components/modals/tabs/component_gallery_tab/ComponentGalleryTabInputsTab.tsx:89
 msgid "Type your message here…"
@@ -34135,14 +33956,6 @@ msgstr "仅显示\"正在输入\""
 #: src/features/user/components/modals/tabs/component_gallery_tab/IndicatorsTab.tsx:251
 msgid "Typing state"
 msgstr "正在输入"
-
-#: src/features/user/components/modals/tabs/component_gallery_tab/index.tsx:365
-msgid "Typography"
-msgstr "字体"
-
-#: src/features/user/components/modals/tabs/component_gallery_tab/TypographyTab.tsx:447
-msgid "Typography scale demonstration"
-msgstr "排版字号演示"
 
 #. Developer options group for forcing UI component states.
 #: src/features/devtools/components/DeveloperOptionsToggleGroups.ts:57
@@ -34199,8 +34012,8 @@ msgstr "无法加载预览。"
 msgid "Unable to load profile banner, badges, and bio."
 msgstr "无法加载个人资料横幅、徽章和简介。"
 
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:272
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:328
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:271
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:327
 msgid "Unable to prepare any emojis for upload. The following errors occurred:"
 msgstr "无法准备要上传的表情符号。出现以下错误："
 
@@ -34312,7 +34125,7 @@ msgid "Unclaimed account"
 msgstr "未认领帐户"
 
 #. Developer control label for the unclaimed-account banner.
-#: src/features/devtools/components/NagbarControls.ts:32
+#: src/features/devtools/components/NagbarControls.ts:27
 msgid "Unclaimed account nagbar"
 msgstr "未认领账户提示栏"
 
@@ -34462,7 +34275,7 @@ msgstr "通用回退。画质最低，但兼容所有设备。"
 #: src/features/i18n/utils/CommonMessageDescriptors.ts:755
 #: src/features/invite/components/InviteListItem.tsx:34
 #: src/features/moderation/components/modals/BanDetailsModal.tsx:114
-#: src/features/updater/commands/UpdaterModalCommands.tsx:140
+#: src/features/updater/commands/UpdaterModalCommands.tsx:144
 msgid "Unknown"
 msgstr "未知"
 
@@ -34617,8 +34430,8 @@ msgstr "无限表情"
 msgid "Unlimited stickers"
 msgstr "无限贴纸"
 
-#: src/features/channel/components/EmojiPicker.tsx:163
-#: src/features/channel/components/MobileEmojiPicker.tsx:208
+#: src/features/channel/components/EmojiPicker.tsx:150
+#: src/features/channel/components/MobileEmojiPicker.tsx:195
 msgid "Unlock {lockedEmojiCount, plural, one {# custom emoji} other {# custom emojis}} from {communityCount, plural, one {# community} other {# communities}} with {PREMIUM_PRODUCT_NAME}."
 msgstr "通过{PREMIUM_PRODUCT_NAME}解锁{lockedEmojiCount, plural, one {#个自定义表情} other {#个自定义表情}}，来自{communityCount, plural, one {#个社群} other {#个社群}}。"
 
@@ -34764,7 +34577,7 @@ msgstr "未命名频道"
 #. Fallback title in an invite embed for a group DM with no name set.
 #. Short label in the channel display name state. Keep it concise.
 #: src/features/channel/components/InviteEmbed.tsx:72
-#: src/features/channel/state/ChannelDisplayName.ts:17
+#: src/features/channel/state/ChannelDisplayName.ts:18
 #: src/features/channel/utils/ChannelUtils.tsx:59
 msgid "Unnamed group"
 msgstr "未命名群组"
@@ -34932,7 +34745,7 @@ msgid "Unsupported icon format"
 msgstr "不支持的图标格式"
 
 #. Title of the error modal shown when an unsupported sticker file type is selected.
-#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:87
+#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:84
 msgid "Unsupported sticker file"
 msgstr "不支持的贴纸文件"
 
@@ -35135,8 +34948,8 @@ msgstr "立即升级"
 
 #. Short label in the max bookmarks modal. Preserve {premiumProductName}; it is inserted by code.
 #. Short label in the max favorite memes modal. Preserve {premiumProductName}; it is inserted by code.
-#: src/features/app/components/alerts/MaxBookmarksModal.tsx:35
-#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:29
+#: src/features/app/components/alerts/MaxBookmarksModal.tsx:36
+#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:30
 msgid "Upgrade to {premiumProductName}"
 msgstr "升级到{premiumProductName}"
 
@@ -35208,7 +35021,7 @@ msgstr "为 {label} 上传自定义提示音"
 msgid "Upload directly to {displayName}"
 msgstr "直接上传到\"{displayName}\""
 
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:454
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:453
 msgid "Upload emoji"
 msgstr "上传表情"
 
@@ -35252,7 +35065,7 @@ msgstr "上传屏幕共享的预览帧。"
 msgid "Upload sound"
 msgstr "上传声音"
 
-#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:286
+#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:281
 msgid "Upload sticker"
 msgstr "上传贴纸"
 
@@ -35857,7 +35670,7 @@ msgstr "用户、机器人或Webhook"
 #. Settings search entry label. Also used as a search synonym in the settings search bar.
 #: src/features/app/components/setup/SetupWizardSteps.tsx:952
 #: src/features/i18n/utils/CommonMessageDescriptors.ts:567
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:217
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:218
 #: src/features/user/components/modals/tabs/my_profile_tab/MyProfileTabUsernameSection.tsx:55
 #: src/features/user/components/settings_utils/search_index/MyProfileIndex.ts:53
 msgid "Username"
@@ -35869,7 +35682,7 @@ msgid "Username (optional)"
 msgstr "用户名（可选）"
 
 #. Short label in the FluxerTag change modal. Keep it concise.
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:39
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:40
 msgid "Username already taken"
 msgstr "用户名已被占用"
 
@@ -35899,11 +35712,11 @@ msgid "Username must be at most 32 characters"
 msgstr "用户名最多32个字符"
 
 #. Short label in the FluxerTag change modal. Keep it concise.
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:43
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:44
 msgid "Username updated"
 msgstr "用户名已更新"
 
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:210
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:211
 msgid "Usernames can only contain letters (a-z, A-Z), numbers (0-9), and underscores. Usernames are case-insensitive."
 msgstr "用户名只能包含字母（a-z, A-Z）、数字（0-9）和下划线。用户名不区分大小写。"
 
@@ -35930,27 +35743,27 @@ msgid "Uses:"
 msgstr "使用："
 
 #. Developer nagbar status: banner follows real account state.
-#: src/features/devtools/components/NagbarControls.ts:101
+#: src/features/devtools/components/NagbarControls.ts:96
 msgid "Using actual account state"
 msgstr "正在使用真实账号状态"
 
 #. Developer nagbar status: banner follows real gift inventory state.
-#: src/features/devtools/components/NagbarControls.ts:121
+#: src/features/devtools/components/NagbarControls.ts:116
 msgid "Using actual gift inventory state"
 msgstr "正在使用实际礼物库存状态"
 
 #. Developer nagbar status: banner follows real premium subscription state.
-#: src/features/devtools/components/NagbarControls.ts:117
+#: src/features/devtools/components/NagbarControls.ts:112
 msgid "Using actual premium state"
 msgstr "正在使用实际高级版状态"
 
 #. Developer nagbar status: banner follows the real app state.
-#: src/features/devtools/components/NagbarControls.ts:125
+#: src/features/devtools/components/NagbarControls.ts:120
 msgid "Using actual state"
 msgstr "使用真实状态"
 
 #. Developer nagbar status: banner follows real email verification state.
-#: src/features/devtools/components/NagbarControls.ts:105
+#: src/features/devtools/components/NagbarControls.ts:100
 msgid "Using actual verification state"
 msgstr "正在使用实际验证状态"
 
@@ -36219,10 +36032,8 @@ msgstr "请先验证邮箱，再编辑个人资料。你仍可在此预览。"
 msgid "Verify your email before sending friend requests."
 msgstr "请先验证你的邮箱，然后才能发送好友请求。"
 
-#. Title of the error modal shown when an unverified account tries to join the canary testers community.
 #. Title of the error modal shown when an unverified account tries to purchase Plutonium.
 #: src/features/app/components/dialogs/components/plutonium/hooks/useCheckoutActions.tsx:106
-#: src/features/app/components/layout/app_layout/nagbars/CanaryTesterCtaNagbar.tsx:30
 msgid "Verify your email first"
 msgstr "请先验证你的邮箱"
 
@@ -36685,7 +36496,7 @@ msgid "Visionary (lifetime {premiumProductName})"
 msgstr "远见者（{premiumProductName} 终身版）"
 
 #. Developer control label for the Visionary two-factor-authentication banner.
-#: src/features/devtools/components/NagbarControls.ts:60
+#: src/features/devtools/components/NagbarControls.ts:55
 msgid "Visionary 2FA nagbar"
 msgstr "Visionary 双重验证提示栏"
 
@@ -36948,7 +36759,7 @@ msgid "Voice region"
 msgstr "语音地区"
 
 #. Developer control label for the voice-session-restore banner.
-#: src/features/devtools/components/NagbarControls.ts:68
+#: src/features/devtools/components/NagbarControls.ts:63
 msgid "Voice session restore nagbar"
 msgstr "语音会话恢复提示栏"
 
@@ -36996,7 +36807,7 @@ msgid "Volume sliders"
 msgstr "音量滑块"
 
 #. Description text in the message delete too quick modal. Keep the tone plain and specific.
-#: src/features/messaging/components/alerts/MessageDeleteTooQuickModal.tsx:13
+#: src/features/messaging/components/alerts/MessageDeleteTooQuickModal.tsx:12
 msgid "Wait a moment before deleting more messages."
 msgstr "请稍后再删除其他消息。"
 
@@ -37096,11 +36907,6 @@ msgstr "Wayland 的 xdg-desktop-portal 拥有选择器，并会同时显示所�
 msgid "Wayland's xdg-desktop-portal owns the picker and shows every window and display together. There is no flag that filters it to windows only. Press open system picker, then choose a window there to get per-app audio."
 msgstr "Wayland 的 xdg-desktop-portal 拥有选择器，并会同时显示所有窗口和显示器。目前没有可将其筛选为仅显示窗口的标志。请按\"打开系统选择器\"，然后选择一个窗口以获取应用内音频。"
 
-#. Title of the error modal shown when a flagged account is blocked from joining the canary testers community.
-#: src/features/app/components/layout/app_layout/nagbars/CanaryTesterCtaNagbar.tsx:46
-msgid "We can't add you right now"
-msgstr "暂时无法添加您"
-
 #. Premium checkout error shown when card verification fails unexpectedly. productName is the app name.
 #: src/features/premium/components/pages/PremiumCallbackPage.tsx:44
 msgid "We could not confirm your card right now. Refresh this page or return to {productName} and try again."
@@ -37148,7 +36954,7 @@ msgstr "暂时无法转发消息。"
 msgid "We couldn't import that theme library file."
 msgstr "无法导入该主题库文件。"
 
-#: src/features/messaging/components/alerts/AttachmentUploadConnectivityModal.tsx:24
+#: src/features/messaging/components/alerts/AttachmentUploadConnectivityModal.tsx:23
 msgid "We couldn't reach the attachment upload service. {PRODUCT_NAME} can fall back to the standard upload path for messages up to {fallbackSizeFormatted} total, but these attachments exceed that combined limit and can't be sent until connectivity is restored. Try again later or contact <0>{SUPPORT_EMAIL}</0> if this keeps happening."
 msgstr "我们无法连接到附件上传服务。{PRODUCT_NAME} 可以回退到标准上传路径，但总大小不能超过 {fallbackSizeFormatted}。这些附件的总大小已超出此限制，因此在连接恢复之前无法发送。请稍后重试，如果问题仍然存在，请联系<0>{SUPPORT_EMAIL}</0>。"
 
@@ -37191,7 +36997,7 @@ msgid "We recommend saving these codes now so that you don't get locked out of y
 msgstr "建议您现在保存这些备用码，以防无法登录您的帐户。"
 
 #. Error text for static emoji uploads that still exceed the file size limit after resizing. {fileSize} and {maxSize} are formatted file sizes.
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:81
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:82
 msgid "We resized and compressed this emoji to 128x128 pixels, but it is still {fileSize}. The limit is {maxSize}. Try a simpler image, fewer colors, or a smaller source file."
 msgstr "我们已将此表情符号的大小调整并压缩到 128x128 像素，但它仍有 {fileSize}。限制为 {maxSize}。请尝试使用更简单的图片、更少的颜色或更小的源文件。"
 
@@ -37301,7 +37107,7 @@ msgid "We've updated our policies. Review and accept them to continue."
 msgstr "我们更新了政策。请查看并接受以继续。"
 
 #. Client info web build identifier shown after the desktop build when both are present. Example: "Web 2026.518.0". Preserve placeholder.
-#: src/features/app/components/dialogs/components/ClientInfo.tsx:28
+#: src/features/app/components/dialogs/components/ClientInfo.tsx:27
 msgid "Web {buildVersion}"
 msgstr "网页版 {buildVersion}"
 
@@ -37311,7 +37117,7 @@ msgid "Web authentication"
 msgstr "网页认证"
 
 #. Settings search synonym. Used to match this term when the user types it in the settings search bar.
-#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:211
+#: src/features/user/components/settings_utils/search_index/ChatSettingsIndex.ts:235
 msgid "Web search"
 msgstr "网页搜索"
 
@@ -37657,8 +37463,8 @@ msgstr "天呐，大家都在打字"
 
 #. Label in the too many attachments modal.
 #. Label in the too many reactions modal.
-#: src/features/messaging/components/alerts/TooManyAttachmentsModal.tsx:10
-#: src/features/messaging/components/alerts/TooManyReactionsModal.tsx:9
+#: src/features/messaging/components/alerts/TooManyAttachmentsModal.tsx:9
+#: src/features/messaging/components/alerts/TooManyReactionsModal.tsx:8
 msgid "Whoa, this is heavy"
 msgstr "内容太多啦"
 
@@ -37741,7 +37547,7 @@ msgid "With {PREMIUM_PRODUCT_NAME}, you can use animated avatars ({ANIMATED_AVAT
 msgstr "有了 {PREMIUM_PRODUCT_NAME}，您可以使用动态头像（{ANIMATED_AVATAR_FORMATS}）、个人资料横幅、自定义您的标签，并解锁许多其他 {PREMIUM_PRODUCT_NAME} 特权。"
 
 #. Premium upsell sentence in the file-too-large alert. premiumProductName is the paid product name; fileSizeLimit is a localized file size.
-#: src/features/messaging/components/alerts/FileSizeTooLargeModal.tsx:46
+#: src/features/messaging/components/alerts/FileSizeTooLargeModal.tsx:43
 msgid "With {premiumProductName}, your per-file upload limit increases to {fileSizeLimit}, plus animated avatars, longer messages, and many other {premiumProductName} perks."
 msgstr "有了 {premiumProductName}，您的单次文件上传限制将增加到 {fileSizeLimit}，此外还有动态头像、更长的消息以及许多其他 {premiumProductName} 特权。"
 
@@ -37871,7 +37677,7 @@ msgid "You are about to transfer ownership of this community to <0>{0}</0>. This
 msgstr "您即将把此社群的所有权转让给<0>{0}</0>。此操作<1>不可撤销</1>，您将失去所有者权限。"
 
 #. Error message in the user banned from guild modal. Keep the tone plain and specific.
-#: src/features/moderation/components/alerts/UserBannedFromGuildModal.tsx:13
+#: src/features/moderation/components/alerts/UserBannedFromGuildModal.tsx:12
 msgid "You are banned from this community and cannot join."
 msgstr "你已被此社群封禁，无法加入。"
 
@@ -37885,7 +37691,7 @@ msgid "You are editing your per-community profile. This profile will only be vis
 msgstr "你正在编辑你的社群专属资料。此资料仅在此社群可见，并会覆盖你的全局资料。"
 
 #. Body text in the settings dialog client info.
-#: src/features/app/components/dialogs/components/ClientInfo.tsx:42
+#: src/features/app/components/dialogs/components/ClientInfo.tsx:41
 msgid "You are now a developer!"
 msgstr "你现在是开发者了！"
 
@@ -37994,7 +37800,7 @@ msgid "You can't add new reactions while you're on timeout."
 msgstr "禁言期间无法添加新表情。"
 
 #. Description text in the attachment permission denied modal. Keep the tone plain and specific.
-#: src/features/messaging/components/alerts/AttachmentPermissionDeniedModal.tsx:20
+#: src/features/messaging/components/alerts/AttachmentPermissionDeniedModal.tsx:17
 msgid "You can't attach files in this channel."
 msgstr "你无法在此频道中附加文件。"
 
@@ -38180,11 +37986,11 @@ msgstr "你无法移除此权限，因为它会把你自己的权限也移除"
 msgid "You changed your nickname in this community from **{previousNickname}** to **{newNickname}**."
 msgstr "你在此社群中的昵称已从\"**{previousNickname}**\"更改为\"**{newNickname}**\"。"
 
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:362
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:367
 msgid "You changed your tag while on {PREMIUM_PRODUCT_NAME}. It will reroll randomly when your {PREMIUM_PRODUCT_NAME} expires on <0>{premiumExpiresAtLabel}</0>, unless it renews."
 msgstr "您在{PREMIUM_PRODUCT_NAME}期间更改了标签。除非续订，否则当您的{PREMIUM_PRODUCT_NAME}在<0>{premiumExpiresAtLabel}</0>到期时，标签将随机重新生成。"
 
-#: src/features/user/components/modals/FluxerTagChangeModal.tsx:369
+#: src/features/user/components/modals/FluxerTagChangeModal.tsx:374
 msgid "You changed your tag while on {PREMIUM_PRODUCT_NAME}. It will reroll randomly when your {PREMIUM_PRODUCT_NAME} expires, unless it renews."
 msgstr "您在{PREMIUM_PRODUCT_NAME}期间更改了标签。除非续订，否则您的{PREMIUM_PRODUCT_NAME}到期后，标签将随机重新生成。"
 
@@ -38283,12 +38089,6 @@ msgstr "你还没有屏蔽任何人。"
 #: src/features/user/components/modals/tabs/ExpressionPacksTab.tsx:343
 msgid "You haven't created any packs yet."
 msgstr "你还没有创建任何表情包。"
-
-#. Toast success shown after joining the canary testers community. {testersCommunityName} is the community name and {canaryReleaseName} is the release channel name.
-#: src/features/app/components/layout/app_layout/nagbars/CanaryTesterCtaNagbar.tsx:25
-#: src/features/channel/components/direct_message/CanaryTesterDmItem.tsx:69
-msgid "You joined {testersCommunityName}. Thanks for testing {canaryReleaseName}!"
-msgstr "你已加入 {testersCommunityName}。感谢你测试 {canaryReleaseName}！"
 
 #. Intro copy in the keyboard navigation modal. {productName} is the app name.
 #: src/features/input/components/modals/KeyboardModeIntroModal.tsx:26
@@ -38425,11 +38225,6 @@ msgstr "您需要先验证邮箱地址，然后才能发送好友请求。"
 msgid "You need to verify your email address before you can start a direct message."
 msgstr "您需要先验证邮箱地址，然后才能发起私信。"
 
-#. Body of the error modal shown when an unverified account tries to join the canary testers community.
-#: src/features/app/components/layout/app_layout/nagbars/CanaryTesterCtaNagbar.tsx:34
-msgid "You need to verify your email before you can join {testersCommunityName}."
-msgstr "您需要先验证邮箱，才能加入{testersCommunityName}。"
-
 #. Body of the error modal shown when the account email is unverified and the user tries to purchase Plutonium. Product name is interpolated.
 #: src/features/app/components/dialogs/components/plutonium/hooks/useCheckoutActions.tsx:110
 msgid "You need to verify your email before you can purchase {premiumProductFullName}."
@@ -38502,17 +38297,17 @@ msgid "You're already Visionary"
 msgstr "您已经是远见者了"
 
 #. Modal body shown when the bookmarks limit is reached on a self-hosted instance with no upgrade path. Limit count is interpolated.
-#: src/features/app/components/alerts/MaxBookmarksModal.tsx:19
+#: src/features/app/components/alerts/MaxBookmarksModal.tsx:20
 msgid "You're at {bookmarksText} — your instance admin sets this cap. Remove one to add another."
 msgstr "您已达到{bookmarksText}上限，此上限由您的实例管理员设置。请移除一个书签以添加新的书签。"
 
 #. Modal body shown when the bookmarks limit is reached and Plutonium is unavailable on this instance. Limit count is interpolated.
-#: src/features/app/components/alerts/MaxBookmarksModal.tsx:24
+#: src/features/app/components/alerts/MaxBookmarksModal.tsx:25
 msgid "You're at {bookmarksText}. Remove one to add another."
 msgstr "你已达到{bookmarksText}。请移除一个，然后添加新的。"
 
 #. Modal body shown when the favorite-memes limit is reached on a self-hosted instance with no Plutonium upgrade path. Limit text is interpolated.
-#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:19
+#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:20
 msgid "You're at the cap of {freeItemsText} — your instance admin sets this limit."
 msgstr "您已达到 {freeItemsText} 的上限 — 此限制由您的实例管理员设置。"
 
@@ -38524,12 +38319,12 @@ msgid "You're at the creation limit. Delete one to create another."
 msgstr "您已达到创建上限。请删除一个，然后重新创建。"
 
 #. Modal body shown when the free bookmarks limit is reached and Plutonium would increase it. Free and Plutonium limits are interpolated.
-#: src/features/app/components/alerts/MaxBookmarksModal.tsx:29
+#: src/features/app/components/alerts/MaxBookmarksModal.tsx:30
 msgid "You're at the free cap of {bookmarksText}. {premiumProductName} bumps you up to {premiumBookmarksText} — or remove one to add another."
 msgstr "您已达到免费书签上限 {bookmarksText}。{premiumProductName} 可将上限提升至 {premiumBookmarksText}，或删除一个书签以添加新的书签。"
 
 #. Modal body shown when the free favorite-memes limit is reached and Plutonium would increase it. Free and Plutonium limits are interpolated.
-#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:24
+#: src/features/app/components/alerts/MaxFavoriteMemesModal.tsx:25
 msgid "You're at the free cap of {freeItemsText}. {premiumProductName} bumps you up to {premiumItemsText}."
 msgstr "您已达到免费上限 {freeItemsText}。{premiumProductName} 可将上限提升至 {premiumItemsText}。"
 
@@ -38541,7 +38336,7 @@ msgid "You're at the install limit. Remove one to add another."
 msgstr "您已达到安装上限。请移除一个，然后添加新的。"
 
 #. Short label in the user banned from guild modal. Keep it concise. Keep the tone plain and specific.
-#: src/features/moderation/components/alerts/UserBannedFromGuildModal.tsx:9
+#: src/features/moderation/components/alerts/UserBannedFromGuildModal.tsx:8
 msgid "You're banned"
 msgstr "你已被封禁"
 
@@ -38566,7 +38361,7 @@ msgid "You're deafened"
 msgstr "你已静音。"
 
 #. Label in the message delete too quick modal. Keep the tone plain and specific.
-#: src/features/messaging/components/alerts/MessageDeleteTooQuickModal.tsx:9
+#: src/features/messaging/components/alerts/MessageDeleteTooQuickModal.tsx:8
 msgid "You're deleting messages too quickly"
 msgstr "您删除消息的速度太快了"
 
@@ -38623,11 +38418,6 @@ msgstr "您已加入的社群数量已达上限。请先退出一个社群，然
 #: src/features/voice/components/bottomsheets/VoiceLobbyBottomSheet.tsx:76
 msgid "You're in the voice channel"
 msgstr "你正在语音频道中"
-
-#. Nagbar body inviting canary release users to join the testers community. {canaryReleaseName} is the release channel name and {testersCommunityName} is the community name.
-#: src/features/app/components/layout/app_layout/nagbars/CanaryTesterCtaNagbar.tsx:102
-msgid "You're on {canaryReleaseName}. Join {testersCommunityName} to submit bug reports and feedback about upcoming builds."
-msgstr "您正在使用 {canaryReleaseName}。加入 {testersCommunityName}，提交关于即将发布的版本的错误报告和反馈。"
 
 #. Plutonium subscription card tooltip shown when the user is on a grandfathered price that is no longer offered.
 #: src/features/app/components/dialogs/components/plutonium/SubscriptionCard.tsx:37
@@ -38725,12 +38515,12 @@ msgid "You've reached the group DM limit"
 msgstr "您已达到群聊私信上限"
 
 #. Emoji upload limit message in community emoji settings. Do not suggest that communities can be upgraded.
-#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:50
+#: src/features/guild/components/modals/guild_tabs/GuildEmojiTab.tsx:51
 msgid "You've reached the maximum number of emojis. Delete some existing emojis to make room."
 msgstr "您已达到表情符号数量上限。请删除一些现有表情符号以腾出空间。"
 
 #. Sticker upload limit message in community sticker settings. Do not suggest that communities can be upgraded.
-#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:65
+#: src/features/guild/components/modals/guild_tabs/GuildStickersTab.tsx:62
 msgid "You've reached the maximum number of stickers. Delete some existing stickers to make room."
 msgstr "您已达到贴纸数量上限。请删除一些现有贴纸以腾出空间。"
 
@@ -38771,11 +38561,6 @@ msgstr "您的 {productName} 会话已过期。请重新登录以继续授权此
 msgid "Your account"
 msgstr "你的账号"
 
-#. Body of the error modal shown when a flagged account is blocked from joining the canary testers community.
-#: src/features/app/components/layout/app_layout/nagbars/CanaryTesterCtaNagbar.tsx:51
-msgid "Your account can't join {testersCommunityName} at the moment. Contact support if you think this is a mistake."
-msgstr "您的帐户目前无法加入“{testersCommunityName}”。如果您认为这是个错误，请联系客服。"
-
 #: src/features/connection/components/pages/ConnectionCallbackPage.tsx:29
 msgid "Your account has been linked successfully. You can now close this tab and return to the app."
 msgstr "您的账号已成功关联。现在可以关闭此页面并返回应用。"
@@ -38783,11 +38568,6 @@ msgstr "您的账号已成功关联。现在可以关闭此页面并返回应用
 #: src/features/app/components/dialogs/components/UnclaimedAccountAlert.tsx:26
 msgid "Your account is not yet claimed. Without an email and password, you won't be able to sign in from other devices and you could lose access to your account. Claim your account now to secure it."
 msgstr "您的帐户尚未认领。如果没有邮箱和密码，您将无法在其他设备上登录，并可能丢失帐户访问权限。立即认领您的帐户以确保安全。"
-
-#. Title of the error modal shown when a too-new account tries to join the canary testers community.
-#: src/features/app/components/layout/app_layout/nagbars/CanaryTesterCtaNagbar.tsx:38
-msgid "Your account is too new"
-msgstr "您的账号太新了"
 
 #: src/features/channel/components/barriers/BarrierComponents.tsx:195
 msgid "Your account is too new to send messages in this community."
@@ -38803,7 +38583,7 @@ msgid "Your account requires multi-factor authentication, but no supported metho
 msgstr "您的帐户需要多重身份验证，但此设备上未设置任何受支持的方法。请在已设置身份验证器应用或安全密钥的设备上登录，或联系支持人员。"
 
 #. Modal body shown when the safety system blocks the requested action. Keep plain and calm; offer support path.
-#: src/features/auth/components/ContentBlockedHandler.tsx:15
+#: src/features/auth/components/ContentBlockedHandler.tsx:14
 msgid "Your action could not be completed because it was flagged by our safety systems. If you believe this is a mistake, please contact support."
 msgstr "你的操作未能完成，因为它已被我们的安全系统标记。如果你认为这是一个错误，请联系客服。"
 
@@ -38928,12 +38708,12 @@ msgid "Your IP address has been successfully authorized."
 msgstr "您的 IP 地址已成功获得授权。"
 
 #. Error message in the user ip banned from guild modal. Keep the tone plain and specific.
-#: src/features/moderation/components/alerts/UserIpBannedFromGuildModal.tsx:13
+#: src/features/moderation/components/alerts/UserIpBannedFromGuildModal.tsx:12
 msgid "Your IP address is banned from this community and you cannot join."
 msgstr "您的 IP 地址已被此社群封禁，无法加入。"
 
 #. Label in the user ip banned from guild modal. Keep the tone plain and specific.
-#: src/features/moderation/components/alerts/UserIpBannedFromGuildModal.tsx:9
+#: src/features/moderation/components/alerts/UserIpBannedFromGuildModal.tsx:8
 msgid "Your IP is banned"
 msgstr "您的 IP 已被封禁"
 

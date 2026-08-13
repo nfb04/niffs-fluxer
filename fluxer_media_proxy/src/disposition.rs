@@ -29,13 +29,21 @@ fn normalize_mime(content_type: &str) -> &str {
 
 pub fn is_inline_viewable(content_type: &str) -> bool {
     let mime = normalize_mime(content_type);
+    if is_scriptable_document(mime) {
+        return false;
+    }
     if mime.len() >= 6 && mime[..6].eq_ignore_ascii_case("image/") {
         return true;
     }
     if mime.len() >= 6 && mime[..6].eq_ignore_ascii_case("video/") {
         return true;
     }
-    mime.eq_ignore_ascii_case("application/pdf")
+    false
+}
+
+fn is_scriptable_document(mime: &str) -> bool {
+    mime.eq_ignore_ascii_case("image/svg+xml")
+        || mime.eq_ignore_ascii_case("application/pdf")
 }
 
 fn is_safe_quoted_filename(s: &str) -> bool {
@@ -110,8 +118,8 @@ mod tests {
             decide("image/jpeg; charset=binary", false)
         );
         assert_eq!(Decision::Inline, decide("video/mp4", false));
-        assert_eq!(Decision::Inline, decide("application/pdf", false));
-        assert_eq!(Decision::Inline, decide("image/svg+xml", false));
+        assert_eq!(Decision::Attachment, decide("application/pdf", false));
+        assert_eq!(Decision::Attachment, decide("image/svg+xml", false));
         assert_eq!(
             Decision::Attachment,
             decide("application/octet-stream", false)
@@ -132,7 +140,7 @@ mod tests {
     #[test]
     fn case_insensitive_mime_matching() {
         assert_eq!(Decision::Inline, decide("IMAGE/PNG", false));
-        assert_eq!(Decision::Inline, decide("Image/Svg+Xml", false));
+        assert_eq!(Decision::Attachment, decide("Image/Svg+Xml", false));
     }
 
     #[test]

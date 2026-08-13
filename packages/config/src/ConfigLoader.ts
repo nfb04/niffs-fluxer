@@ -91,6 +91,7 @@ function defaultConfig(): MasterConfig {
 		services: {
 			api: {
 				port: 8080,
+				ip_ban_exempt_ips: [],
 				presigned_attachment_uploads_enabled: false,
 				unfurl_ignored_hosts: [],
 				embeds: {
@@ -219,13 +220,7 @@ function defaultConfig(): MasterConfig {
 				port: 3310,
 				fail_open: false,
 			},
-			gif: {
-				provider: 'tenor',
-			},
 			klipy: {
-				api_key: '',
-			},
-			tenor: {
 				api_key: '',
 			},
 			youtube: {
@@ -296,7 +291,7 @@ function defaultConfig(): MasterConfig {
 			min_member_count: 1,
 		},
 		attachment_decay_enabled: true,
-		deletion_grace_period_hours: 72,
+		deletion_grace_period_hours: 336,
 		inactivity_deletion_threshold_days: 365,
 	};
 }
@@ -399,7 +394,6 @@ function normalizeConfig(config: MasterConfig): MasterConfig {
 	assertOneOf(config.integrations.email.provider, ['smtp', 'none'], 'FLUXER_EMAIL_PROVIDER');
 	assertOneOf(config.integrations.captcha.provider, ['hcaptcha', 'turnstile', 'none'], 'FLUXER_CAPTCHA_PROVIDER');
 	assertOneOf(config.integrations.search.engine, ['elasticsearch', 'meilisearch'], 'FLUXER_SEARCH_ENGINE');
-	assertOneOf(config.integrations.gif.provider, ['tenor', 'klipy'], 'FLUXER_GIF_PROVIDER');
 	assertOneOf(
 		config.instance.abuse_policy.direct_contact_spam.action,
 		['flag_spammer', 'suppress_delivery'],

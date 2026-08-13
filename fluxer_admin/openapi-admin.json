@@ -8977,7 +8977,7 @@
 							"type": "integer",
 							"minimum": 0,
 							"maximum": 8640000000000000,
-							"format": "int64",
+							"format": "int53",
 							"description": "Inclusive start timestamp in milliseconds"
 						}
 					},
@@ -8989,7 +8989,7 @@
 							"type": "integer",
 							"minimum": 0,
 							"maximum": 8640000000000000,
-							"format": "int64",
+							"format": "int53",
 							"description": "Inclusive end timestamp in milliseconds"
 						}
 					},
@@ -9087,7 +9087,7 @@
 							"type": "integer",
 							"minimum": 0,
 							"maximum": 8640000000000000,
-							"format": "int64",
+							"format": "int53",
 							"description": "Inclusive start timestamp in milliseconds"
 						}
 					},
@@ -9099,7 +9099,7 @@
 							"type": "integer",
 							"minimum": 0,
 							"maximum": 8640000000000000,
-							"format": "int64",
+							"format": "int53",
 							"description": "Inclusive end timestamp in milliseconds"
 						}
 					},
@@ -9718,7 +9718,7 @@
 					"acls": {
 						"type": "array",
 						"items": {"type": "string"},
-						"maxItems": 100,
+						"maxItems": 115,
 						"description": "List of access control permissions for the key"
 					}
 				},
@@ -9813,7 +9813,6 @@
 					"DISCRIMINATOR_REQUIRED",
 					"EMAIL_SERVICE_NOT_TESTABLE",
 					"EMAIL_VERIFICATION_REQUIRED",
-					"CANARY_TESTER_EMAIL_VERIFICATION_REQUIRED",
 					"DIRECT_MESSAGE_EMAIL_VERIFICATION_REQUIRED",
 					"FRIEND_REQUEST_EMAIL_VERIFICATION_REQUIRED",
 					"GUILD_CREATION_EMAIL_VERIFICATION_REQUIRED",
@@ -10061,11 +10060,11 @@
 			"ValidationErrorItem": {
 				"type": "object",
 				"properties": {
-					"field": {"type": "string", "description": "Field path that failed validation"},
+					"path": {"type": "string", "description": "Field path that failed validation"},
 					"code": {"type": "string", "description": "Machine-readable validation error code"},
 					"message": {"type": "string", "description": "Human-readable validation error message"}
 				},
-				"required": ["field", "code", "message"]
+				"required": ["path", "message"]
 			},
 			"CreateAdminApiKeyRequest": {
 				"type": "object",
@@ -10081,7 +10080,7 @@
 					"acls": {
 						"type": "array",
 						"items": {"type": "string"},
-						"maxItems": 100,
+						"maxItems": 115,
 						"description": "List of access control permissions for the key"
 					}
 				},
@@ -10111,7 +10110,7 @@
 					"acls": {
 						"type": "array",
 						"items": {"type": "string"},
-						"maxItems": 100,
+						"maxItems": 115,
 						"description": "List of access control permissions for the key"
 					}
 				},
@@ -10613,7 +10612,7 @@
 						"type": "integer",
 						"minimum": 0,
 						"maximum": 9007199254740991,
-						"format": "int64",
+						"format": "int53",
 						"description": "Number of entries to skip"
 					}
 				}
@@ -10645,7 +10644,7 @@
 						"type": "integer",
 						"minimum": 0,
 						"maximum": 9007199254740991,
-						"format": "int64",
+						"format": "int53",
 						"description": "Number of entries to skip"
 					}
 				}
@@ -11147,7 +11146,7 @@
 					"amount_cents": {
 						"type": "integer",
 						"maximum": 9007199254740991,
-						"format": "int64",
+						"format": "int53",
 						"minimum": 0,
 						"exclusiveMinimum": true
 					},
@@ -11981,7 +11980,7 @@
 				"properties": {
 					"guild_id": {"$ref": "#/components/schemas/SnowflakeType"},
 					"limit": {"type": "integer", "minimum": 1, "maximum": 200, "format": "int32"},
-					"offset": {"type": "integer", "minimum": 0, "maximum": 9007199254740991, "format": "int64"}
+					"offset": {"type": "integer", "minimum": 0, "maximum": 9007199254740991, "format": "int53"}
 				},
 				"required": ["guild_id"]
 			},
@@ -12197,7 +12196,9 @@
 						"description": "Custom content warning text shown before entry",
 						"nullable": true,
 						"type": "string"
-					}
+					},
+					"approximate_member_count": {"$ref": "#/components/schemas/Int32Type"},
+					"approximate_presence_count": {"$ref": "#/components/schemas/Int32Type"}
 				},
 				"required": [
 					"id",
@@ -12217,7 +12218,7 @@
 				"properties": {
 					"query": {"type": "string"},
 					"limit": {"type": "integer", "minimum": 1, "maximum": 200, "format": "int32"},
-					"offset": {"type": "integer", "minimum": 0, "maximum": 9007199254740991, "format": "int64"}
+					"offset": {"type": "integer", "minimum": 0, "maximum": 9007199254740991, "format": "int53"}
 				}
 			},
 			"ShutdownGuildRequest": {
@@ -12437,9 +12438,9 @@
 											"type": "integer",
 											"minimum": 1,
 											"maximum": 9007199254740991,
-											"format": "int64"
+											"format": "int53"
 										},
-										"use_count": {"type": "integer", "minimum": 0, "maximum": 9007199254740991, "format": "int64"},
+										"use_count": {"type": "integer", "minimum": 0, "maximum": 9007199254740991, "format": "int53"},
 										"revoked_at": {"nullable": true, "type": "string", "format": "date-time"},
 										"approval_required": {"type": "boolean"},
 										"last_used_at": {"nullable": true, "type": "string", "format": "date-time"},
@@ -12592,20 +12593,8 @@
 						"properties": {
 							"gif": {
 								"type": "object",
-								"properties": {
-									"provider": {"nullable": true, "enum": ["tenor", "klipy"], "type": "string"},
-									"effective_provider": {"enum": ["tenor", "klipy"], "type": "string"},
-									"tenor_api_key_set": {"type": "boolean"},
-									"klipy_api_key_set": {"type": "boolean"},
-									"effective_available": {"type": "boolean"}
-								},
-								"required": [
-									"provider",
-									"effective_provider",
-									"tenor_api_key_set",
-									"klipy_api_key_set",
-									"effective_available"
-								]
+								"properties": {"klipy_api_key_set": {"type": "boolean"}, "effective_available": {"type": "boolean"}},
+								"required": ["klipy_api_key_set", "effective_available"]
 							},
 							"youtube": {
 								"type": "object",
@@ -12652,7 +12641,9 @@
 											"secure": {"nullable": true, "type": "boolean"}
 										},
 										"required": ["host", "port", "username", "password_set", "secure"]
-									}
+									},
+									"disable_new_ip_authorization": {"type": "boolean"},
+									"effective_disable_new_ip_authorization": {"type": "boolean"}
 								},
 								"required": [
 									"enabled",
@@ -12661,7 +12652,9 @@
 									"effective_provider",
 									"from_email",
 									"from_name",
-									"smtp"
+									"smtp",
+									"disable_new_ip_authorization",
+									"effective_disable_new_ip_authorization"
 								]
 							},
 							"bluesky": {
@@ -12674,7 +12667,7 @@
 									"logo_uri": {"nullable": true, "type": "string"},
 									"tos_uri": {"nullable": true, "type": "string"},
 									"policy_uri": {"nullable": true, "type": "string"},
-									"key_count": {"type": "integer", "minimum": 0, "maximum": 9007199254740991, "format": "int64"}
+									"key_count": {"type": "integer", "minimum": 0, "maximum": 9007199254740991, "format": "int53"}
 								},
 								"required": [
 									"enabled",
@@ -12704,7 +12697,7 @@
 										"nullable": true,
 										"type": "integer",
 										"maximum": 9007199254740991,
-										"format": "int64",
+										"format": "int53",
 										"minimum": 0,
 										"exclusiveMinimum": true
 									},
@@ -12712,7 +12705,7 @@
 										"nullable": true,
 										"type": "integer",
 										"maximum": 9007199254740991,
-										"format": "int64",
+										"format": "int53",
 										"minimum": 0,
 										"exclusiveMinimum": true
 									},
@@ -12721,7 +12714,7 @@
 										"nullable": true,
 										"type": "integer",
 										"maximum": 9007199254740991,
-										"format": "int64",
+										"format": "int53",
 										"minimum": 0,
 										"exclusiveMinimum": true
 									},
@@ -12729,7 +12722,7 @@
 										"nullable": true,
 										"type": "integer",
 										"maximum": 9007199254740991,
-										"format": "int64",
+										"format": "int53",
 										"minimum": 0,
 										"exclusiveMinimum": true
 									},
@@ -12743,14 +12736,14 @@
 											"min_lifetime_days": {
 												"type": "integer",
 												"maximum": 9007199254740991,
-												"format": "int64",
+												"format": "int53",
 												"minimum": 0,
 												"exclusiveMinimum": true
 											},
 											"max_lifetime_days": {
 												"type": "integer",
 												"maximum": 9007199254740991,
-												"format": "int64",
+												"format": "int53",
 												"minimum": 0,
 												"exclusiveMinimum": true
 											},
@@ -12758,14 +12751,14 @@
 											"renew_threshold_days": {
 												"type": "integer",
 												"maximum": 9007199254740991,
-												"format": "int64",
+												"format": "int53",
 												"minimum": 0,
 												"exclusiveMinimum": true
 											},
 											"renew_window_days": {
 												"type": "integer",
 												"maximum": 9007199254740991,
-												"format": "int64",
+												"format": "int53",
 												"minimum": 0,
 												"exclusiveMinimum": true
 											}
@@ -12877,9 +12870,9 @@
 								"type": "integer",
 								"minimum": 1,
 								"maximum": 9007199254740991,
-								"format": "int64"
+								"format": "int53"
 							},
-							"use_count": {"type": "integer", "minimum": 0, "maximum": 9007199254740991, "format": "int64"},
+							"use_count": {"type": "integer", "minimum": 0, "maximum": 9007199254740991, "format": "int53"},
 							"revoked_at": {"nullable": true, "type": "string", "format": "date-time"},
 							"approval_required": {"type": "boolean"},
 							"last_used_at": {"nullable": true, "type": "string", "format": "date-time"},
@@ -12988,11 +12981,7 @@
 							"gif": {
 								"nullable": true,
 								"type": "object",
-								"properties": {
-									"provider": {"nullable": true, "enum": ["tenor", "klipy"], "type": "string"},
-									"tenor_api_key": {"nullable": true, "type": "string", "maxLength": 4096},
-									"klipy_api_key": {"nullable": true, "type": "string", "maxLength": 4096}
-								}
+								"properties": {"klipy_api_key": {"nullable": true, "type": "string", "maxLength": 4096}}
 							},
 							"youtube": {
 								"nullable": true,
@@ -13028,7 +13017,8 @@
 											"password": {"nullable": true, "type": "string", "maxLength": 4096},
 											"secure": {"nullable": true, "type": "boolean"}
 										}
-									}
+									},
+									"disable_new_ip_authorization": {"nullable": true, "type": "boolean"}
 								}
 							},
 							"bluesky": {
@@ -13073,7 +13063,7 @@
 										"nullable": true,
 										"type": "integer",
 										"maximum": 9007199254740991,
-										"format": "int64",
+										"format": "int53",
 										"minimum": 0,
 										"exclusiveMinimum": true
 									},
@@ -13081,7 +13071,7 @@
 										"nullable": true,
 										"type": "integer",
 										"maximum": 9007199254740991,
-										"format": "int64",
+										"format": "int53",
 										"minimum": 0,
 										"exclusiveMinimum": true
 									},
@@ -13090,7 +13080,7 @@
 										"nullable": true,
 										"type": "integer",
 										"maximum": 9007199254740991,
-										"format": "int64",
+										"format": "int53",
 										"minimum": 0,
 										"exclusiveMinimum": true
 									},
@@ -13098,7 +13088,7 @@
 										"nullable": true,
 										"type": "integer",
 										"maximum": 9007199254740991,
-										"format": "int64",
+										"format": "int53",
 										"minimum": 0,
 										"exclusiveMinimum": true
 									}
@@ -13305,7 +13295,7 @@
 										},
 										"limits": {
 											"type": "object",
-											"additionalProperties": {"type": "number", "minimum": 0},
+											"additionalProperties": {"$ref": "#/components/schemas/NonNegativeSafeIntegerType"},
 											"description": "Per-limit key values"
 										},
 										"modifiedFields": {"type": "array", "items": {"type": "string"}}
@@ -13361,6 +13351,7 @@
 					"limit_keys"
 				]
 			},
+			"NonNegativeSafeIntegerType": {"type": "integer", "minimum": 0, "maximum": 9007199254740991, "format": "int53"},
 			"LimitConfigUpdateRequest": {
 				"type": "object",
 				"properties": {
@@ -13396,7 +13387,7 @@
 										},
 										"limits": {
 											"type": "object",
-											"additionalProperties": {"type": "number", "minimum": 0},
+											"additionalProperties": {"$ref": "#/components/schemas/NonNegativeSafeIntegerType"},
 											"description": "Per-limit key values"
 										}
 									},
@@ -13464,7 +13455,7 @@
 								"content_type": {"nullable": true, "type": "string"},
 								"width": {"nullable": true, "allOf": [{"$ref": "#/components/schemas/Int32Type"}]},
 								"height": {"nullable": true, "allOf": [{"$ref": "#/components/schemas/Int32Type"}]},
-								"size": {"nullable": true, "allOf": [{"$ref": "#/components/schemas/Int32Type"}]},
+								"size": {"nullable": true, "allOf": [{"$ref": "#/components/schemas/NonNegativeSafeIntegerType"}]},
 								"ncmec_status": {
 									"type": "string",
 									"enum": ["not_submitted", "submitted", "failed"],
@@ -14133,8 +14124,8 @@
 					"size": {
 						"type": "integer",
 						"minimum": 0,
-						"maximum": 2147483647,
-						"format": "int32",
+						"maximum": 9007199254740991,
+						"format": "int53",
 						"description": "The size of the attachment in bytes"
 					},
 					"url": {"description": "The URL of the attachment", "nullable": true, "type": "string"},
@@ -14222,8 +14213,7 @@
 					"me": {
 						"description": "Whether the current user has reacted with this emoji",
 						"nullable": true,
-						"type": "boolean",
-						"enum": [true]
+						"type": "boolean"
 					}
 				},
 				"required": ["emoji", "count"]
@@ -14397,7 +14387,7 @@
 						"items": {"$ref": "#/components/schemas/MessageResponseSchema"},
 						"maxItems": 100
 					},
-					"total": {"type": "integer", "minimum": 0, "maximum": 9007199254740991, "format": "int64"}
+					"total": {"type": "integer", "minimum": 0, "maximum": 9007199254740991, "format": "int53"}
 				},
 				"required": ["messages", "total"]
 			},
@@ -14415,7 +14405,7 @@
 				"properties": {
 					"success": {"type": "boolean", "enum": [true]},
 					"job_id": {"type": "string"},
-					"requested": {"type": "integer", "minimum": 0, "maximum": 9007199254740991, "format": "int64"}
+					"requested": {"type": "integer", "minimum": 0, "maximum": 9007199254740991, "format": "int53"}
 				},
 				"required": ["success", "job_id"]
 			},
@@ -14568,7 +14558,10 @@
 											"content_type": {"nullable": true, "type": "string"},
 											"width": {"nullable": true, "allOf": [{"$ref": "#/components/schemas/Int32Type"}]},
 											"height": {"nullable": true, "allOf": [{"$ref": "#/components/schemas/Int32Type"}]},
-											"size": {"nullable": true, "allOf": [{"$ref": "#/components/schemas/Int32Type"}]},
+											"size": {
+												"nullable": true,
+												"allOf": [{"$ref": "#/components/schemas/NonNegativeSafeIntegerType"}]
+											},
 											"ncmec_status": {
 												"type": "string",
 												"enum": ["not_submitted", "submitted", "failed"],
@@ -14674,7 +14667,7 @@
 						"type": "integer",
 						"minimum": 0,
 						"maximum": 9007199254740991,
-						"format": "int64",
+						"format": "int53",
 						"description": "Number of reports to skip"
 					}
 				}
@@ -14722,7 +14715,7 @@
 						"type": "integer",
 						"minimum": 0,
 						"maximum": 9007199254740991,
-						"format": "int64",
+						"format": "int53",
 						"description": "Number of entries to skip"
 					},
 					"reporter_id": {"$ref": "#/components/schemas/SnowflakeType"},
@@ -15027,11 +15020,12 @@
 				"properties": {
 					"user_id": {"$ref": "#/components/schemas/SnowflakeType"},
 					"username": {"$ref": "#/components/schemas/UsernameType"},
-					"discriminator": {"$ref": "#/components/schemas/Int32Type"}
+					"discriminator": {"$ref": "#/components/schemas/DiscriminatorType"}
 				},
 				"required": ["user_id", "username"]
 			},
 			"UsernameType": {"type": "string", "minLength": 1, "maxLength": 32, "pattern": "^[a-zA-Z0-9_]+$"},
+			"DiscriminatorType": {"type": "string", "pattern": "^\\d{1,4}$"},
 			"ClearUserFieldsRequest": {
 				"type": "object",
 				"properties": {
@@ -15444,7 +15438,7 @@
 					"email": {"type": "string"},
 					"last_active_ip": {"type": "string"},
 					"limit": {"type": "integer", "minimum": 1, "maximum": 200, "format": "int32"},
-					"offset": {"type": "integer", "minimum": 0, "maximum": 9007199254740991, "format": "int64"}
+					"offset": {"type": "integer", "minimum": 0, "maximum": 9007199254740991, "format": "int53"}
 				}
 			},
 			"SendPasswordResetRequest": {

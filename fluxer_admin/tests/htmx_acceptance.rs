@@ -16,10 +16,41 @@ use tokio::net::TcpListener;
 use tower::ServiceExt;
 
 const SECRET_KEY: &str = "htmx-acceptance-test-secret";
+const ADMIN_API_KEY_SECRET: &str = "fa_1900000000000000001_OneTimeSecretForAcceptance";
 
 struct TestApp {
     router: Router,
     session_cookie: String,
+}
+
+#[tokio::test]
+async fn admin_api_key_create_form_renders_the_one_time_secret() {
+    let app = setup().await;
+    let (headers, page) = get_with_headers(&app, "/admin-api-keys", &[]).await;
+    let csrf_token = csrf_cookie(&headers)
+        .unwrap_or_else(|| panic!("Admin API keys page did not set csrf_token cookie\n{page}"));
+    assert!(page.contains(r#"data-admin-result-form="true""#), "{page}");
+
+    let (status, _, response_body) = post_form_with_headers(
+        &app,
+        "/admin-api-keys?action=create",
+        &[
+            ("HX-Request", "true"),
+            ("HX-Boosted", "true"),
+            ("HX-Target", "body"),
+            (
+                "Cookie",
+                &format!("{}; csrf_token={}", app.session_cookie, csrf_token),
+            ),
+        ],
+        &format!("_csrf={csrf_token}&name=Acceptance+Key&acls=*"),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::OK, "{response_body}");
+    assert_full_layout(&response_body);
+    assert!(response_body.contains(r#"hx-history="false""#));
+    assert!(response_body.contains(ADMIN_API_KEY_SECRET));
 }
 
 #[tokio::test]
@@ -542,6 +573,84 @@ async fn creating_registration_url_swaps_copyable_url_list_fragment() {
     assert!(toast.contains("Registration URL created"), "{toast}");
 }
 
+#[tokio::test]
+async fn fonts_are_served_locally_content_hashed_and_immutable() {
+    let app = setup().await;
+
+    let stylesheet_path = format!(
+        "/static/fonts/{}",
+        fluxer_admin::fonts::STYLESHEET_FILE_NAME
+    );
+    let (headers, css) = get_with_headers(&app, &stylesheet_path, &[]).await;
+    assert_eq!(
+        headers.get(header::CACHE_CONTROL).unwrap(),
+        "public, max-age=31536000, immutable"
+    );
+
+    for fragment in css.split("url('").skip(1) {
+        let file_name = fragment.split('\'').next().unwrap();
+        let response = app
+            .router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/static/fonts/{file_name}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            response.status(),
+            StatusCode::OK,
+            "missing font {file_name}"
+        );
+        assert_eq!(
+            response.headers().get(header::CONTENT_TYPE).unwrap(),
+            "font/woff2"
+        );
+        assert_eq!(
+            response.headers().get(header::CACHE_CONTROL).unwrap(),
+            "public, max-age=31536000, immutable"
+        );
+    }
+
+    let response = app
+        .router
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/static/fonts/does-not-exist.woff2")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn rendered_heads_never_reference_the_static_cdn_for_fonts() {
+    let app = setup().await;
+
+    let (headers, page) = get_with_headers(&app, "/users", &[]).await;
+    assert!(
+        !page.contains("/fonts/ibm-plex.css"),
+        "the admin layout still links the CDN font stylesheets"
+    );
+    assert!(page.contains("/static/fonts/"), "{page}");
+
+    let csp = headers
+        .get(header::CONTENT_SECURITY_POLICY)
+        .and_then(|value| value.to_str().ok())
+        .expect("missing CSP");
+    assert!(csp.contains("font-src 'self';"), "font-src was {csp}");
+    assert!(
+        csp.contains("style-src 'self' 'unsafe-inline';"),
+        "style-src was {csp}"
+    );
+}
+
 struct SearchCase {
     path: &'static str,
     result_target: &'static str,
@@ -680,6 +789,15 @@ async fn spawn_mock_api() -> String {
 async fn mock_api(method: Method, uri: Uri) -> Response {
     match (method, uri.path()) {
         (Method::GET, "/admin/users/me") => json_response(json!({ "user": admin_user() })),
+        (Method::GET, "/admin/api-keys") => json_response(json!([])),
+        (Method::POST, "/admin/api-keys") => json_response(json!({
+            "key_id": "1900000000000000001",
+            "key": ADMIN_API_KEY_SECRET,
+            "name": "Acceptance key",
+            "created_at": "2026-07-10T15:00:00.000Z",
+            "expires_at": null,
+            "acls": ["*"]
+        })),
         (Method::POST, "/admin/users/search") => {
             json_response(json!({ "users": [searched_user()], "total": 1 }))
         }

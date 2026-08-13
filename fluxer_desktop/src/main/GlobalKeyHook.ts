@@ -235,8 +235,8 @@ function keyEventMatchesRegistration(
 			return true;
 		}
 	}
-	if (keybind.keyName !== null) {
-		return keybind.keyName === event.keyName;
+	if (keybind.keyName !== null && event.keyName !== null && keybind.keyName === event.keyName) {
+		return true;
 	}
 	return keybind.keycode !== 0 && keybind.keycode === (event.keycode ?? 0);
 }

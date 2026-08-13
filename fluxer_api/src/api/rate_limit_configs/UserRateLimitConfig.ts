@@ -116,6 +116,14 @@ export const UserRateLimitConfigs = {
 		bucket: 'user:channels',
 		config: {limit: 40, windowMs: ms('10 seconds')},
 	} as RouteRateLimitConfig,
+	USER_GROUP_DM_CREATE: {
+		bucket: 'user:group_dm:create',
+		config: {limit: 10, windowMs: ms('1 hour'), exemptFromGlobal: true},
+	} as RouteRateLimitConfig,
+	USER_GROUP_DM_RECIPIENT_ADD: {
+		bucket: 'user:group_dm:recipient:add',
+		config: {limit: 10, windowMs: ms('1 hour'), exemptFromGlobal: true},
+	} as RouteRateLimitConfig,
 	USER_RELATIONSHIPS_LIST: {
 		bucket: 'user:relationships:list',
 		config: {limit: 40, windowMs: ms('10 seconds')},
@@ -207,10 +215,6 @@ export const UserRateLimitConfigs = {
 	USER_HARVEST_DOWNLOAD: {
 		bucket: 'user:harvest:download',
 		config: {limit: 10, windowMs: ms('1 minute')},
-	} as RouteRateLimitConfig,
-	USER_CANARY_TESTER_JOIN: {
-		bucket: 'user:canary_tester:join',
-		config: {limit: 3, windowMs: ms('1 hour')},
 	} as RouteRateLimitConfig,
 	USER_ENTRANCE_SOUND_LIST: {
 		bucket: 'user:entrance_sound:list',

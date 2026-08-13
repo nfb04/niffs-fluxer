@@ -151,7 +151,10 @@ export class AuthRequestService {
 	}
 
 	startSso(data: SsoStartRequest) {
-		return this.ssoService.startLogin(data.redirect_to ?? undefined);
+		return this.ssoService.startLogin({
+			redirectTo: data.redirect_to ?? undefined,
+			redirectUri: data.redirect_uri ?? undefined,
+		});
 	}
 
 	completeSso(data: SsoCompleteRequest, request: Request) {
@@ -176,7 +179,7 @@ export class AuthRequestService {
 	}
 
 	async loginMfaTotp({code, ticket, request}: AuthLoginMfaRequest): Promise<AuthTokenWithUserIdResponse> {
-		const result = await AuthLogin.loginMfaTotp(this.apiContext, this.loginDependencies, {code, ticket, request});
+		const result = await AuthLogin.loginMfaTotp(this.apiContext, {code, ticket, request});
 		return await this.toAuthTokenResponse(result);
 	}
 
@@ -282,7 +285,7 @@ export class AuthRequestService {
 	}
 
 	async loginMfaWebAuthn({data, request}: AuthWebAuthnMfaRequest): Promise<AuthTokenWithUserIdResponse> {
-		const result = await AuthLogin.loginMfaWebAuthn(this.apiContext, this.loginDependencies, {
+		const result = await AuthLogin.loginMfaWebAuthn(this.apiContext, {
 			response: data.response,
 			challenge: data.challenge,
 			ticket: data.ticket,

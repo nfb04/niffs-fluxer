@@ -1330,6 +1330,9 @@
 				"msgid": "Enable the integrations whose credentials you have configured. Only available services are shown."
 			},
 			{
+				"msgid": "Ensures file messages appear in the order you sent them"
+			},
+			{
 				"msgid": "Enter a community name between 1 and 100 characters."
 			},
 			{
@@ -1343,6 +1346,9 @@
 			},
 			{
 				"msgid": "Favicon"
+			},
+			{
+				"msgid": "File ordering"
 			},
 			{
 				"msgid": "Finish"
@@ -1423,6 +1429,9 @@
 				"msgid": "Optional services"
 			},
 			{
+				"msgid": "Ordered upload"
+			},
+			{
 				"msgid": "Per-device volume"
 			},
 			{
@@ -1471,6 +1480,15 @@
 				"msgid": "Self-host setup"
 			},
 			{
+				"msgid": "Send file messages in order"
+			},
+			{
+				"msgid": "Sequential send"
+			},
+			{
+				"msgid": "Serial send"
+			},
+			{
 				"msgid": "Set up {productName}"
 			},
 			{
@@ -1516,6 +1534,9 @@
 				"msgid": "Talk in calls and test your input."
 			},
 			{
+				"msgid": "Text is rendered with grayscale antialiasing instead of ClearType while transparency is enabled, so it will look softer."
+			},
+			{
 				"msgid": "That image could not be used. Try a different file."
 			},
 			{
@@ -1526,6 +1547,9 @@
 			},
 			{
 				"msgid": "This instance has no accounts yet. The first account you create automatically becomes the administrator. Create it now, then return here to finish setup."
+			},
+			{
+				"msgid": "This reset link has expired. Reset links last 1 hour. Please request a new one."
 			},
 			{
 				"msgid": "Unavailable"

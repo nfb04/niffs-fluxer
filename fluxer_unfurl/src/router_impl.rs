@@ -64,7 +64,6 @@ impl RouterService for UnfurlRouter {
                 url,
                 nsfw_mode,
                 bypass_cache,
-                cache_only: _,
                 ..
             } => {
                 if *bypass_cache {
@@ -125,6 +124,7 @@ mod tests {
             bypass_cache: false,
             cache_only,
             youtube_api_key: None,
+            klipy_api_key: None,
         }
     }
 

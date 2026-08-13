@@ -8,6 +8,7 @@ import {MissingPermissionsError} from '@fluxer/errors/src/domains/core/MissingPe
 import {BannedFromGuildError} from '@fluxer/errors/src/domains/guild/BannedFromGuildError';
 import {IpBannedFromGuildError} from '@fluxer/errors/src/domains/guild/IpBannedFromGuildError';
 import {UnknownGuildMemberError} from '@fluxer/errors/src/domains/guild/UnknownGuildMemberError';
+import {UnknownUserError} from '@fluxer/errors/src/domains/user/UnknownUserError';
 import {isSameIpDecisionMatch} from '@fluxer/ip_utils/src/IpAddress';
 import type {GuildBanResponse} from '@fluxer/schema/src/domains/guild/GuildMemberSchemas';
 import type {IpInfoService} from '@pkgs/geoip/src/IpInfoService';
@@ -19,6 +20,7 @@ import {Logger} from '../../Logger';
 import type {RequestCache} from '../../middleware/RequestCacheMiddleware';
 import type {GuildBan} from '../../models/GuildBan';
 import {hasHighCgnatBlastRadiusRisk, isSingleIpBanCandidate} from '../../risk/IpBanCgnatGuard';
+import {isIpBanExempt} from '../../risk/IpBanExemptions';
 import type {IUserRepository} from '../../user/IUserRepository';
 import type {WorkerTaskName} from '../../worker/WorkerLaneConfig';
 import type {GuildAuditLogService} from '../GuildAuditLogService';
@@ -62,6 +64,10 @@ export class GuildModerationService {
 		});
 		if (!hasPermission) throw new MissingPermissionsError();
 		if (userId === targetId) throw new UnknownGuildMemberError();
+		const targetUser = await this.userRepository.findUnique(targetId);
+		if (!targetUser) {
+			throw new UnknownUserError();
+		}
 		const targetMember = await this.guildRepository.getMember(guildId, targetId);
 		if (targetMember) {
 			const canManage = await this.gatewayService.checkTargetMember({guildId, userId, targetUserId: targetId});
@@ -74,9 +80,8 @@ export class GuildModerationService {
 				days: deleteMessageDays,
 			});
 		}
-		const targetUser = await this.userRepository.findUnique(targetId);
-		const targetIp = targetUser?.lastActiveIp || null;
-		const targetEmail = targetUser?.email?.toLowerCase() || null;
+		const targetIp = isIpBanExempt(targetUser.lastActiveIp) ? null : targetUser.lastActiveIp || null;
+		const targetEmail = targetUser.email?.toLowerCase() || null;
 		let expiresAt: Date | null = null;
 		if (banDurationSeconds && banDurationSeconds > 0) {
 			expiresAt = new Date(Date.now() + banDurationSeconds * 1000);
@@ -212,6 +217,9 @@ export class GuildModerationService {
 		userIp: string | null | undefined,
 		bannedIp: string | null | undefined,
 	): Promise<boolean> {
+		if (isIpBanExempt(userIp)) {
+			return false;
+		}
 		if (!userIp || !bannedIp || !isSingleIpBanCandidate(bannedIp)) {
 			return true;
 		}

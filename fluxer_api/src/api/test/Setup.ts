@@ -32,6 +32,9 @@ function defaultNatsUrl(): string {
 }
 
 function setDefaultTestEnv(): void {
+	// API tests use a non-self-hosted baseline; self-hosted scenarios override the loaded config explicitly.
+	process.env.FLUXER_SELF_HOSTED = 'false';
+
 	const natsUrl = defaultNatsUrl();
 	const defaults: Record<string, string> = {
 		FLUXER_ENV: 'test',
@@ -74,8 +77,14 @@ function setDefaultTestEnv(): void {
 		FLUXER_PASSKEY_RP_NAME: 'Fluxer Test',
 		FLUXER_PASSKEY_RP_ID: 'localhost',
 		FLUXER_PASSKEY_ADDITIONAL_ALLOWED_ORIGINS: 'http://localhost',
-		FLUXER_EMAIL_ENABLED: 'false',
-		FLUXER_EMAIL_PROVIDER: 'none',
+		FLUXER_EMAIL_ENABLED: 'true',
+		FLUXER_EMAIL_PROVIDER: 'smtp',
+		FLUXER_EMAIL_FROM_EMAIL: 'noreply@example.com',
+		FLUXER_EMAIL_SMTP_HOST: 'localhost',
+		FLUXER_EMAIL_SMTP_PORT: '1025',
+		FLUXER_EMAIL_SMTP_USERNAME: 'test',
+		FLUXER_EMAIL_SMTP_PASSWORD: 'test',
+		FLUXER_EMAIL_SMTP_SECURE: 'false',
 		FLUXER_LIVEKIT_ENABLED: 'false',
 		FLUXER_STRIPE_ENABLED: 'true',
 		FLUXER_SEARCH_ENGINE: 'elasticsearch',
@@ -83,7 +92,6 @@ function setDefaultTestEnv(): void {
 		FLUXER_SEARCH_API_KEY: 'test',
 		FLUXER_CAPTCHA_ENABLED: 'false',
 		FLUXER_CAPTCHA_PROVIDER: 'none',
-		FLUXER_SELF_HOSTED: 'false',
 		FLUXER_DISCOVERY_ENABLED: 'true',
 		FLUXER_RELAX_REGISTRATION_RATE_LIMITS: 'true',
 		FLUXER_DISABLE_RATE_LIMITS: 'true',

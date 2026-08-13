@@ -33,6 +33,7 @@ export type APIGeoipConfig = APIGeoipFilesystemConfig | APIGeoipS3Config;
 export interface APIConfig {
 	nodeEnv: 'development' | 'production';
 	port: number;
+	ipBanExemptIps: Array<string>;
 	cassandra: {
 		hosts: string;
 		port: number;
@@ -271,13 +272,7 @@ export interface APIConfig {
 		domain: string;
 		secure: boolean;
 	};
-	gif: {
-		provider: 'klipy' | 'tenor';
-	};
 	klipy: {
-		apiKey?: string;
-	};
-	tenor: {
 		apiKey?: string;
 	};
 	youtube: {
@@ -287,6 +282,7 @@ export interface APIConfig {
 		selfHosted: boolean;
 		autoJoinInviteCode?: string;
 		visionariesGuildId?: string;
+		visionariesGuildVisionaryRoleId?: string;
 		branding: {
 			productName: string;
 			iconUrl?: string;

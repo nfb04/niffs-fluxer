@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import {AdminACLs} from '@fluxer/constants/src/AdminACLs';
 import {
 	GIFT_CODE_DURATION_TYPE_DEFINITIONS,
 	MAX_GIFT_CODES_PER_REQUEST,
@@ -36,12 +37,15 @@ import {
 	createStringType,
 	Int32Type,
 	Int64StringType,
+	NonNegativeSafeIntegerType,
 	SnowflakeStringType,
 	SnowflakeType,
 	withOpenApiType,
 } from '@fluxer/schema/src/primitives/SchemaPrimitives';
 import {EmailType} from '@fluxer/schema/src/primitives/UserValidators';
 import {z} from 'zod';
+
+const ADMIN_ACL_COUNT = Object.keys(AdminACLs).length;
 
 const ReportStatusSchema = withOpenApiType(
 	createInt32EnumType(
@@ -526,7 +530,6 @@ const InstancePolicyResponse = z.object({
 	}),
 });
 
-const GifProviderSchema = z.enum(['tenor', 'klipy']);
 const CaptchaProviderSchema = z.enum(['hcaptcha', 'turnstile', 'none']);
 const EmailProviderSchema = z.enum(['smtp', 'none']);
 
@@ -559,9 +562,6 @@ const InstanceMediaResponse = z.object({
 
 const InstanceIntegrationsResponse = z.object({
 	gif: z.object({
-		provider: GifProviderSchema.nullable(),
-		effective_provider: GifProviderSchema,
-		tenor_api_key_set: z.boolean(),
 		klipy_api_key_set: z.boolean(),
 		effective_available: z.boolean(),
 	}),
@@ -592,6 +592,8 @@ const InstanceIntegrationsResponse = z.object({
 			password_set: z.boolean(),
 			secure: z.boolean().nullable(),
 		}),
+		disable_new_ip_authorization: z.boolean(),
+		effective_disable_new_ip_authorization: z.boolean(),
 	}),
 	bluesky: z.object({
 		enabled: z.boolean().nullable(),
@@ -648,8 +650,6 @@ export const InstanceConfigUpdateRequest = z.object({
 		.object({
 			gif: z
 				.object({
-					provider: GifProviderSchema.nullish(),
-					tenor_api_key: z.string().trim().max(4096).nullish(),
 					klipy_api_key: z.string().trim().max(4096).nullish(),
 				})
 				.nullish(),
@@ -682,6 +682,7 @@ export const InstanceConfigUpdateRequest = z.object({
 							secure: z.boolean().nullish(),
 						})
 						.nullish(),
+					disable_new_ip_authorization: z.boolean().nullish(),
 				})
 				.nullish(),
 			bluesky: z
@@ -803,7 +804,7 @@ const LimitRuleSchema = z.object({
 	id: z.string().min(1).describe('Unique rule identifier'),
 	filters: LimitFilterSchema.optional().describe('Optional filters that scope the rule'),
 	limits: z
-		.record(z.string(), z.number().min(0))
+		.record(z.string(), NonNegativeSafeIntegerType)
 		.refine(
 			(limits) => {
 				const limitKeys = Object.keys(limits);
@@ -848,7 +849,7 @@ export const CreateAdminApiKeyRequest = z.object({
 		.refine((value) => value.trim().length > 0, 'Name cannot be empty')
 		.describe('Display name for the API key'),
 	expires_in_days: z.number().int().min(1).max(365).optional().describe('Number of days until the key expires'),
-	acls: z.array(z.string()).max(100).describe('List of access control permissions for the key'),
+	acls: z.array(z.string()).max(ADMIN_ACL_COUNT).describe('List of access control permissions for the key'),
 });
 
 export type CreateAdminApiKeyRequest = z.infer<typeof CreateAdminApiKeyRequest>;
@@ -859,7 +860,7 @@ export const CreateAdminApiKeyResponse = z.object({
 	name: z.string().describe('Display name for the API key'),
 	created_at: z.string().describe('ISO 8601 timestamp when the key was created'),
 	expires_at: z.string().nullable().describe('ISO 8601 timestamp when the key expires, or null if no expiration'),
-	acls: z.array(z.string()).max(100).describe('List of access control permissions for the key'),
+	acls: z.array(z.string()).max(ADMIN_ACL_COUNT).describe('List of access control permissions for the key'),
 });
 
 export type CreateAdminApiKeyResponse = z.infer<typeof CreateAdminApiKeyResponse>;
@@ -871,7 +872,7 @@ export const ListAdminApiKeyResponse = z.object({
 	last_used_at: z.string().nullable().describe('ISO 8601 timestamp when the key was last used, or null if never used'),
 	expires_at: z.string().nullable().describe('ISO 8601 timestamp when the key expires, or null if no expiration'),
 	created_by_user_id: SnowflakeStringType.describe('User ID of the admin who created this key'),
-	acls: z.array(z.string()).max(100).describe('List of access control permissions for the key'),
+	acls: z.array(z.string()).max(ADMIN_ACL_COUNT).describe('List of access control permissions for the key'),
 });
 
 export type ListAdminApiKeyResponse = z.infer<typeof ListAdminApiKeyResponse>;
@@ -1261,7 +1262,7 @@ const AdminMessageAttachmentSchema = z.object({
 	content_type: z.string().nullable(),
 	width: Int32Type.nullable(),
 	height: Int32Type.nullable(),
-	size: Int32Type.nullable().optional(),
+	size: NonNegativeSafeIntegerType.nullable().optional(),
 	ncmec_status: NcmecSubmissionStatusEnum,
 	ncmec_report_id: createStringType(1, 256).nullable(),
 	ncmec_failure_reason: createStringType(1, 4000).nullable(),
@@ -1428,7 +1429,7 @@ export const LimitConfigGetResponse = z.object({
 	}),
 	limit_config_json: z.string(),
 	self_hosted: z.boolean(),
-	defaults: z.record(z.string(), z.record(LimitKeySchema, z.number())),
+	defaults: z.record(z.string(), z.partialRecord(LimitKeySchema, z.number())),
 	metadata: z.record(LimitKeySchema, LimitKeyMetadataSchema),
 	categories: z.record(z.string(), z.string()),
 	limit_keys: z.array(z.string()),
