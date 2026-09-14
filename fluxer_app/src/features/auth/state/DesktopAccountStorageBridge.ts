@@ -3,17 +3,19 @@
 import type {StoredAccount} from '@app/features/auth/state/AccountStorage';
 import {getElectronAPI} from '@app/features/ui/utils/NativeUtils';
 
-function getDesktopAccountsApi() {
+interface DesktopAccountsApi {
+	desktopAccountsList(): Promise<Array<Record<string, unknown>>>;
+	desktopAccountsGet(userId: string): Promise<Record<string, unknown> | null>;
+	desktopAccountsPut(account: Record<string, unknown>): Promise<void>;
+	desktopAccountsDelete(userId: string): Promise<void>;
+}
+
+function getDesktopAccountsApi(): DesktopAccountsApi | null {
 	const api = getElectronAPI();
-	if (
-		!api?.desktopAccountsList ||
-		!api.desktopAccountsGet ||
-		!api.desktopAccountsPut ||
-		!api.desktopAccountsDelete
-	) {
+	if (!api?.desktopAccountsList || !api.desktopAccountsGet || !api.desktopAccountsPut || !api.desktopAccountsDelete) {
 		return null;
 	}
-	return api;
+	return api as DesktopAccountsApi;
 }
 
 export function canUseDesktopAccountStore(): boolean {
@@ -26,7 +28,7 @@ export async function listDesktopStoredAccounts(): Promise<Array<StoredAccount>>
 		return [];
 	}
 	const accounts = await api.desktopAccountsList();
-	return accounts as Array<StoredAccount>;
+	return accounts as unknown as Array<StoredAccount>;
 }
 
 export async function getDesktopStoredAccount(userId: string): Promise<StoredAccount | null> {

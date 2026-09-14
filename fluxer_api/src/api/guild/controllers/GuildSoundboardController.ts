@@ -2,13 +2,13 @@
 
 import {GuildIdParam, GuildIdSoundIdParam} from '@fluxer/schema/src/domains/common/CommonParamSchemas';
 import {
-	GuildSoundboardListResponse,
-	GuildSoundboardSoundResponse,
-} from '@fluxer/schema/src/domains/guild/GuildSoundboardSchemas';
-import {
 	GuildSoundboardCreateRequest,
 	GuildSoundboardUpdateRequest,
 } from '@fluxer/schema/src/domains/guild/GuildRequestSchemas';
+import {
+	GuildSoundboardListResponse,
+	GuildSoundboardSoundResponse,
+} from '@fluxer/schema/src/domains/guild/GuildSoundboardSchemas';
 import {createGuildID} from '../../BrandedTypes';
 import {LoginRequired} from '../../middleware/AuthMiddleware';
 import {RateLimitMiddleware} from '../../middleware/RateLimitMiddleware';
@@ -93,7 +93,7 @@ export function GuildSoundboardController(app: HonoApp) {
 			const guildId = createGuildID(guild_id);
 			const result = await ctx
 				.get('guildService')
-				.content.updateSoundboardSound({userId: user.id, guildId, soundId: sound_id, name});
+				.content.updateSoundboardSound({userId: user.id, guildId, soundId: sound_id.toString(), name});
 			return ctx.json(result);
 		},
 	);
@@ -116,7 +116,9 @@ export function GuildSoundboardController(app: HonoApp) {
 			const user = ctx.get('user');
 			const {guild_id, sound_id} = ctx.req.valid('param');
 			const guildId = createGuildID(guild_id);
-			await ctx.get('guildService').content.deleteSoundboardSound({userId: user.id, guildId, soundId: sound_id});
+			await ctx
+				.get('guildService')
+				.content.deleteSoundboardSound({userId: user.id, guildId, soundId: sound_id.toString()});
 			return ctx.body(null, 204);
 		},
 	);

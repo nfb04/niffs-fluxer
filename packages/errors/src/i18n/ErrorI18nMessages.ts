@@ -573,6 +573,7 @@ export const ERROR_I18N_MESSAGES = {
 	'entrance_sounds.name_length_invalid': 'Entrance sound names must be between 1 and {max, number} characters.',
 	'entrance_sounds.not_found': 'Entrance sound not found.',
 	'entrance_sounds.invalid_scope': 'Invalid entrance sound scope.',
+	'guild_soundboard.max_sounds_reached': "You've reached the limit of {max, number} soundboard sounds for this server.",
 } as const;
 
 export type ErrorI18nCatalog = typeof ERROR_I18N_MESSAGES;

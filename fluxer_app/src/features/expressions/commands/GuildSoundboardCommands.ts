@@ -28,18 +28,13 @@ export async function create(
 	return response.body;
 }
 
-export async function update(
-	guildId: string,
-	soundId: string,
-	name: string,
-): Promise<GuildSoundboardSoundResponse> {
-	const response = await http.patch<GuildSoundboardSoundResponse>(
-		Endpoints.GUILD_SOUNDBOARD_SOUND(guildId, soundId),
-		{body: {name}},
-	);
+export async function update(guildId: string, soundId: string, name: string): Promise<GuildSoundboardSoundResponse> {
+	const response = await http.patch<GuildSoundboardSoundResponse>(Endpoints.GUILD_SOUNDBOARD_SOUND(guildId, soundId), {
+		body: {name},
+	});
 	return response.body;
 }
 
 export async function remove(guildId: string, soundId: string): Promise<void> {
-	await http.delete({url: Endpoints.GUILD_SOUNDBOARD_SOUND(guildId, soundId)});
+	await http.delete(Endpoints.GUILD_SOUNDBOARD_SOUND(guildId, soundId));
 }

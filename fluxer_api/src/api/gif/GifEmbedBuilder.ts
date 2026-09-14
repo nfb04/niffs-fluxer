@@ -105,7 +105,12 @@ function toEmbedMedia(format: GifMediaFormat, contentType: string, animated: boo
 	};
 }
 
-function buildAnimatedImageEmbed(gif: GifResponse, pageUrl: string, imageFormat: GifMediaFormat, formatKey: string): MessageEmbedChild {
+function buildAnimatedImageEmbed(
+	_gif: GifResponse,
+	pageUrl: string,
+	imageFormat: GifMediaFormat,
+	formatKey: string,
+): MessageEmbedChild {
 	return {
 		type: 'image',
 		title: null,
@@ -182,14 +187,7 @@ export function buildGifEmbedFromResponse(gif: GifResponse, pageUrl: string): Me
 	const thumbFormat = thumbPick?.format ?? videoFormat;
 	if (!videoFormat || !thumbFormat) return null;
 
-	return buildGifvEmbed(
-		gif,
-		pageUrl,
-		videoFormat,
-		videoPick?.key ?? 'mp4',
-		thumbFormat,
-		thumbPick?.key ?? 'webp',
-	);
+	return buildGifvEmbed(gif, pageUrl, videoFormat, videoPick?.key ?? 'mp4', thumbFormat, thumbPick?.key ?? 'webp');
 }
 
 /** @deprecated Use buildGifEmbedFromResponse */

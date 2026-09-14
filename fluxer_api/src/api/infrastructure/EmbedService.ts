@@ -6,18 +6,18 @@ import type {IChannelRepository} from '@app/api/channel/IChannelRepository';
 import {nextVersion} from '@app/api/database/CassandraTypes';
 import type {MessageEmbed, MessageEmbedChild} from '@app/api/database/types/MessageTypes';
 import {
-	type IMediaService,
-	type MediaProxyMetadataResponse,
-	type MediaProxyNsfwMode,
-	mediaProxyMetadataPolicy,
-} from '@app/api/infrastructure/IMediaService';
-import {
 	isGifMediaEmbedType,
 	isGifProviderUrl,
 	isRenderableGifEmbedFromModel,
 	resolveGifEmbedFromProviders,
 } from '@app/api/gif/GifEmbedBuilder';
 import type {GifService} from '@app/api/gif/GifService';
+import {
+	type IMediaService,
+	type MediaProxyMetadataResponse,
+	type MediaProxyNsfwMode,
+	mediaProxyMetadataPolicy,
+} from '@app/api/infrastructure/IMediaService';
 import type {IUnfurlerService, UnfurlOptions} from '@app/api/infrastructure/IUnfurlerService';
 import {Logger} from '@app/api/Logger';
 import {Embed} from '@app/api/models/Embed';
@@ -148,7 +148,7 @@ export class EmbedService {
 			const embeds = result.embeds.map((embedData) => new Embed(this.mapResponseEmbed(embedData)));
 			let renderableEmbeds = embeds.filter((embed) =>
 				isRenderableGifEmbedFromModel({
-					type: embed.type,
+					type: embed.type ?? '',
 					thumbnail: embed.thumbnail,
 					video: embed.video,
 				}),

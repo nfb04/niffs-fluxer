@@ -492,6 +492,16 @@ export interface ElectronAPI {
 	}): Promise<void>;
 	consumeDesktopHandoffCode?(): Promise<string | null>;
 	consumeDesktopAccountSwitchUserId?(): Promise<string | null>;
+	getInstanceTabs?(): Promise<{
+		tabs: Array<{id: string; url: string; label: string; isOfficial: boolean}>;
+		activeIndex: number;
+	}>;
+	switchTab?(index: number): Promise<void>;
+	removeInstanceTab?(globalTabIndex: number): Promise<void>;
+	addInstanceTab?(instanceUrl: string): Promise<void>;
+	promptAddInstanceTab?(): Promise<void>;
+	closeAddInstancePrompt?(): Promise<void>;
+	onInstanceTabsUpdated?(callback: () => void): () => void;
 	desktopAccountsList?(): Promise<Array<Record<string, unknown>>>;
 	desktopAccountsGet?(userId: string): Promise<Record<string, unknown> | null>;
 	desktopAccountsPut?(account: Record<string, unknown>): Promise<void>;

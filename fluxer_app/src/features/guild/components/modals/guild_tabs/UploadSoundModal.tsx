@@ -3,8 +3,8 @@
 import * as Modal from '@app/features/app/components/dialogs/Modal';
 import {GlobalLimits} from '@app/features/app/utils/GlobalLimits';
 import type {FlatEmoji} from '@app/features/emoji/types/EmojiTypes';
-import {ExpressionPickerPopout} from '@app/features/expressions/components/popouts/ExpressionPickerPopout';
 import * as GuildSoundboardCommands from '@app/features/expressions/commands/GuildSoundboardCommands';
+import {ExpressionPickerPopout} from '@app/features/expressions/components/popouts/ExpressionPickerPopout';
 import {getEmojiURL} from '@app/features/expressions/utils/EmojiUtils';
 import styles from '@app/features/guild/components/modals/guild_tabs/UploadSoundModal.module.css';
 import {formatFileSize} from '@app/features/messaging/utils/FileUtils';
@@ -41,10 +41,10 @@ interface UploadSoundModalProps {
 }
 
 export const UploadSoundModal: React.FC<UploadSoundModalProps> = ({guildId, onSuccess}) => {
-	const {t} = useLingui();
+	const {t, i18n} = useLingui();
 	const soundboardMaxDurationSec = GlobalLimits.getSoundboardMaxDurationSec();
 	const soundboardMaxSize = GlobalLimits.getSoundboardMaxSize();
-	const soundboardMaxSizeLabel = formatFileSize(soundboardMaxSize);
+	const soundboardMaxSizeLabel = formatFileSize(i18n.locale, soundboardMaxSize);
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const [file, setFile] = useState<File | null>(null);
@@ -362,6 +362,7 @@ export const UploadSoundModal: React.FC<UploadSoundModalProps> = ({guildId, onSu
 							>
 								{audioBuffer ? formatDuration(trimmedDuration) : '0.00s'}
 							</span>
+							{/* biome-ignore lint/a11y/noStaticElementInteractions: click-to-seek is a pointer-only shortcut; the trim handles below carry the real role="slider" keyboard semantics. */}
 							<div className={styles.waveformContainer} onClick={handleWaveformClick} role="presentation">
 								<canvas
 									ref={canvasRef}
@@ -392,6 +393,7 @@ export const UploadSoundModal: React.FC<UploadSoundModalProps> = ({guildId, onSu
 											style={{left: `${trimStart * 100}%`}}
 											onPointerDown={handleTrimPointerDown('start')}
 											role="slider"
+											tabIndex={0}
 											aria-valuenow={trimStart}
 											aria-valuemin={0}
 											aria-valuemax={1}
@@ -401,6 +403,7 @@ export const UploadSoundModal: React.FC<UploadSoundModalProps> = ({guildId, onSu
 											style={{left: `${trimEnd * 100}%`}}
 											onPointerDown={handleTrimPointerDown('end')}
 											role="slider"
+											tabIndex={0}
 											aria-valuenow={trimEnd}
 											aria-valuemin={0}
 											aria-valuemax={1}
@@ -413,7 +416,7 @@ export const UploadSoundModal: React.FC<UploadSoundModalProps> = ({guildId, onSu
 
 					<div>
 						<span className={styles.sectionLabel}>
-							<Trans>File</Trans> *
+							<Trans>File *</Trans>
 						</span>
 						<div className={styles.fileSection}>
 							<input
@@ -438,7 +441,7 @@ export const UploadSoundModal: React.FC<UploadSoundModalProps> = ({guildId, onSu
 
 					<div className={styles.nameSection}>
 						<label htmlFor="sound-name" className={styles.sectionLabel}>
-							<Trans>Sound Name</Trans> *
+							<Trans>Sound Name *</Trans>
 						</label>
 						<input
 							id="sound-name"

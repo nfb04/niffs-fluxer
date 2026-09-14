@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import {openClaimAccountModal} from '@app/features/auth/components/modals/ClaimAccountModal';
 import SessionManager from '@app/features/platform/state/AuthSession';
 import {User} from '@app/features/user/models/User';
 import type {UserPrivate, User as WireUser} from '@fluxer/schema/src/domains/user/UserResponseSchemas';

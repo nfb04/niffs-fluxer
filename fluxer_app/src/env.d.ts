@@ -63,6 +63,7 @@ declare global {
 		readonly PUBLIC_RELEASE_CHANNEL?: 'stable' | 'canary';
 		readonly PUBLIC_BOOTSTRAP_API_ENDPOINT?: string;
 		readonly PUBLIC_BOOTSTRAP_API_PUBLIC_ENDPOINT?: string;
+		readonly PUBLIC_SELF_HOSTED_DESKTOP_DOWNLOAD_URL?: string;
 	}
 	interface ImportMetaHot {
 		readonly data: Record<string, unknown>;

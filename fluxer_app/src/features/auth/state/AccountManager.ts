@@ -2,6 +2,10 @@
 
 import {Routes} from '@app/app/Routes';
 import type {UserData} from '@app/features/auth/state/AccountStorage';
+import {
+	accountRequiresInstanceReload,
+	reloadDesktopToAccountInstance,
+} from '@app/features/auth/utils/DesktopInstanceSwitch';
 import GatewayConnection from '@app/features/gateway/transport/GatewayConnection';
 import * as RouterUtils from '@app/features/navigation/utils/RouterUtils';
 import * as NotificationUtils from '@app/features/notification/utils/NotificationUtils';
@@ -10,7 +14,6 @@ import SessionManager, {type Account, SessionExpiredError} from '@app/features/p
 import {Logger} from '@app/features/platform/utils/AppLogger';
 import {isInstalledPwa} from '@app/features/ui/utils/PwaUtils';
 import MediaEngine from '@app/features/voice/engine/MediaEngineFacade';
-import {accountRequiresInstanceReload, reloadDesktopToAccountInstance} from '@app/features/auth/utils/DesktopInstanceSwitch';
 import {computed, makeAutoObservable} from 'mobx';
 
 const logger = new Logger('AccountManager');

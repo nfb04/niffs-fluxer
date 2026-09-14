@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import {MAX_GUILD_SOUNDBOARD_SOUNDS, SOUNDBOARD_MAX_SIZE} from '@fluxer/constants/src/LimitConstants';
 import type {LimitKey} from '@fluxer/constants/src/LimitConfigMetadata';
+import {MAX_GUILD_SOUNDBOARD_SOUNDS, SOUNDBOARD_MAX_SIZE} from '@fluxer/constants/src/LimitConstants';
 import {ValidationErrorCodes} from '@fluxer/constants/src/ValidationErrorCodes';
 import {InputValidationError} from '@fluxer/errors/src/domains/core/InputValidationError';
 import {resolveLimit} from '@fluxer/limits/src/LimitResolver';
@@ -63,10 +63,10 @@ export class SoundboardService {
 
 		const bucket = Config.s3.buckets.cdn;
 		const key = manifestKey(guildId);
-		let manifest: ManifestEntry[];
+		let manifest: Array<ManifestEntry>;
 		try {
 			const data = await this.storageService.readObject(bucket, key);
-			manifest = JSON.parse(Buffer.from(data).toString('utf8')) as ManifestEntry[];
+			manifest = JSON.parse(Buffer.from(data).toString('utf8')) as Array<ManifestEntry>;
 			if (!Array.isArray(manifest)) manifest = [];
 		} catch {
 			manifest = [];
@@ -96,7 +96,7 @@ export class SoundboardService {
 		try {
 			audioBuffer = Buffer.from(audioBase64, 'base64');
 		} catch {
-			throw InputValidationError.fromCode('body.audio', ValidationErrorCodes.INVALID_IMAGE_DATA);
+			throw InputValidationError.fromCode('body.audio', ValidationErrorCodes.INVALID_BASE64_FORMAT);
 		}
 		const maxSize = this.resolveGuildLimit('soundboard_max_size', SOUNDBOARD_MAX_SIZE);
 		if (audioBuffer.length > maxSize) {
@@ -105,7 +105,7 @@ export class SoundboardService {
 			});
 		}
 		if (audioBuffer.length === 0) {
-			throw InputValidationError.fromCode('body.audio', ValidationErrorCodes.INVALID_IMAGE_DATA);
+			throw InputValidationError.fromCode('body.audio', ValidationErrorCodes.INVALID_BASE64_FORMAT);
 		}
 
 		const existing = await this.listSounds({userId: user.id, guildId});
@@ -127,11 +127,11 @@ export class SoundboardService {
 			contentType: isWav ? 'audio/wav' : 'audio/mpeg',
 		});
 
-		let manifest: ManifestEntry[];
+		let manifest: Array<ManifestEntry>;
 		const manifestKeyPath = manifestKey(guildId);
 		try {
 			const data = await this.storageService.readObject(bucket, manifestKeyPath);
-			manifest = JSON.parse(Buffer.from(data).toString('utf8')) as ManifestEntry[];
+			manifest = JSON.parse(Buffer.from(data).toString('utf8')) as Array<ManifestEntry>;
 			if (!Array.isArray(manifest)) manifest = [];
 		} catch {
 			manifest = [];
@@ -164,10 +164,10 @@ export class SoundboardService {
 		const bucket = Config.s3.buckets.cdn;
 		const manifestKeyPath = manifestKey(guildId);
 
-		let manifest: ManifestEntry[];
+		let manifest: Array<ManifestEntry>;
 		try {
 			const data = await this.storageService.readObject(bucket, manifestKeyPath);
-			manifest = JSON.parse(Buffer.from(data).toString('utf8')) as ManifestEntry[];
+			manifest = JSON.parse(Buffer.from(data).toString('utf8')) as Array<ManifestEntry>;
 			if (!Array.isArray(manifest)) manifest = [];
 		} catch {
 			manifest = [];
@@ -199,10 +199,10 @@ export class SoundboardService {
 
 		const bucket = Config.s3.buckets.cdn;
 		const manifestKeyPath = manifestKey(guildId);
-		let manifest: ManifestEntry[];
+		let manifest: Array<ManifestEntry>;
 		try {
 			const data = await this.storageService.readObject(bucket, manifestKeyPath);
-			manifest = JSON.parse(Buffer.from(data).toString('utf8')) as ManifestEntry[];
+			manifest = JSON.parse(Buffer.from(data).toString('utf8')) as Array<ManifestEntry>;
 			if (!Array.isArray(manifest)) manifest = [];
 		} catch {
 			throw new Error('Soundboard manifest not found');

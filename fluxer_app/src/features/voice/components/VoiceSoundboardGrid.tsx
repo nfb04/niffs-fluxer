@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import UnicodeEmojis from '@app/features/expressions/utils/UnicodeEmojis';
-import * as EmojiUtils from '@app/features/expressions/utils/EmojiUtils';
 import * as GuildSoundboardCommands from '@app/features/expressions/commands/GuildSoundboardCommands';
+import * as EmojiUtils from '@app/features/expressions/utils/EmojiUtils';
+import UnicodeEmojis from '@app/features/expressions/utils/UnicodeEmojis';
 import {mediaUrl} from '@app/features/messaging/utils/MessagingUrlUtils';
 import {SOUNDBOARD_SOUNDS} from '@app/features/voice/components/VoiceSoundboardConstants';
 import styles from '@app/features/voice/components/VoiceSoundboardPopover.module.css';
@@ -33,8 +33,8 @@ function getSoundDisplayName(sound: GridSound): string {
 }
 
 function renderSoundboardLabelWithTwemoji(name: string): React.ReactNode {
-	const re = new RegExp(UnicodeEmojis.EMOJI_NAME_AND_DIVERSITY_RE.source, 'g');
-	const parts: React.ReactNode[] = [];
+	const re = /:([a-zA-Z0-9_+-]+):/g;
+	const parts: Array<React.ReactNode> = [];
 	let lastIndex = 0;
 	let key = 0;
 	for (const match of name.matchAll(re)) {
@@ -42,18 +42,13 @@ function renderSoundboardLabelWithTwemoji(name: string): React.ReactNode {
 			parts.push(<React.Fragment key={key++}>{name.slice(lastIndex, match.index)}</React.Fragment>);
 		}
 		const shortcode = match[1];
-		const surrogate = UnicodeEmojis.convertNameToSurrogate(shortcode);
+		const normalized = UnicodeEmojis.normalizeEmojiNameToSurrogate(shortcode);
+		const surrogate = normalized !== shortcode ? normalized : null;
 		if (surrogate) {
 			const url = EmojiUtils.getEmojiURL(surrogate);
 			if (url) {
 				parts.push(
-					<img
-						key={key++}
-						src={url}
-						alt={`:${shortcode}:`}
-						className={styles.soundboardEmoji}
-						draggable={false}
-					/>,
+					<img key={key++} src={url} alt={`:${shortcode}:`} className={styles.soundboardEmoji} draggable={false} />,
 				);
 			} else {
 				parts.push(<React.Fragment key={key++}>{surrogate}</React.Fragment>);
@@ -66,7 +61,7 @@ function renderSoundboardLabelWithTwemoji(name: string): React.ReactNode {
 	if (lastIndex < name.length) {
 		parts.push(<React.Fragment key={key++}>{name.slice(lastIndex)}</React.Fragment>);
 	}
-	return parts.length > 0 ? <>{parts}</> : name;
+	return parts.length > 0 ? parts : name;
 }
 
 interface VoiceSoundboardGridProps {
@@ -80,14 +75,14 @@ export function VoiceSoundboardGrid({room, guildId}: VoiceSoundboardGridProps) {
 	const [customSounds, setCustomSounds] = useState<Array<{id: string; name: string}>>([]);
 	const [searchQuery, setSearchQuery] = useState('');
 
-	const builtIns: GridSound[] = SOUNDBOARD_SOUNDS.map((s) => ({
+	const builtIns: Array<GridSound> = SOUNDBOARD_SOUNDS.map((s) => ({
 		id: s.id,
 		label: s.label,
 		url: s.url,
 		isCustom: false as const,
 	}));
 
-	const customs: GridSound[] =
+	const customs: Array<GridSound> =
 		guildId != null
 			? customSounds.map((s) => ({
 					id: s.id,
@@ -97,7 +92,7 @@ export function VoiceSoundboardGrid({room, guildId}: VoiceSoundboardGridProps) {
 				}))
 			: [];
 
-	const allSounds: GridSound[] = [...builtIns, ...customs];
+	const allSounds: Array<GridSound> = [...builtIns, ...customs];
 
 	const filteredSounds = useMemo(() => {
 		const q = searchQuery.trim().toLowerCase();

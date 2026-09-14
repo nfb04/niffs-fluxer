@@ -4,12 +4,12 @@ import {ConfirmModal} from '@app/features/app/components/dialogs/ConfirmModal';
 import {StatusSlate} from '@app/features/app/components/dialogs/shared/StatusSlate';
 import {GlobalLimits} from '@app/features/app/utils/GlobalLimits';
 import * as GuildSoundboardCommands from '@app/features/expressions/commands/GuildSoundboardCommands';
-import {UploadSlotInfo} from '@app/features/guild/components/UploadSlotInfo';
 import styles from '@app/features/guild/components/modals/guild_tabs/GuildSoundboardTab.module.css';
 import {UploadSoundModal} from '@app/features/guild/components/modals/guild_tabs/UploadSoundModal';
+import {UploadSlotInfo} from '@app/features/guild/components/UploadSlotInfo';
 import Guilds from '@app/features/guild/state/Guilds';
-import {mediaUrl} from '@app/features/messaging/utils/MessagingUrlUtils';
 import {formatFileSize} from '@app/features/messaging/utils/FileUtils';
+import {mediaUrl} from '@app/features/messaging/utils/MessagingUrlUtils';
 import {Logger} from '@app/features/platform/utils/AppLogger';
 import {Button} from '@app/features/ui/button/Button';
 import * as ModalCommands from '@app/features/ui/commands/ModalCommands';
@@ -26,10 +26,10 @@ import {useCallback, useEffect, useRef, useState} from 'react';
 const logger = new Logger('GuildSoundboardTab');
 
 const GuildSoundboardTab: React.FC<{guildId: string}> = observer(function GuildSoundboardTab({guildId}) {
-	const {t} = useLingui();
+	const {t, i18n} = useLingui();
 	const guild = Guilds.getGuild(guildId);
 	const maxSounds = guild?.maxSoundboardSounds ?? GlobalLimits.getMaxGuildSoundboardSounds();
-	const soundboardMaxSizeLabel = formatFileSize(GlobalLimits.getSoundboardMaxSize());
+	const soundboardMaxSizeLabel = formatFileSize(i18n.locale, GlobalLimits.getSoundboardMaxSize());
 	const soundboardMaxDurationSec = GlobalLimits.getSoundboardMaxDurationSec();
 	const [sounds, setSounds] = useState<ReadonlyArray<GuildSoundboardSoundResponse>>([]);
 	const [fetchStatus, setFetchStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
@@ -104,7 +104,7 @@ const GuildSoundboardTab: React.FC<{guildId: string}> = observer(function GuildS
 						title={t`Remove sound`}
 						description={t`Are you sure you want to remove this sound? This cannot be undone.`}
 						primaryText={t`Remove`}
-						primaryVariant="danger-primary"
+						primaryVariant="danger"
 						secondaryText={t`Cancel`}
 						onPrimary={async () => {
 							await GuildSoundboardCommands.remove(guildId, sound.id);
@@ -169,7 +169,7 @@ const GuildSoundboardTab: React.FC<{guildId: string}> = observer(function GuildS
 			)}
 
 			{fetchStatus === 'success' && sounds.length > 0 && (
-				<ul className={styles.soundList} role="list">
+				<ul className={styles.soundList}>
 					{sounds.map((sound) => (
 						<li key={sound.id} className={styles.soundRow}>
 							<button

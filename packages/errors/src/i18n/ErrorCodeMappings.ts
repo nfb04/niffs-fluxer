@@ -537,4 +537,5 @@ export const ErrorCodeToI18nKey = {
 	[ValidationErrorCodes.ENTRANCE_SOUND_NAME_LENGTH_INVALID]: 'entrance_sounds.name_length_invalid',
 	[ValidationErrorCodes.ENTRANCE_SOUND_NOT_FOUND]: 'entrance_sounds.not_found',
 	[ValidationErrorCodes.ENTRANCE_SOUND_INVALID_SCOPE]: 'entrance_sounds.invalid_scope',
+	[ValidationErrorCodes.MAX_GUILD_SOUNDBOARD_SOUNDS_REACHED]: 'guild_soundboard.max_sounds_reached',
 } as const satisfies Record<AllErrorCodes, ErrorI18nKey>;

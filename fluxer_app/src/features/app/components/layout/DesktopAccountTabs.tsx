@@ -1,19 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import styles from '@app/features/app/components/layout/DesktopAccountTabs.module.css';
-import AccountSwitcherModal from '@app/features/auth/components/accounts/AccountSwitcherModal';
-import {getAccountAvatarUrl, getAccountDisplayName} from '@app/features/auth/components/accounts/AccountListItem';
-import AccountManager from '@app/features/auth/state/AccountManager';
-import {showBrowserLoginHandoffModal} from '@app/features/auth/flow/BrowserLoginHandoffModal';
 import * as AuthenticationCommands from '@app/features/auth/commands/AuthenticationCommands';
-import {MockAvatar} from '@app/features/ui/components/MockAvatar';
+import {getAccountAvatarUrl, getAccountDisplayName} from '@app/features/auth/components/accounts/AccountListItem';
+import AccountSwitcherModal from '@app/features/auth/components/accounts/AccountSwitcherModal';
+import {showBrowserLoginHandoffModal} from '@app/features/auth/flow/BrowserLoginHandoffModal';
+import AccountManager from '@app/features/auth/state/AccountManager';
 import * as ModalCommands from '@app/features/ui/commands/ModalCommands';
 import {modal} from '@app/features/ui/commands/ModalCommands';
+import {MockAvatar} from '@app/features/ui/components/MockAvatar';
 import {Tooltip} from '@app/features/ui/tooltip/Tooltip';
 import {GearIcon, PlusIcon} from '@phosphor-icons/react';
 import clsx from 'clsx';
 import {observer} from 'mobx-react-lite';
-import type React from 'react';
 import {useCallback} from 'react';
 
 function getInstanceHostLabel(account: {instance?: {apiEndpoint?: string}}): string | null {
@@ -38,7 +37,9 @@ export const DesktopAccountTabs = observer(function DesktopAccountTabs() {
 		});
 	}, []);
 	const openManageAccounts = useCallback(() => {
-		ModalCommands.push(modal(() => <AccountSwitcherModal data-flx="app.desktop-account-tabs.account-switcher-modal" />));
+		ModalCommands.push(
+			modal(() => <AccountSwitcherModal data-flx="app.desktop-account-tabs.account-switcher-modal" />),
+		);
 	}, []);
 	if (accounts.length === 0) {
 		return null;
@@ -59,7 +60,11 @@ export const DesktopAccountTabs = observer(function DesktopAccountTabs() {
 						>
 							<button
 								type="button"
-								className={clsx(styles.tab, isActive && styles.tabActive, account.isValid === false && styles.tabExpired)}
+								className={clsx(
+									styles.tab,
+									isActive && styles.tabActive,
+									account.isValid === false && styles.tabExpired,
+								)}
 								disabled={isBusy}
 								onClick={() => {
 									if (isActive || isBusy) {
@@ -71,7 +76,7 @@ export const DesktopAccountTabs = observer(function DesktopAccountTabs() {
 								data-flx="app.desktop-account-tabs.tab"
 							>
 								<MockAvatar
-									size={18}
+									size={20}
 									avatarUrl={getAccountAvatarUrl(account)}
 									userTag={displayName}
 									data-flx="app.desktop-account-tabs.mock-avatar"

@@ -8,7 +8,7 @@ import {SoundType} from '@app/features/notification/utils/SoundUtils';
 import Permission from '@app/features/permissions/state/Permission';
 import NativePermission from '@app/features/permissions/system/state/NativePermission';
 import {Logger} from '@app/features/platform/utils/AppLogger';
-import {ComponentDispatch} from '@app/features/platform/utils/ComponentBus';
+import {ComponentBus} from '@app/features/platform/utils/ComponentBus';
 import {MenuGroup} from '@app/features/ui/action_menu/MenuGroup';
 import {MenuItem} from '@app/features/ui/action_menu/MenuItem';
 import * as ContextMenuCommands from '@app/features/ui/commands/ContextMenuCommands';
@@ -26,9 +26,6 @@ import {
 	VoiceCameraSettingsBottomSheet,
 	VoiceMoreOptionsBottomSheet,
 } from '@app/features/voice/components/bottomsheets/VoiceSettingsBottomSheets';
-import {VoiceSoundboardBottomSheet} from '@app/features/voice/components/VoiceSoundboardBottomSheet';
-import {VoiceSoundboardGrid} from '@app/features/voice/components/VoiceSoundboardGrid';
-import popoverStyles from '@app/features/voice/components/VoiceSoundboardPopover.module.css';
 import {
 	CameraPreviewModalInRoom,
 	CameraPreviewModalStandalone,
@@ -54,6 +51,9 @@ import {
 	VoiceMoreOptionsMenu,
 	VoiceOutputSettingsMenu,
 } from '@app/features/voice/components/VoiceSettingsMenus';
+import {VoiceSoundboardBottomSheet} from '@app/features/voice/components/VoiceSoundboardBottomSheet';
+import {VoiceSoundboardGrid} from '@app/features/voice/components/VoiceSoundboardGrid';
+import popoverStyles from '@app/features/voice/components/VoiceSoundboardPopover.module.css';
 import MediaEngine, {useMediaEngineVersion} from '@app/features/voice/engine/MediaEngineFacade';
 import {VOICE_CAMERA_USER_LIMIT_REACHED_DESCRIPTOR} from '@app/features/voice/engine/media_engine_facade/shared';
 import {getEffectiveAudioState} from '@app/features/voice/engine/VoiceEffectiveAudioState';
@@ -84,10 +84,6 @@ import {
 	VOICE_UNDEAFEN_DESCRIPTOR,
 } from '@app/features/voice/utils/VoiceMessageDescriptors';
 import {parseVoiceParticipantIdentity} from '@app/features/voice/utils/VoiceParticipantIdentity';
-import {Permissions} from '@fluxer/constants/src/ChannelConstants';
-import {VOICE_CHANNEL_CAMERA_USER_LIMIT} from '@fluxer/constants/src/LimitConstants';
-import {msg} from '@lingui/core/macro';
-import {useLingui} from '@lingui/react/macro';
 import {
 	FloatingFocusManager,
 	flip,
@@ -99,6 +95,10 @@ import {
 	useInteractions,
 	useRole,
 } from '@floating-ui/react';
+import {Permissions} from '@fluxer/constants/src/ChannelConstants';
+import {VOICE_CHANNEL_CAMERA_USER_LIMIT} from '@fluxer/constants/src/LimitConstants';
+import {msg} from '@lingui/core/macro';
+import {useLingui} from '@lingui/react/macro';
 import {useMaybeRoomContext} from '@livekit/components-react';
 import {
 	CameraIcon,
@@ -255,19 +255,20 @@ const VoiceControlBarInner = observer(function VoiceControlBarInner() {
 	const [moreOptionsOpen, setMoreOptionsOpen] = useState(false);
 	const [soundboardOpen, setSoundboardOpen] = useState(false);
 	const room = MediaEngine.room;
-	const {refs: soundboardRefs, context: soundboardContext, floatingStyles: soundboardFloatingStyles} = useFloating({
+	const {
+		refs: soundboardRefs,
+		context: soundboardContext,
+		floatingStyles: soundboardFloatingStyles,
+	} = useFloating({
 		open: soundboardOpen,
 		onOpenChange: setSoundboardOpen,
 		placement: 'top',
 		middleware: [offset(8), flip(), shift({padding: 8})],
 	});
-	const {getReferenceProps: getSoundboardReferenceProps, getFloatingProps: getSoundboardFloatingProps} = useInteractions([
-		useClick(soundboardContext),
-		useDismiss(soundboardContext),
-		useRole(soundboardContext),
-	]);
+	const {getReferenceProps: getSoundboardReferenceProps, getFloatingProps: getSoundboardFloatingProps} =
+		useInteractions([useClick(soundboardContext), useDismiss(soundboardContext), useRole(soundboardContext)]);
 	useEffect(() => {
-		return ComponentDispatch.subscribe('SOUNDBOARD_TOGGLE', () => {
+		return ComponentBus.subscribe('SOUNDBOARD_TOGGLE', () => {
 			setSoundboardOpen((open) => !open);
 		});
 	}, []);
