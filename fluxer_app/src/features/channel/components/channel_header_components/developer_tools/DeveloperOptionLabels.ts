@@ -13,13 +13,20 @@ import {
 	USE_ACTUAL_VALUE_DESCRIPTOR,
 	USE_DEFAULT_DESCRIPTOR,
 } from '@app/features/channel/components/channel_header_components/developer_tools/DeveloperToolsShared';
+import {formatDurationMs} from '@app/features/channel/components/channel_header_components/developer_tools/FormatHelpers';
+import {
+	getPremiumTypeLabel,
+	LIFETIME_DESCRIPTOR,
+} from '@app/features/channel/components/channel_header_components/developer_tools/OptionPresets';
+import {
+	DEVELOPER_OPTION_KEYS,
+	isDeveloperOptionAtDefault,
+	resetDeveloperOption,
+} from '@app/features/channel/components/channel_header_components/developer_tools/ResetOptions';
 import type {DeveloperOptionsState} from '@app/features/devtools/state/DeveloperOptions';
 import DeveloperOptions from '@app/features/devtools/state/DeveloperOptions';
 import type {I18n, MessageDescriptor} from '@lingui/core';
 import {msg} from '@lingui/core/macro';
-import {formatDurationMs} from './FormatHelpers';
-import {getPremiumTypeLabel, LIFETIME_DESCRIPTOR} from './OptionPresets';
-import {DEVELOPER_OPTION_KEYS, isDeveloperOptionAtDefault, resetDeveloperOption} from './ResetOptions';
 
 const ACTIVE_DEVELOPER_OPTION_KEYS = DEVELOPER_OPTION_KEYS.filter((key) => key !== 'premiumScenarioOverride');
 export const ATTACHMENT_MOCKS_DESCRIPTOR = msg({
@@ -38,8 +45,12 @@ const MONTHS_PLURAL_DESCRIPTOR = msg({
 	message: '{months, plural, one {# month} other {# months}}',
 	comment: 'Developer tools debug menu label. Internal-only surface for developers; translators may keep this terse.',
 });
-const BYPASS_SPLASH_SCREEN_DESCRIPTOR = msg({
-	message: 'Bypass splash screen',
+const BYPASS_LOADING_SKELETON_DESCRIPTOR = msg({
+	message: 'Bypass loading skeleton',
+	comment: 'Developer tools debug menu label. Internal-only surface for developers; translators may keep this terse.',
+});
+const FORCE_LOADING_SKELETON_DESCRIPTOR = msg({
+	message: 'Force loading skeleton',
 	comment: 'Developer tools debug menu label. Internal-only surface for developers; translators may keep this terse.',
 });
 const FAIL_MESSAGE_SENDS_DESCRIPTOR = msg({
@@ -267,15 +278,11 @@ const GIFT_REDEEMED_DESCRIPTOR = msg({
 	comment: 'Developer tools debug menu label. Internal-only surface for developers; translators may keep this terse.',
 });
 const TITLEBAR_PLATFORM_DESCRIPTOR = msg({
-	message: 'Titlebar platform',
+	message: 'Title bar platform',
 	comment: 'Developer tools debug menu label. Internal-only surface for developers; translators may keep this terse.',
 });
 const DEVELOPER_OPTION_DESCRIPTOR = msg({
 	message: 'Developer option',
-	comment: 'Developer tools debug menu label. Internal-only surface for developers; translators may keep this terse.',
-});
-const GAME_CAPTURE_INJECTION_METHOD_DESCRIPTOR = msg({
-	message: 'Game capture injection (Windows)',
 	comment: 'Developer tools debug menu label. Internal-only surface for developers; translators may keep this terse.',
 });
 const DEVELOPER_OPTION_LABEL_FALLBACKS: Partial<Record<keyof DeveloperOptionsState, MessageDescriptor>> = {
@@ -323,7 +330,6 @@ const formatDeveloperOptionValue = <K extends keyof DeveloperOptionsState>(
 		case 'mockRequiredActionsResendOutcome':
 		case 'mockTitlebarPlatformOverride':
 		case 'mockUpdaterState':
-		case 'gameCaptureInjectionMethod':
 			return String(value).replace(/_/g, ' ');
 		case 'premiumSinceOverride':
 		case 'premiumUntilOverride':
@@ -354,8 +360,10 @@ const formatDeveloperOptionValue = <K extends keyof DeveloperOptionsState>(
 };
 export const getDeveloperOptionLabel = (key: keyof DeveloperOptionsState): MessageDescriptor => {
 	switch (key) {
-		case 'bypassSplashScreen':
-			return BYPASS_SPLASH_SCREEN_DESCRIPTOR;
+		case 'bypassLoadingSkeleton':
+			return BYPASS_LOADING_SKELETON_DESCRIPTOR;
+		case 'forceLoadingSkeleton':
+			return FORCE_LOADING_SKELETON_DESCRIPTOR;
 		case 'forceFailMessageSends':
 			return FAIL_MESSAGE_SENDS_DESCRIPTOR;
 		case 'forceFailMessageLoads':
@@ -404,8 +412,6 @@ export const getDeveloperOptionLabel = (key: keyof DeveloperOptionsState): Messa
 			return VANITY_URL_DISCLAIMER_DESCRIPTOR;
 		case 'forceShowVoiceConnection':
 			return VOICE_CONNECTION_DEBUG_DESCRIPTOR;
-		case 'gameCaptureInjectionMethod':
-			return GAME_CAPTURE_INJECTION_METHOD_DESCRIPTOR;
 		case 'premiumTypeOverride':
 			return PREMIUM_TYPE_DESCRIPTOR;
 		case 'premiumLifetimeSequenceOverride':

@@ -1,8 +1,32 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import type {ApiContext} from '@app/api/ApiContext';
+import {mapUserToAdminResponse} from '@app/api/admin/models/UserTypes';
+import type {AdminAuditService} from '@app/api/admin/services/AdminAuditService';
+import type {AdminUserUpdatePropagator} from '@app/api/admin/services/AdminUserUpdatePropagator';
+import * as AuthEmail from '@app/api/auth/AuthEmail';
+import * as AuthMfa from '@app/api/auth/AuthMfa';
+import * as AuthSession from '@app/api/auth/AuthSession';
+import * as AuthUtility from '@app/api/auth/AuthUtility';
+import {createPasswordResetToken, createUserID, type UserID} from '@app/api/BrandedTypes';
+import type {UserRow} from '@app/api/database/types/UserTypes';
+import {Logger} from '@app/api/Logger';
+import {getInstanceConfigRepository} from '@app/api/middleware/ServiceSingletons';
+import type {IRiskHistoryRepository} from '@app/api/risk/HistoricalOutcomeRepository';
+import type {HistoricalOutcomeCode} from '@app/api/risk/RiskHistoryTypes';
+import {resolveAssignedTraits} from '@app/api/user/UserTraits';
+import {getIpAddressReverse, getLocationLabelFromIp} from '@app/api/utils/IpUtils';
+import {resolveSessionClientInfo} from '@app/api/utils/SessionClientIdentity';
 import {AdminACLs} from '@fluxer/constants/src/AdminACLs';
 import {APIErrorCodes} from '@fluxer/constants/src/ApiErrorCodes';
-import {SuspiciousActivityFlags, UserFlags} from '@fluxer/constants/src/UserConstants';
+import {
+	ADMIN_PHONE_TOGGLE_CLEARABLE_FLAGS,
+	ALL_SUSPICIOUS_ACTIVITY_FLAGS,
+	DEFERRABLE_PHONE_FLAGS,
+	DEFERRED_PHONE_ON_COMMUNITY_JOIN,
+	PHONE_GATE_PROMOTED_FROM_DEFERRAL,
+	UserFlags,
+} from '@fluxer/constants/src/UserConstants';
 import {ValidationErrorCodes} from '@fluxer/constants/src/ValidationErrorCodes';
 import {AccessDeniedError} from '@fluxer/errors/src/domains/core/AccessDeniedError';
 import {InputValidationError} from '@fluxer/errors/src/domains/core/InputValidationError';
@@ -10,8 +34,6 @@ import {MissingACLError} from '@fluxer/errors/src/domains/core/MissingACLError';
 import {ServiceUnavailableError} from '@fluxer/errors/src/domains/core/ServiceUnavailableError';
 import {UnknownUserError} from '@fluxer/errors/src/domains/user/UnknownUserError';
 import type {
-	BulkUpdateSuspiciousActivityFlagsRequest,
-	BulkUpdateUserFlagsRequest,
 	DeleteWebAuthnCredentialRequest,
 	DisableForSuspiciousActivityRequest,
 	DisableMfaRequest,
@@ -25,21 +47,6 @@ import type {
 	UpdateSuspiciousActivityFlagsRequest,
 } from '@fluxer/schema/src/domains/admin/AdminUserSchemas';
 import type {WebAuthnCredentialListResponse} from '@fluxer/schema/src/domains/auth/AuthSchemas';
-import type {ApiContext} from '../../ApiContext';
-import * as AuthEmail from '../../auth/AuthEmail';
-import * as AuthMfa from '../../auth/AuthMfa';
-import * as AuthSession from '../../auth/AuthSession';
-import * as AuthUtility from '../../auth/AuthUtility';
-import {createPasswordResetToken, createUserID, type UserID} from '../../BrandedTypes';
-import {Logger} from '../../Logger';
-import type {IRiskHistoryRepository} from '../../risk/HistoricalOutcomeRepository';
-import type {HistoricalOutcomeCode} from '../../risk/RiskHistoryTypes';
-import {getIpAddressReverse, getLocationLabelFromIp} from '../../utils/IpUtils';
-import {resolveSessionClientInfo} from '../../utils/UserAgentUtils';
-import {mapUserToAdminResponse} from '../models/UserTypes';
-import type {AdminAuditService} from './AdminAuditService';
-import type {AdminUserUpdatePropagator} from './AdminUserUpdatePropagator';
-import {BulkCancelledError, type BulkProgressHelpers} from './BulkProgressHelpers';
 
 interface AdminUserSecurityServiceDeps {
 	apiContext: ApiContext;
@@ -49,7 +56,6 @@ interface AdminUserSecurityServiceDeps {
 }
 
 interface FlagAuditMetadataParams {
-	userCount?: number;
 	addFlags: ReadonlyArray<bigint | number | string>;
 	removeFlags: ReadonlyArray<bigint | number | string>;
 	newFlags?: bigint | number | string;
@@ -63,19 +69,11 @@ function joinAuditValues(values: ReadonlyArray<bigint | number | string>): strin
 	return values.map((value) => value.toString()).join(',');
 }
 
-function createFlagAuditMetadata({
-	userCount,
-	addFlags,
-	removeFlags,
-	newFlags,
-}: FlagAuditMetadataParams): Map<string, string> {
+function createFlagAuditMetadata({addFlags, removeFlags, newFlags}: FlagAuditMetadataParams): Map<string, string> {
 	const entries: Array<[string, string]> = [
 		['add_flags', joinAuditValues(addFlags)],
 		['remove_flags', joinAuditValues(removeFlags)],
 	];
-	if (userCount !== undefined) {
-		entries.unshift(['user_count', userCount.toString()]);
-	}
 	if (newFlags !== undefined) {
 		entries.push(['new_flags', newFlags.toString()]);
 	}
@@ -304,7 +302,7 @@ export class AdminUserSecurityService {
 		if (!user) {
 			throw new UnknownUserError();
 		}
-		await AuthSession.terminateAllUserSessions(this.deps.apiContext, userId);
+		const terminatedCount = await AuthSession.terminateAllUserSessions(this.deps.apiContext, userId);
 		await auditService.createAuditLog({
 			adminUserId,
 			targetType: 'user',
@@ -313,6 +311,7 @@ export class AdminUserSecurityService {
 			auditLogReason,
 			metadata: new Map(),
 		});
+		return {terminated_count: terminatedCount};
 	}
 
 	async setUserAcls(
@@ -371,7 +370,8 @@ export class AdminUserSecurityService {
 		if (!user) {
 			throw new UnknownUserError();
 		}
-		const traitSet = data.traits.length > 0 ? new Set(data.traits) : null;
+		const assigned = resolveAssignedTraits(user.traits ?? [], data.traits);
+		const traitSet = assigned.size > 0 ? assigned : null;
 		const updatedUser = await userRepository.patchUpsert(
 			userId,
 			{
@@ -406,11 +406,14 @@ export class AdminUserSecurityService {
 		if (!user) {
 			throw new UnknownUserError();
 		}
-		const updatedUser = await userRepository.patchUpsert(
-			userId,
-			{has_verified_phone: data.has_verified_phone},
-			user.toRow(),
-		);
+		const phonePatch: Partial<UserRow> = {has_verified_phone: data.has_verified_phone};
+		if (data.has_verified_phone) {
+			const clearedFlags = (user.suspiciousActivityFlags ?? 0) & ~ADMIN_PHONE_TOGGLE_CLEARABLE_FLAGS;
+			if (clearedFlags !== (user.suspiciousActivityFlags ?? 0)) {
+				phonePatch.suspicious_activity_flags = clearedFlags;
+			}
+		}
+		const updatedUser = await userRepository.patchUpsert(userId, phonePatch, user.toRow());
 		await updatePropagator.propagateUserUpdate({userId, oldUser: user, updatedUser});
 		await auditService.createAuditLog({
 			adminUserId,
@@ -418,7 +421,15 @@ export class AdminUserSecurityService {
 			targetId: BigInt(userId),
 			action: 'update_has_verified_phone',
 			auditLogReason,
-			metadata: new Map([['has_verified_phone', String(data.has_verified_phone)]]),
+			metadata: new Map(
+				phonePatch.suspicious_activity_flags === undefined
+					? [['has_verified_phone', String(data.has_verified_phone)]]
+					: [
+							['has_verified_phone', String(data.has_verified_phone)],
+							['suspicious_activity_flags_before', String(user.suspiciousActivityFlags ?? 0)],
+							['suspicious_activity_flags_after', String(phonePatch.suspicious_activity_flags)],
+						],
+			),
 		});
 		return {
 			user: await mapUserToAdminResponse(updatedUser, cacheService, acls),
@@ -438,15 +449,30 @@ export class AdminUserSecurityService {
 		if (!user) {
 			throw new UnknownUserError();
 		}
+		const currentFlags = user.suspiciousActivityFlags ?? 0;
+		const keepsDeferral =
+			(currentFlags & DEFERRED_PHONE_ON_COMMUNITY_JOIN) !== 0 &&
+			(data.flags & DEFERRABLE_PHONE_FLAGS) !== 0 &&
+			(data.flags & DEFERRABLE_PHONE_FLAGS) === (currentFlags & DEFERRABLE_PHONE_FLAGS);
+		const keepsPromotion =
+			(currentFlags & PHONE_GATE_PROMOTED_FROM_DEFERRAL) !== 0 &&
+			(data.flags & DEFERRABLE_PHONE_FLAGS) !== 0 &&
+			(data.flags & DEFERRABLE_PHONE_FLAGS) === (currentFlags & DEFERRABLE_PHONE_FLAGS);
+		const newFlags =
+			(keepsDeferral ? data.flags | DEFERRED_PHONE_ON_COMMUNITY_JOIN : data.flags) |
+			(keepsPromotion ? PHONE_GATE_PROMOTED_FROM_DEFERRAL : 0);
 		const updatedUser = await userRepository.patchUpsert(
 			userId,
 			{
-				suspicious_activity_flags: data.flags,
+				suspicious_activity_flags: newFlags,
 			},
 			user.toRow(),
 		);
 		await updatePropagator.propagateUserUpdate({userId, oldUser: user, updatedUser: updatedUser});
-		if ((user.suspiciousActivityFlags ?? 0) !== data.flags && data.flags !== 0) {
+		if (
+			(currentFlags & ALL_SUSPICIOUS_ACTIVITY_FLAGS) !== (newFlags & ALL_SUSPICIOUS_ACTIVITY_FLAGS) &&
+			(newFlags & ALL_SUSPICIOUS_ACTIVITY_FLAGS) !== 0
+		) {
 			await this.recordRiskOutcomes(userId, ['challenged'], 'admin_update_suspicious_activity_flags');
 		}
 		await auditService.createAuditLog({
@@ -504,140 +530,6 @@ export class AdminUserSecurityService {
 		});
 		return {
 			user: await mapUserToAdminResponse(updatedUser, cacheService, acls),
-		};
-	}
-
-	async bulkUpdateUserFlags(
-		data: BulkUpdateUserFlagsRequest,
-		adminUserId: UserID,
-		auditLogReason: string | null,
-		acls: ReadonlySet<string>,
-		helpers?: BulkProgressHelpers,
-	) {
-		const {auditService} = this.deps;
-		const successful: Array<string> = [];
-		const failed: Array<{
-			id: string;
-			error: string;
-		}> = [];
-		const addFlags = data.add_flags.map((flag) => BigInt(flag));
-		const removeFlags = data.remove_flags.map((flag) => BigInt(flag));
-		const total = data.user_ids.length;
-		await helpers?.reportProgress(0, total, `Updating flags on ${total} users`);
-		let processed = 0;
-		for (const userIdBigInt of data.user_ids) {
-			if (helpers && (await helpers.shouldCancel())) throw new BulkCancelledError();
-			try {
-				const userId = createUserID(userIdBigInt);
-				await this.updateUserFlags({
-					userId,
-					data: {addFlags, removeFlags},
-					adminUserId,
-					auditLogReason: null,
-					acls,
-				});
-				successful.push(userId.toString());
-			} catch (error) {
-				failed.push({
-					id: userIdBigInt.toString(),
-					error: error instanceof Error ? error.message : 'Unknown error',
-				});
-			}
-			processed++;
-			if (helpers && processed % 25 === 0) {
-				await helpers.reportProgress(processed, total, null);
-			}
-		}
-		await helpers?.reportProgress(total, total, `+${successful.length} ok, ${failed.length} failed`);
-		await auditService.createAuditLog({
-			adminUserId,
-			targetType: 'user',
-			targetId: BigInt(0),
-			action: 'bulk_update_user_flags',
-			auditLogReason,
-			metadata: createFlagAuditMetadata({
-				userCount: data.user_ids.length,
-				addFlags: data.add_flags,
-				removeFlags: data.remove_flags,
-			}),
-		});
-		return {
-			successful,
-			failed,
-		};
-	}
-
-	async bulkUpdateSuspiciousActivityFlags(
-		data: BulkUpdateSuspiciousActivityFlagsRequest,
-		adminUserId: UserID,
-		auditLogReason: string | null,
-		helpers?: BulkProgressHelpers,
-	) {
-		const {users: userRepository} = this.deps.apiContext.services;
-		const {auditService, updatePropagator} = this.deps;
-		const successful: Array<string> = [];
-		const failed: Array<{
-			id: string;
-			error: string;
-		}> = [];
-		const addMask = data.add_flags.reduce((mask, flagName) => {
-			const value = SuspiciousActivityFlags[flagName as keyof typeof SuspiciousActivityFlags];
-			return value !== undefined ? mask | value : mask;
-		}, 0);
-		const removeMask = data.remove_flags.reduce((mask, flagName) => {
-			const value = SuspiciousActivityFlags[flagName as keyof typeof SuspiciousActivityFlags];
-			return value !== undefined ? mask | value : mask;
-		}, 0);
-		const total = data.user_ids.length;
-		await helpers?.reportProgress(0, total, `Updating suspicious flags on ${total} users`);
-		let processed = 0;
-		for (const userIdBigInt of data.user_ids) {
-			if (helpers && (await helpers.shouldCancel())) throw new BulkCancelledError();
-			try {
-				const userId = createUserID(userIdBigInt);
-				const user = await userRepository.findUnique(userId);
-				if (!user) {
-					throw new UnknownUserError();
-				}
-				const currentFlags = user.suspiciousActivityFlags ?? 0;
-				const newFlags = (currentFlags | addMask) & ~removeMask;
-				const updatedUser = await userRepository.patchUpsert(
-					userId,
-					{suspicious_activity_flags: newFlags},
-					user.toRow(),
-				);
-				await updatePropagator.propagateUserUpdate({userId, oldUser: user, updatedUser});
-				if (newFlags !== currentFlags && newFlags !== 0) {
-					await this.recordRiskOutcomes(userId, ['challenged'], 'admin_bulk_update_suspicious_activity_flags');
-				}
-				successful.push(userId.toString());
-			} catch (error) {
-				failed.push({
-					id: userIdBigInt.toString(),
-					error: error instanceof Error ? error.message : 'Unknown error',
-				});
-			}
-			processed++;
-			if (helpers && processed % 25 === 0) {
-				await helpers.reportProgress(processed, total, null);
-			}
-		}
-		await helpers?.reportProgress(total, total, `+${successful.length} ok, ${failed.length} failed`);
-		await auditService.createAuditLog({
-			adminUserId,
-			targetType: 'user',
-			targetId: BigInt(0),
-			action: 'bulk_update_suspicious_activity_flags',
-			auditLogReason,
-			metadata: createFlagAuditMetadata({
-				userCount: data.user_ids.length,
-				addFlags: data.add_flags,
-				removeFlags: data.remove_flags,
-			}),
-		});
-		return {
-			successful,
-			failed,
 		};
 	}
 
@@ -720,7 +612,7 @@ export class AdminUserSecurityService {
 			approximateLastUsedAt: Date;
 			clientIp: string;
 			clientUserAgent: string | null;
-			clientIsDesktop: boolean | null;
+			clientOs: string | null;
 			deletedAt: Date | null;
 		}> = [
 			...activeSessions.map((s) => ({
@@ -729,7 +621,7 @@ export class AdminUserSecurityService {
 				approximateLastUsedAt: s.approximateLastUsedAt,
 				clientIp: s.clientIp,
 				clientUserAgent: s.clientUserAgent,
-				clientIsDesktop: s.clientIsDesktop,
+				clientOs: s.clientOs ?? null,
 				deletedAt: null as Date | null,
 			})),
 			...tombstones.map((t) => ({
@@ -738,7 +630,7 @@ export class AdminUserSecurityService {
 				approximateLastUsedAt: t.approximateLastUsedAt,
 				clientIp: t.clientIp,
 				clientUserAgent: t.clientUserAgent,
-				clientIsDesktop: t.clientIsDesktop,
+				clientOs: t.clientOs ?? null,
 				deletedAt: t.deletedAt,
 			})),
 		];
@@ -747,6 +639,8 @@ export class AdminUserSecurityService {
 			if (a.deletedAt !== null && b.deletedAt === null) return 1;
 			return b.createdAt.getTime() - a.createdAt.getTime();
 		});
+		const {branding} = await getInstanceConfigRepository().getAppPublicConfig();
+		const productName = branding.product_name;
 		const canViewIp = acls.has(AdminACLs.USER_VIEW_IP) || acls.has(AdminACLs.WILDCARD);
 		if (!canViewIp) {
 			await auditService.createAuditLog({
@@ -759,9 +653,10 @@ export class AdminUserSecurityService {
 			});
 			return {
 				sessions: entries.map((entry) => {
-					const {clientOs, clientPlatform} = resolveSessionClientInfo({
+					const clientInfo = resolveSessionClientInfo({
 						userAgent: entry.clientUserAgent,
-						isDesktopClient: entry.clientIsDesktop,
+						reportedOs: entry.clientOs,
+						productName,
 					});
 					return {
 						session_id_hash: entry.sessionIdHash.toString('base64url'),
@@ -769,8 +664,8 @@ export class AdminUserSecurityService {
 						approx_last_used_at: entry.approximateLastUsedAt.toISOString(),
 						client_ip: '[redacted]',
 						client_ip_reverse: null,
-						client_os: clientOs,
-						client_platform: clientPlatform,
+						client_os: clientInfo.os,
+						client_platform: clientInfo.platform,
 						client_location: null,
 						deleted_at: entry.deletedAt?.toISOString() ?? null,
 					};
@@ -807,9 +702,10 @@ export class AdminUserSecurityService {
 				const clientLocation = locationResult.status === 'fulfilled' ? locationResult.value : null;
 				const reverseDnsResult = reverseDnsResults[index];
 				const clientIpReverse = reverseDnsResult?.status === 'fulfilled' ? reverseDnsResult.value : null;
-				const {clientOs, clientPlatform} = resolveSessionClientInfo({
+				const clientInfo = resolveSessionClientInfo({
 					userAgent: entry.clientUserAgent,
-					isDesktopClient: entry.clientIsDesktop,
+					reportedOs: entry.clientOs,
+					productName,
 				});
 				return {
 					session_id_hash: entry.sessionIdHash.toString('base64url'),
@@ -817,8 +713,8 @@ export class AdminUserSecurityService {
 					approx_last_used_at: entry.approximateLastUsedAt.toISOString(),
 					client_ip: entry.clientIp,
 					client_ip_reverse: clientIpReverse,
-					client_os: clientOs,
-					client_platform: clientPlatform,
+					client_os: clientInfo.os,
+					client_platform: clientInfo.platform,
 					client_location: clientLocation,
 					deleted_at: entry.deletedAt?.toISOString() ?? null,
 				};

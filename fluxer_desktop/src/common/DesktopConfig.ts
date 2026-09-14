@@ -110,7 +110,6 @@ interface PersistedDesktopWindowBehaviorSettings {
 	allowTransparency?: boolean;
 	smoothScrolling?: boolean;
 	middleClickAutoscroll?: boolean;
-	firstClickPassThroughWhenUnfocused?: boolean;
 }
 
 interface PersistedDesktopTroubleshootingSettings {
@@ -141,7 +140,6 @@ function getDefaultDesktopWindowBehaviorSettings(): DesktopWindowBehaviorSetting
 		activeSmoothScrolling: true,
 		middleClickAutoscroll: false,
 		activeMiddleClickAutoscroll: false,
-		firstClickPassThroughWhenUnfocused: false,
 	};
 }
 
@@ -173,9 +171,6 @@ function sanitizePersistedDesktopWindowBehaviorSettings(
 	}
 	if (typeof value.middleClickAutoscroll === 'boolean') {
 		settings.middleClickAutoscroll = value.middleClickAutoscroll;
-	}
-	if (typeof value.firstClickPassThroughWhenUnfocused === 'boolean') {
-		settings.firstClickPassThroughWhenUnfocused = value.firstClickPassThroughWhenUnfocused;
 	}
 	const minimizeToTrayV2 = value[MINIMIZE_TO_TRAY_STORAGE_KEY_V2];
 	if (typeof minimizeToTrayV2 === 'boolean') {
@@ -222,11 +217,7 @@ function sanitizeDesktopConfig(value: unknown): DesktopConfig {
 		return {};
 	}
 	const nextConfig: DesktopConfig = {...value};
-	if (typeof value.app_url === 'string') {
-		nextConfig.app_url = value.app_url;
-	} else {
-		delete nextConfig.app_url;
-	}
+	delete nextConfig.app_url;
 	const chromiumSwitches = sanitizeChromiumSwitchesSetting(value.chromiumSwitches);
 	if (chromiumSwitches) {
 		nextConfig.chromiumSwitches = chromiumSwitches;
@@ -321,10 +312,6 @@ function normalizeDesktopWindowBehaviorSettings(
 				: typeof normalizedSettings?.middleClickAutoscroll === 'boolean'
 					? normalizedSettings.middleClickAutoscroll
 					: defaults.middleClickAutoscroll,
-		firstClickPassThroughWhenUnfocused:
-			typeof normalizedSettings?.firstClickPassThroughWhenUnfocused === 'boolean'
-				? normalizedSettings.firstClickPassThroughWhenUnfocused
-				: defaults.firstClickPassThroughWhenUnfocused,
 	};
 	if (!normalized.showTrayIcon) {
 		normalized.minimizeToTray = false;
@@ -343,7 +330,6 @@ function serializeDesktopWindowBehaviorSettings(
 		allowTransparency: settings.allowTransparency,
 		smoothScrolling: settings.smoothScrolling,
 		middleClickAutoscroll: settings.middleClickAutoscroll,
-		firstClickPassThroughWhenUnfocused: settings.firstClickPassThroughWhenUnfocused,
 		[MINIMIZE_TO_TRAY_STORAGE_KEY_V2]: settings.minimizeToTray,
 		[CLOSE_TO_TRAY_STORAGE_KEY_V2]: settings.closeToTray,
 	};
@@ -378,7 +364,7 @@ function saveDesktopConfig(): void {
 	try {
 		fs.writeFileSync(tempPath, JSON.stringify(config, null, 2), 'utf-8');
 		fs.renameSync(tempPath, configPath);
-		log.debug('Saved desktop config to', configPath, {app_url: config.app_url ?? '(default)'});
+		log.debug('Saved desktop config to', configPath);
 	} catch (error) {
 		log.error('Failed to save desktop config:', error);
 		try {
@@ -418,6 +404,7 @@ export function getAppUrl(): string {
 	const idx = Math.max(0, Math.min(config.active_tab_index ?? 0, tabs.length - 1));
 	return tabs[idx]?.url ?? getOfficialAppUrl();
 }
+
 
 export function getAllInstanceOrigins(): Array<string> {
 	const origins: Array<string> = [];

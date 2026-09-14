@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+pub use crate::api::generated::types::VoiceNoiseSuppressionBackendSchema as NoiseSuppressionBackend;
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct InstanceConfigResponse {
     pub sso: SsoConfigResponse,
@@ -18,14 +20,24 @@ pub struct InstanceConfigResponse {
     pub integrations: InstanceIntegrationsResponse,
     #[serde(default)]
     pub media: InstanceMediaResponse,
+    #[serde(default)]
+    pub voice_noise_suppression: VoiceNoiseSuppressionConfigResponse,
+    #[serde(default)]
+    pub experiment_delivery: ExperimentDeliveryConfigResponse,
+    #[serde(default)]
+    pub message_hover_tracking: MessageHoverTrackingConfigResponse,
+    #[serde(default)]
+    pub message_keyboard_focus: MessageKeyboardFocusConfigResponse,
+    #[serde(default)]
+    pub blocked_message_groups: BlockedMessageGroupsConfigResponse,
+    #[serde(default)]
+    pub guild_activity_log_presentation: GuildActivityLogPresentationConfigResponse,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct InstancePolicyResponse {
     #[serde(default)]
     pub single_community_enabled: bool,
-    #[serde(default)]
-    pub single_community_locked: bool,
     pub single_community_guild_id: Option<String>,
     #[serde(default)]
     pub direct_messages_disabled: bool,
@@ -39,13 +51,34 @@ pub struct InstancePolicyResponse {
     pub services_resolved: InstanceServicesResolved,
     #[serde(default)]
     pub services_available: InstanceServicesAvailable,
+    #[serde(default)]
+    pub deferred_phone_gate: DeferredPhoneGateResponse,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct DeferredPhoneGateResponse {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub window_hours: f64,
+    #[serde(default)]
+    pub member_threshold: i64,
+}
+
+impl Default for DeferredPhoneGateResponse {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            window_hours: 6.0,
+            member_threshold: 50,
+        }
+    }
 }
 
 impl Default for InstancePolicyResponse {
     fn default() -> Self {
         Self {
             single_community_enabled: false,
-            single_community_locked: false,
             single_community_guild_id: None,
             direct_messages_disabled: false,
             direct_messages_locked: false,
@@ -53,6 +86,7 @@ impl Default for InstancePolicyResponse {
             services: InstanceServicesOverrides::default(),
             services_resolved: InstanceServicesResolved::default(),
             services_available: InstanceServicesAvailable::default(),
+            deferred_phone_gate: DeferredPhoneGateResponse::default(),
         }
     }
 }
@@ -416,6 +450,277 @@ impl VoiceE2eeScope {
     }
 }
 
+pub const VOICE_NS_MAX_TARGETED_USERS: usize = 1_000;
+pub const VOICE_NS_MAX_GUILD_OVERRIDES: usize = 200;
+
+impl NoiseSuppressionBackend {
+    pub const ALL: [Self; 7] = [
+        Self::None,
+        Self::Standard,
+        Self::Gate,
+        Self::Speex,
+        Self::Rnnoise,
+        Self::Gtcrn,
+        Self::DeepFilter,
+    ];
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::None => "None (pass-through)",
+            Self::Standard => "Standard (WebRTC)",
+            Self::Gate => "Noise gate",
+            Self::Speex => "Speex",
+            Self::Rnnoise => "RNNoise",
+            Self::Gtcrn => "GTCRN",
+            Self::DeepFilter => "DeepFilterNet",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct VoiceNoiseSuppressionGuildOverride {
+    pub guild_id: String,
+    pub backend: NoiseSuppressionBackend,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(default)]
+pub struct VoiceNoiseSuppressionConfigResponse {
+    pub enabled: bool,
+    pub config_version: u64,
+    pub default_backend: NoiseSuppressionBackend,
+    pub enabled_backends: Vec<NoiseSuppressionBackend>,
+    pub allow_user_override: bool,
+    pub rollout_basis_points: u32,
+    pub rollout_salt: String,
+    pub included_user_ids: Vec<String>,
+    pub excluded_user_ids: Vec<String>,
+    pub guild_overrides: Vec<VoiceNoiseSuppressionGuildOverride>,
+    pub stereo_enabled: bool,
+    pub suppression_strength: u32,
+}
+
+impl Default for VoiceNoiseSuppressionConfigResponse {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            config_version: 0,
+            default_backend: NoiseSuppressionBackend::Standard,
+            enabled_backends: NoiseSuppressionBackend::ALL.to_vec(),
+            allow_user_override: true,
+            rollout_basis_points: 0,
+            rollout_salt: "voice-ns-v1".to_owned(),
+            included_user_ids: Vec::new(),
+            excluded_user_ids: Vec::new(),
+            guild_overrides: Vec::new(),
+            stereo_enabled: false,
+            suppression_strength: 80,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct VoiceNoiseSuppressionConfigUpdateRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_backend: Option<NoiseSuppressionBackend>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled_backends: Option<Vec<NoiseSuppressionBackend>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allow_user_override: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rollout_basis_points: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rollout_salt: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub included_user_ids: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub excluded_user_ids: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub guild_overrides: Option<Vec<VoiceNoiseSuppressionGuildOverride>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stereo_enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub suppression_strength: Option<u32>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(default)]
+pub struct MessageHoverTrackingConfigResponse {
+    pub enabled: bool,
+    pub config_version: u64,
+    pub rollout_basis_points: u32,
+    pub rollout_salt: String,
+    pub included_user_ids: Vec<String>,
+    pub excluded_user_ids: Vec<String>,
+}
+
+impl Default for MessageHoverTrackingConfigResponse {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            config_version: 0,
+            rollout_basis_points: 0,
+            rollout_salt: "message-hover-tracking-v1".to_owned(),
+            included_user_ids: Vec::new(),
+            excluded_user_ids: Vec::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct MessageHoverTrackingConfigUpdateRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rollout_basis_points: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rollout_salt: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub included_user_ids: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub excluded_user_ids: Option<Vec<String>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(default)]
+pub struct MessageKeyboardFocusConfigResponse {
+    pub enabled: bool,
+    pub config_version: u64,
+    pub rollout_basis_points: u32,
+    pub rollout_salt: String,
+    pub included_user_ids: Vec<String>,
+    pub excluded_user_ids: Vec<String>,
+}
+
+impl Default for MessageKeyboardFocusConfigResponse {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            config_version: 0,
+            rollout_basis_points: 0,
+            rollout_salt: "message-keyboard-focus-v1".to_owned(),
+            included_user_ids: Vec::new(),
+            excluded_user_ids: Vec::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct MessageKeyboardFocusConfigUpdateRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rollout_basis_points: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rollout_salt: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub included_user_ids: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub excluded_user_ids: Option<Vec<String>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(default)]
+pub struct BlockedMessageGroupsConfigResponse {
+    pub enabled: bool,
+    pub config_version: u64,
+    pub rollout_basis_points: u32,
+    pub rollout_salt: String,
+    pub included_user_ids: Vec<String>,
+    pub excluded_user_ids: Vec<String>,
+}
+
+impl Default for BlockedMessageGroupsConfigResponse {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            config_version: 0,
+            rollout_basis_points: 0,
+            rollout_salt: "blocked-message-groups-v1".to_owned(),
+            included_user_ids: Vec::new(),
+            excluded_user_ids: Vec::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct BlockedMessageGroupsConfigUpdateRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rollout_basis_points: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rollout_salt: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub included_user_ids: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub excluded_user_ids: Option<Vec<String>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(default)]
+pub struct GuildActivityLogPresentationConfigResponse {
+    pub enabled: bool,
+    pub config_version: u64,
+    pub rollout_basis_points: u32,
+    pub rollout_salt: String,
+    pub included_user_ids: Vec<String>,
+    pub excluded_user_ids: Vec<String>,
+}
+
+impl Default for GuildActivityLogPresentationConfigResponse {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            config_version: 0,
+            rollout_basis_points: 0,
+            rollout_salt: "guild-activity-log-presentation-v1".to_owned(),
+            included_user_ids: Vec::new(),
+            excluded_user_ids: Vec::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct GuildActivityLogPresentationConfigUpdateRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rollout_basis_points: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rollout_salt: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub included_user_ids: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub excluded_user_ids: Option<Vec<String>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(default)]
+pub struct ExperimentDeliveryConfigResponse {
+    pub poll_interval_seconds: u64,
+    pub poll_jitter_percent: u32,
+}
+
+impl Default for ExperimentDeliveryConfigResponse {
+    fn default() -> Self {
+        Self {
+            poll_interval_seconds: 300,
+            poll_jitter_percent: 15,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct ExperimentDeliveryConfigUpdateRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub poll_interval_seconds: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub poll_jitter_percent: Option<u32>,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct InstanceRegistrationResponse {
     pub mode: RegistrationMode,
@@ -505,6 +810,18 @@ pub struct InstanceConfigUpdateRequest {
     pub integrations: Option<InstanceIntegrationsUpdateRequest>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub media: Option<InstanceMediaUpdateRequest>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub voice_noise_suppression: Option<VoiceNoiseSuppressionConfigUpdateRequest>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub experiment_delivery: Option<ExperimentDeliveryConfigUpdateRequest>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message_hover_tracking: Option<MessageHoverTrackingConfigUpdateRequest>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message_keyboard_focus: Option<MessageKeyboardFocusConfigUpdateRequest>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub blocked_message_groups: Option<BlockedMessageGroupsConfigUpdateRequest>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub guild_activity_log_presentation: Option<GuildActivityLogPresentationConfigUpdateRequest>,
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -519,6 +836,18 @@ pub struct InstancePolicyUpdateRequest {
     pub premium_mode: Option<PremiumMode>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub services: Option<InstanceServicesUpdateRequest>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deferred_phone_gate: Option<DeferredPhoneGateUpdateRequest>,
+}
+
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct DeferredPhoneGateUpdateRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub window_hours: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub member_threshold: Option<i64>,
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -795,12 +1124,233 @@ pub struct CreateRegistrationUrlResponse {
     pub url: String,
 }
 
-#[derive(Clone, Debug, Serialize)]
-pub struct RegistrationUrlActionRequest {
-    pub id: String,
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::api::generated::types as generated_types;
+    use serde_json::json;
 
-#[derive(Clone, Debug, Serialize)]
-pub struct PendingRegistrationActionRequest {
-    pub user_id: String,
+    #[test]
+    fn noise_suppression_backend_choices_use_the_generated_wire_contract() {
+        assert_eq!(
+            serde_json::to_value(NoiseSuppressionBackend::ALL).expect("serializable backends"),
+            json!([
+                "none",
+                "standard",
+                "gate",
+                "speex",
+                "rnnoise",
+                "gtcrn",
+                "deep_filter"
+            ])
+        );
+        assert!(serde_json::from_value::<NoiseSuppressionBackend>(json!("deepfilter")).is_err());
+    }
+
+    #[test]
+    fn default_instance_experiment_config_matches_the_published_contract() {
+        let schema: serde_json::Value =
+            serde_json::from_str(include_str!("../../../openapi-admin.json"))
+                .expect("admin schema");
+        let noise = serde_json::from_value::<VoiceNoiseSuppressionConfigResponse>(json!({}))
+            .expect("default noise config");
+        let delivery = serde_json::from_value::<ExperimentDeliveryConfigResponse>(json!({}))
+            .expect("default delivery config");
+        let hover = serde_json::from_value::<MessageHoverTrackingConfigResponse>(json!({}))
+            .expect("default message hover tracking config");
+        let keyboard = serde_json::from_value::<MessageKeyboardFocusConfigResponse>(json!({}))
+            .expect("default message keyboard focus config");
+        let blocked = serde_json::from_value::<BlockedMessageGroupsConfigResponse>(json!({}))
+            .expect("default blocked message groups config");
+        let activity_log =
+            serde_json::from_value::<GuildActivityLogPresentationConfigResponse>(json!({}))
+                .expect("default guild activity log presentation config");
+        let noise = serde_json::to_value(noise).expect("serializable noise config");
+        let delivery = serde_json::to_value(delivery).expect("serializable delivery config");
+        let hover =
+            serde_json::to_value(hover).expect("serializable message hover tracking config");
+        let keyboard =
+            serde_json::to_value(keyboard).expect("serializable message keyboard focus config");
+        let blocked =
+            serde_json::to_value(blocked).expect("serializable blocked message groups config");
+        let activity_log = serde_json::to_value(activity_log)
+            .expect("serializable guild activity log presentation config");
+        let generated_noise: generated_types::VoiceNoiseSuppressionConfigResponse =
+            serde_json::from_value(noise.clone()).expect("generated noise config contract");
+        let generated_delivery: generated_types::ExperimentDeliveryConfigResponse =
+            serde_json::from_value(delivery.clone()).expect("generated delivery config contract");
+        let generated_hover: generated_types::MessageHoverTrackingConfigResponse =
+            serde_json::from_value(hover.clone())
+                .expect("generated message hover tracking config contract");
+        let generated_keyboard: generated_types::MessageKeyboardFocusConfigResponse =
+            serde_json::from_value(keyboard.clone())
+                .expect("generated message keyboard focus config contract");
+        let generated_blocked: generated_types::BlockedMessageGroupsConfigResponse =
+            serde_json::from_value(blocked.clone())
+                .expect("generated blocked message groups config contract");
+        let generated_activity_log: generated_types::GuildActivityLogPresentationConfigResponse =
+            serde_json::from_value(activity_log.clone())
+                .expect("generated guild activity log presentation config contract");
+        assert_eq!(
+            serde_json::to_value(generated_noise).expect("serializable generated noise config"),
+            noise
+        );
+        assert_eq!(
+            serde_json::to_value(generated_delivery)
+                .expect("serializable generated delivery config"),
+            delivery
+        );
+        assert_eq!(
+            serde_json::to_value(generated_hover)
+                .expect("serializable generated message hover tracking config"),
+            hover
+        );
+        assert_eq!(
+            serde_json::to_value(generated_keyboard)
+                .expect("serializable generated message keyboard focus config"),
+            keyboard
+        );
+        assert_eq!(
+            serde_json::to_value(generated_blocked)
+                .expect("serializable generated blocked message groups config"),
+            blocked
+        );
+        assert_eq!(
+            serde_json::to_value(generated_activity_log)
+                .expect("serializable generated guild activity log presentation config"),
+            activity_log
+        );
+        for (name, value) in [
+            ("VoiceNoiseSuppressionConfigResponse", noise),
+            ("ExperimentDeliveryConfigResponse", delivery),
+            ("MessageHoverTrackingConfigResponse", hover),
+            ("MessageKeyboardFocusConfigResponse", keyboard),
+            ("BlockedMessageGroupsConfigResponse", blocked),
+            ("GuildActivityLogPresentationConfigResponse", activity_log),
+        ] {
+            for (field, value) in value.as_object().expect("config object") {
+                assert_eq!(
+                    value, &schema["components"]["schemas"][name]["properties"][field]["default"],
+                    "{name}.{field}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn message_hover_tracking_update_preserves_empty_lists_and_omitted_fields() {
+        let update = MessageHoverTrackingConfigUpdateRequest {
+            included_user_ids: Some(Vec::new()),
+            excluded_user_ids: Some(Vec::new()),
+            ..Default::default()
+        };
+        let value = serde_json::to_value(update).expect("serializable update");
+        serde_json::from_value::<generated_types::MessageHoverTrackingConfigUpdateRequest>(
+            value.clone(),
+        )
+        .expect("generated update contract");
+        assert_eq!(
+            value,
+            json!({"included_user_ids": [], "excluded_user_ids": []})
+        );
+        assert_eq!(
+            serde_json::to_value(MessageHoverTrackingConfigUpdateRequest::default())
+                .expect("serializable update"),
+            json!({})
+        );
+    }
+
+    #[test]
+    fn message_keyboard_focus_update_preserves_empty_lists_and_omitted_fields() {
+        let update = MessageKeyboardFocusConfigUpdateRequest {
+            included_user_ids: Some(Vec::new()),
+            excluded_user_ids: Some(Vec::new()),
+            ..Default::default()
+        };
+        let value = serde_json::to_value(update).expect("serializable update");
+        serde_json::from_value::<generated_types::MessageKeyboardFocusConfigUpdateRequest>(
+            value.clone(),
+        )
+        .expect("generated update contract");
+        assert_eq!(
+            value,
+            json!({"included_user_ids": [], "excluded_user_ids": []})
+        );
+        assert_eq!(
+            serde_json::to_value(MessageKeyboardFocusConfigUpdateRequest::default())
+                .expect("serializable update"),
+            json!({})
+        );
+    }
+
+    #[test]
+    fn blocked_message_groups_update_preserves_empty_lists_and_omitted_fields() {
+        let update = BlockedMessageGroupsConfigUpdateRequest {
+            included_user_ids: Some(Vec::new()),
+            excluded_user_ids: Some(Vec::new()),
+            ..Default::default()
+        };
+        let value = serde_json::to_value(update).expect("serializable update");
+        serde_json::from_value::<generated_types::BlockedMessageGroupsConfigUpdateRequest>(
+            value.clone(),
+        )
+        .expect("generated update contract");
+        assert_eq!(
+            value,
+            json!({"included_user_ids": [], "excluded_user_ids": []})
+        );
+        assert_eq!(
+            serde_json::to_value(BlockedMessageGroupsConfigUpdateRequest::default())
+                .expect("serializable update"),
+            json!({})
+        );
+    }
+
+    #[test]
+    fn guild_activity_log_presentation_update_preserves_empty_lists_and_omitted_fields() {
+        let update = GuildActivityLogPresentationConfigUpdateRequest {
+            included_user_ids: Some(Vec::new()),
+            excluded_user_ids: Some(Vec::new()),
+            ..Default::default()
+        };
+        let value = serde_json::to_value(update).expect("serializable update");
+        serde_json::from_value::<generated_types::GuildActivityLogPresentationConfigUpdateRequest>(
+            value.clone(),
+        )
+        .expect("generated update contract");
+        assert_eq!(
+            value,
+            json!({"included_user_ids": [], "excluded_user_ids": []})
+        );
+        assert_eq!(
+            serde_json::to_value(GuildActivityLogPresentationConfigUpdateRequest::default())
+                .expect("serializable update"),
+            json!({})
+        );
+    }
+
+    #[test]
+    fn noise_suppression_update_preserves_empty_lists_and_omitted_fields() {
+        let update = VoiceNoiseSuppressionConfigUpdateRequest {
+            enabled_backends: Some(Vec::new()),
+            included_user_ids: Some(Vec::new()),
+            excluded_user_ids: Some(Vec::new()),
+            guild_overrides: Some(Vec::new()),
+            ..Default::default()
+        };
+        let value = serde_json::to_value(update).expect("serializable update");
+        serde_json::from_value::<generated_types::VoiceNoiseSuppressionConfigUpdateRequest>(
+            value.clone(),
+        )
+        .expect("generated update contract");
+        assert_eq!(
+            value,
+            json!({"enabled_backends": [], "included_user_ids": [], "excluded_user_ids": [], "guild_overrides": []})
+        );
+        assert_eq!(
+            serde_json::to_value(VoiceNoiseSuppressionConfigUpdateRequest::default())
+                .expect("serializable update"),
+            json!({})
+        );
+    }
 }

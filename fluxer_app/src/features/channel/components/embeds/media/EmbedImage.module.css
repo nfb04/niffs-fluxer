@@ -96,6 +96,7 @@
 .thumbHashContainer {
 	position: absolute;
 	inset: 0;
+	pointer-events: none;
 }
 
 .thumbHashImage {
@@ -125,6 +126,11 @@
 	max-height: 100%;
 	object-fit: cover;
 	border-radius: var(--media-border-radius);
+}
+
+.animatedImageElement {
+	position: absolute;
+	inset: 0;
 }
 
 .opacityHidden {

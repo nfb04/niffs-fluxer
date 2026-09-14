@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import {getAnimatedMediaPlaybackAllowed} from '@app/features/app/hooks/useAnimatedMediaPlayback';
 import RuntimeConfig from '@app/features/app/state/RuntimeConfig';
 import styles from '@app/features/channel/components/GifPicker.module.css';
 import {safePause, safePlay, useGifVideoPool} from '@app/features/channel/components/GifVideoPool';
-import {FavoriteGifFirstTimePromptModal} from '@app/features/channel/components/pickers/gif/FavoriteGifFirstTimePromptModal';
+import {resolvesToVideo} from '@app/features/channel/components/pickers/gif/GifPickerMediaKind';
 import type {GifPickerGridItemData} from '@app/features/channel/components/pickers/gif/GifPickerTypes';
 import {PickerThumbnail} from '@app/features/channel/components/pickers/shared/PickerThumbnail';
 import {usePooledVideo} from '@app/features/channel/components/pickers/shared/usePooledVideo';
@@ -22,8 +21,9 @@ import {
 	REMOVE_FROM_FAVORITES_DESCRIPTOR,
 } from '@app/features/i18n/utils/CommonMessageDescriptors';
 import {isKeyboardActivationKey} from '@app/features/input/utils/KeyboardUtils';
-import {ComponentDispatch} from '@app/features/platform/utils/ComponentBus';
-import {modal, push} from '@app/features/ui/commands/ModalCommands';
+import {decodeThumbHashDataURL} from '@app/features/messaging/utils/ThumbHashUtils';
+import {ComponentBus} from '@app/features/platform/utils/ComponentBus';
+import {remFromPx} from '@app/features/theme/layout/RemFromPx';
 import FocusRing from '@app/features/ui/focus_ring/FocusRing';
 import {Tooltip} from '@app/features/ui/tooltip/Tooltip';
 import {msg} from '@lingui/core/macro';
@@ -53,16 +53,6 @@ const SELECT_GIF_DESCRIPTOR = msg({
 	comment:
 		'Button label in the gif picker grid item when picking a GIF for an avatar, banner, or video background. Keep it concise. Preserve {title}; it is inserted by code.',
 });
-const VIDEO_FILE_EXTENSION_REGEX = /\.(mp4|webm|mov|m4v)(?:$|\?)/iu;
-
-function isVideoSourceUrl(value: string): boolean {
-	try {
-		const url = new URL(value);
-		return VIDEO_FILE_EXTENSION_REGEX.test(url.pathname);
-	} catch {
-		return VIDEO_FILE_EXTENSION_REGEX.test(value);
-	}
-}
 
 export const GifPickerGridItem = observer(function GifPickerGridItem({
 	item,
@@ -113,13 +103,24 @@ export const GifPickerGridItem = observer(function GifPickerGridItem({
 		if (item.type === 'category') return item.previewUrl;
 		return null;
 	})();
+	const mediaContentType = (() => {
+		if (item.type === 'gif') return item.gif.contentType ?? '';
+		if (item.type === 'category') return item.previewContentType ?? '';
+		return '';
+	})();
 	const thumbnailPlaceholder = (() => {
 		if (item.type !== 'gif') return null;
 		if (item.gif.placeholder) return item.gif.placeholder;
 		const lookupUrl = item.gif.favoriteGifLookup?.url ?? item.gif.url;
 		return FavoriteGif.findByUrl(lookupUrl)?.placeholder ?? null;
 	})();
-	const usesVideoElement = !isSkeleton && mediaSourceUrl !== null && isVideoSourceUrl(mediaSourceUrl);
+	const usesVideoElement =
+		!isSkeleton &&
+		proxySrc !== null &&
+		proxySrc.length > 0 &&
+		resolvesToVideo(mediaContentType, proxySrc, mediaSourceUrl);
+	const videoThumbHashURL = decodeThumbHashDataURL(usesVideoElement ? thumbnailPlaceholder : null);
+	const hasThumbnailContent = (proxySrc !== null && proxySrc.length > 0) || thumbnailPlaceholder !== null;
 	const videoRef = usePooledVideo({
 		src: usesVideoElement ? proxySrc : null,
 		containerRef: videoContainerRef,
@@ -130,7 +131,6 @@ export const GifPickerGridItem = observer(function GifPickerGridItem({
 	const playOnHover = useCallback(
 		(event: React.PointerEvent<HTMLDivElement>) => {
 			if (event.pointerType !== 'mouse') return;
-			if (!getAnimatedMediaPlaybackAllowed()) return;
 			const v = videoRef.current;
 			if (!v) return;
 			void safePlay(v);
@@ -172,7 +172,7 @@ export const GifPickerGridItem = observer(function GifPickerGridItem({
 				return;
 			}
 			if (gif.favoriteGifLookup) {
-				ComponentDispatch.dispatch('GIF_SELECT', {
+				ComponentBus.dispatch('GIF_SELECT', {
 					gif,
 					autoSend: autoSendKlipyGifs && !shiftKey,
 				});
@@ -183,7 +183,7 @@ export const GifPickerGridItem = observer(function GifPickerGridItem({
 			if (!shareId) return;
 			GifCommands.registerShare(shareId, searchTerm);
 			const shareUrl = GifSlugUtils.resolveShareUrl(provider, {url: gif.url, slug: shareId});
-			ComponentDispatch.dispatch('GIF_SELECT', {
+			ComponentBus.dispatch('GIF_SELECT', {
 				gif: {
 					...gif,
 					id: shareId,
@@ -213,12 +213,13 @@ export const GifPickerGridItem = observer(function GifPickerGridItem({
 		},
 		[handleClick],
 	);
-	const hoverPlaybackHandlers = gifAutoPlay
-		? null
-		: {
-				onPointerEnter: playOnHover,
-				onPointerLeave: stopOnHoverEnd,
-			};
+	const hoverPlaybackHandlers =
+		gifAutoPlay || !usesVideoElement
+			? null
+			: {
+					onPointerEnter: playOnHover,
+					onPointerLeave: stopOnHoverEnd,
+				};
 	if (isSkeleton) {
 		return (
 			<div
@@ -382,17 +383,6 @@ export const GifPickerGridItem = observer(function GifPickerGridItem({
 	const handleFavoriteClick = (e: React.MouseEvent) => {
 		e.stopPropagation();
 		if (isFavoritePending) return;
-		if (!FavoriteGif.hasSeenFavoriteGifFirstTimePrompt && !isFavorited) {
-			push(
-				modal(() => (
-					<FavoriteGifFirstTimePromptModal
-						onConfirm={() => void performFavoriteToggle()}
-						data-flx="channel.pickers.gif.gif-picker-grid-item.handle-favorite-click.favorite-gif-first-time-prompt-modal"
-					/>
-				)),
-			);
-			return;
-		}
 		void performFavoriteToggle();
 	};
 	const favoriteTooltipText = (() => {
@@ -425,7 +415,7 @@ export const GifPickerGridItem = observer(function GifPickerGridItem({
 				{...(hoverPlaybackHandlers ?? {})}
 			>
 				<div
-					className={styles.gifMediaContainer}
+					className={clsx(styles.gifMediaContainer, styles.gifMediaContainerPlaceholder)}
 					data-flx="channel.pickers.gif.gif-picker-grid-item.gif-media-container--3"
 				>
 					{usesVideoElement ? (
@@ -433,15 +423,26 @@ export const GifPickerGridItem = observer(function GifPickerGridItem({
 							ref={videoContainerRef}
 							className={styles.gifVideoContainer}
 							data-flx="channel.pickers.gif.gif-picker-grid-item.gif-video-container--3"
-						/>
+						>
+							{videoThumbHashURL != null && (
+								<img
+									src={videoThumbHashURL}
+									alt=""
+									aria-hidden
+									data-flx="channel.pickers.gif.gif-picker-grid-item.img--2"
+								/>
+							)}
+						</div>
 					) : (
-						<PickerThumbnail
-							src={proxySrc ?? ''}
-							alt={gif.title || ''}
-							className={styles.gif}
-							placeholder={thumbnailPlaceholder}
-							data-flx="channel.pickers.gif.gif-picker-grid-item.gif--2"
-						/>
+						hasThumbnailContent && (
+							<PickerThumbnail
+								src={proxySrc ?? ''}
+								alt={gif.title || ''}
+								className={styles.gif}
+								placeholder={thumbnailPlaceholder}
+								data-flx="channel.pickers.gif.gif-picker-grid-item.gif--2"
+							/>
+						)
 					)}
 				</div>
 				<div
@@ -482,7 +483,7 @@ export const GifPickerGridItem = observer(function GifPickerGridItem({
 										/>
 									) : (
 										<StarIcon
-											size={18}
+											size={remFromPx(18)}
 											weight={isFavorited ? 'fill' : 'bold'}
 											className={isFavorited ? styles.favoriteButtonActiveIcon : styles.favoriteButtonIcon}
 											data-flx="channel.pickers.gif.gif-picker-grid-item.favorite-button"

@@ -1,10 +1,98 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {createHash} from 'node:crypto';
+import type {ApiContext} from '@app/api/ApiContext';
+import * as AuthSession from '@app/api/auth/AuthSession';
+import type {ChannelID, GuildID, UserID} from '@app/api/BrandedTypes';
+import {
+	createChannelID,
+	createGuildID,
+	createMessageID,
+	createUserID,
+	userIdToChannelId,
+	vanityCodeToInviteCode,
+} from '@app/api/BrandedTypes';
+import {Config} from '@app/api/Config';
+import {mapChannelToResponse} from '@app/api/channel/ChannelMappers';
+import type {IChannelRepository} from '@app/api/channel/IChannelRepository';
+import {buildBroadcastMessageData} from '@app/api/channel/services/message/MessageGatewayDispatch';
+import {ensurePersonalNotesChannelExists} from '@app/api/channel/services/PersonalNotesChannelRepair';
+import {mapFavoriteMemeToResponse} from '@app/api/favorite_meme/FavoriteMemeModel';
+import type {IFavoriteMemeRepository} from '@app/api/favorite_meme/IFavoriteMemeRepository';
+import {
+	mapGuildEmojiToResponse,
+	mapGuildMemberToResponse,
+	mapGuildRoleToResponse,
+	mapGuildStickerToResponse,
+	mapGuildToGuildResponse,
+} from '@app/api/guild/GuildModel';
+import type {IGuildRepositoryAggregate} from '@app/api/guild/repositories/IGuildRepositoryAggregate';
+import type {AvatarService} from '@app/api/infrastructure/AvatarService';
+import type {IDiscriminatorService} from '@app/api/infrastructure/DiscriminatorService';
+import type {IGatewayService} from '@app/api/infrastructure/IGatewayService';
+import type {ListParticipantsResult} from '@app/api/infrastructure/ILiveKitService';
+import type {IStorageService} from '@app/api/infrastructure/IStorageService';
+import type {PremiumStateReconciliationQueueService} from '@app/api/infrastructure/PremiumStateReconciliationQueueService';
+import type {UserCacheService} from '@app/api/infrastructure/UserCacheService';
+import type {InstanceConfigRepository} from '@app/api/instance/InstanceConfigRepository';
+import type {IInviteRepository} from '@app/api/invite/IInviteRepository';
+import {Logger} from '@app/api/Logger';
+import type {LimitConfigService} from '@app/api/limits/LimitConfigService';
+import {resolveLimitSafe} from '@app/api/limits/LimitConfigUtils';
+import {createLimitMatchContext} from '@app/api/limits/LimitMatchContextBuilder';
+import type {RequestCache} from '@app/api/middleware/RequestCacheMiddleware';
+import type {AuthSession as AuthSessionModel} from '@app/api/models/AuthSession';
+import type {Channel} from '@app/api/models/Channel';
+import type {FavoriteMeme} from '@app/api/models/FavoriteMeme';
+import type {Guild} from '@app/api/models/Guild';
+import type {GuildMember} from '@app/api/models/GuildMember';
+import type {GuildSticker} from '@app/api/models/GuildSticker';
+import type {ReadState} from '@app/api/models/ReadState';
+import type {Relationship} from '@app/api/models/Relationship';
+import type {User} from '@app/api/models/User';
+import type {UserGuildSettings} from '@app/api/models/UserGuildSettings';
+import {UserSettings} from '@app/api/models/UserSettings';
+import type {WebAuthnCredential} from '@app/api/models/WebAuthnCredential';
+import type {BotAuthService} from '@app/api/oauth/BotAuthService';
+import {sendApnsPush} from '@app/api/push/ApnsPushService';
+import {mapReadStateResponse} from '@app/api/read_state/ReadStateResponseMapper';
+import type {ReadStateService} from '@app/api/read_state/ReadStateService';
+import {RpcSessionStartService} from '@app/api/rpc/RpcSessionStartService';
+import {
+	createRpcTimingNode,
+	RpcTimingRecorder,
+	type RpcTimingSteps,
+	startRpcTiming,
+	timeRpcStep,
+	timeRpcStepSync,
+} from '@app/api/rpc/RpcTimings';
+import type {IUserRepository} from '@app/api/user/IUserRepository';
+import {PaymentRepository} from '@app/api/user/repositories/PaymentRepository';
+import {CustomStatusValidator} from '@app/api/user/services/CustomStatusValidator';
+import {getCachedUserPartialResponse} from '@app/api/user/UserCacheHelpers';
+import {
+	mapRelationshipToResponse,
+	mapUserGuildSettingsToResponse,
+	mapUserSettingsToResponse,
+	mapUserToPrivateResponse,
+} from '@app/api/user/UserMappers';
+import {isUserAdult} from '@app/api/utils/AgeUtils';
+import {deriveDominantAvatarColor} from '@app/api/utils/AvatarColorUtils';
+import {calculateDistance, parseCoordinate} from '@app/api/utils/GeoUtils';
+import {lookupGeoip} from '@app/api/utils/IpUtils';
+import type {VoiceAccessContext, VoiceAvailabilityService} from '@app/api/voice/VoiceAvailabilityService';
+import type {VoiceService} from '@app/api/voice/VoiceService';
+import type {IWebhookRepository} from '@app/api/webhook/IWebhookRepository';
+import type {WorkerTaskName} from '@app/api/worker/WorkerLaneConfig';
 import {AUTOMATIC_VOICE_REGION_ID, ChannelTypes, MessageTypes} from '@fluxer/constants/src/ChannelConstants';
 import type {LimitKey} from '@fluxer/constants/src/LimitConfigMetadata';
 import {MAX_PRIVATE_CHANNELS_PER_USER} from '@fluxer/constants/src/LimitConstants';
-import {GroupDmAddPermissionFlags, IncomingCallFlags, UserPremiumTypes} from '@fluxer/constants/src/UserConstants';
+import {
+	GroupDmAddPermissionFlags,
+	IncomingCallFlags,
+	UserFlags,
+	UserPremiumTypes,
+} from '@fluxer/constants/src/UserConstants';
 import {RateLimitError} from '@fluxer/errors/src/domains/core/RateLimitError';
 import {UnauthorizedError} from '@fluxer/errors/src/domains/core/UnauthorizedError';
 import {UnknownGuildError} from '@fluxer/errors/src/domains/guild/UnknownGuildError';
@@ -26,93 +114,6 @@ import type {IWorkerService} from '@pkgs/worker/src/contracts/IWorkerService';
 import {ms} from 'itty-time';
 import sharp from 'sharp';
 import {uint8ArrayToBase64} from 'uint8array-extras';
-import type {ApiContext} from '../ApiContext';
-import * as AuthSession from '../auth/AuthSession';
-import type {ChannelID, GuildID, UserID} from '../BrandedTypes';
-import {
-	createChannelID,
-	createGuildID,
-	createMessageID,
-	createUserID,
-	userIdToChannelId,
-	vanityCodeToInviteCode,
-} from '../BrandedTypes';
-import {Config} from '../Config';
-import {mapChannelToResponse} from '../channel/ChannelMappers';
-import type {IChannelRepository} from '../channel/IChannelRepository';
-import type {ChannelService} from '../channel/services/ChannelService';
-import {buildBroadcastMessageData} from '../channel/services/message/MessageGatewayDispatch';
-import {ensurePersonalNotesChannelExists} from '../channel/services/PersonalNotesChannelRepair';
-import {mapFavoriteMemeToResponse} from '../favorite_meme/FavoriteMemeModel';
-import type {IFavoriteMemeRepository} from '../favorite_meme/IFavoriteMemeRepository';
-import {
-	mapGuildEmojiToResponse,
-	mapGuildMemberToResponse,
-	mapGuildRoleToResponse,
-	mapGuildStickerToResponse,
-	mapGuildToGuildResponse,
-} from '../guild/GuildModel';
-import type {IGuildRepositoryAggregate} from '../guild/repositories/IGuildRepositoryAggregate';
-import type {AvatarService} from '../infrastructure/AvatarService';
-import type {IDiscriminatorService} from '../infrastructure/DiscriminatorService';
-import type {IGatewayService} from '../infrastructure/IGatewayService';
-import type {ListParticipantsResult} from '../infrastructure/ILiveKitService';
-import type {IStorageService} from '../infrastructure/IStorageService';
-import type {PremiumStateReconciliationQueueService} from '../infrastructure/PremiumStateReconciliationQueueService';
-import type {UserCacheService} from '../infrastructure/UserCacheService';
-import type {InstanceConfigRepository} from '../instance/InstanceConfigRepository';
-import type {IInviteRepository} from '../invite/IInviteRepository';
-import {Logger} from '../Logger';
-import type {LimitConfigService} from '../limits/LimitConfigService';
-import {resolveLimitSafe} from '../limits/LimitConfigUtils';
-import {createLimitMatchContext} from '../limits/LimitMatchContextBuilder';
-import type {RequestCache} from '../middleware/RequestCacheMiddleware';
-import type {AuthSession as AuthSessionModel} from '../models/AuthSession';
-import type {Channel} from '../models/Channel';
-import type {FavoriteMeme} from '../models/FavoriteMeme';
-import type {Guild} from '../models/Guild';
-import type {GuildMember} from '../models/GuildMember';
-import type {GuildSticker} from '../models/GuildSticker';
-import type {ReadState} from '../models/ReadState';
-import type {Relationship} from '../models/Relationship';
-import type {User} from '../models/User';
-import type {UserGuildSettings} from '../models/UserGuildSettings';
-import {UserSettings} from '../models/UserSettings';
-import type {WebAuthnCredential} from '../models/WebAuthnCredential';
-import type {BotAuthService} from '../oauth/BotAuthService';
-import {sendApnsPush} from '../push/ApnsPushService';
-import {encodeReadStatesResponseProto, mapReadStateResponse} from '../read_state/ReadStateResponseMapper';
-import type {ReadStateService} from '../read_state/ReadStateService';
-import {PneumaticPostRepository} from '../system/PneumaticPostRepository';
-import {PneumaticPostService} from '../system/PneumaticPostService';
-import type {IUserRepository} from '../user/IUserRepository';
-import {PaymentRepository} from '../user/repositories/PaymentRepository';
-import {CustomStatusValidator} from '../user/services/CustomStatusValidator';
-import type {UserChannelService} from '../user/services/UserChannelService';
-import {getCachedUserPartialResponse} from '../user/UserCacheHelpers';
-import {
-	mapRelationshipToResponse,
-	mapUserGuildSettingsToResponse,
-	mapUserSettingsToResponse,
-	mapUserToPrivateResponse,
-} from '../user/UserMappers';
-import {isUserAdult} from '../utils/AgeUtils';
-import {deriveDominantAvatarColor} from '../utils/AvatarColorUtils';
-import {calculateDistance, parseCoordinate} from '../utils/GeoUtils';
-import {lookupGeoip} from '../utils/IpUtils';
-import type {VoiceAccessContext, VoiceAvailabilityService} from '../voice/VoiceAvailabilityService';
-import type {VoiceService} from '../voice/VoiceService';
-import type {IWebhookRepository} from '../webhook/IWebhookRepository';
-import type {WorkerTaskName} from '../worker/WorkerLaneConfig';
-import {RpcSessionStartService} from './RpcSessionStartService';
-import {
-	createRpcTimingNode,
-	RpcTimingRecorder,
-	type RpcTimingSteps,
-	startRpcTiming,
-	timeRpcStep,
-	timeRpcStepSync,
-} from './RpcTimings';
 
 interface HandleRpcRequestParams {
 	request: RpcRequest;
@@ -247,8 +248,6 @@ export class RpcService {
 		private webhookRepository: IWebhookRepository,
 		private storageService: IStorageService,
 		private avatarService: AvatarService,
-		private channelService: ChannelService,
-		private userChannelService: UserChannelService,
 		private rateLimitService: IRateLimitService,
 		private readonly limitConfigService: LimitConfigService,
 		private readonly kvClient: IKVProvider,
@@ -270,13 +269,6 @@ export class RpcService {
 			gatewayService: this.gatewayService,
 			discriminatorService: this.discriminatorService,
 			paymentRepository: new PaymentRepository(),
-			pneumaticPostService: new PneumaticPostService({
-				repository: new PneumaticPostRepository(),
-				userRepository: this.userRepository,
-				userChannelService: this.userChannelService,
-				channelService: this.channelService,
-				userCacheService: this.userCacheService,
-			}),
 		});
 	}
 
@@ -315,7 +307,6 @@ export class RpcService {
 					name: sticker.name,
 					description: sticker.description,
 					animated,
-					nsfw: sticker.isNsfw,
 					tags: sticker.tags,
 					creator_id: sticker.creatorId,
 					version: sticker.version,
@@ -1177,9 +1168,6 @@ export class RpcService {
 			read_states: timeRpcStepSync(responseBuildSteps, 'map_read_states', () =>
 				userData.readStates.map(mapReadStateResponse),
 			),
-			read_state_proto: timeRpcStepSync(responseBuildSteps, 'encode_read_state_proto', () =>
-				encodeReadStatesResponseProto(userData.readStates),
-			),
 			guilds,
 			private_channels: privateChannels,
 			relationships,
@@ -1202,6 +1190,9 @@ export class RpcService {
 			version,
 		};
 		timings.record('build_session_response_payload', responseBuildStartedAtNs, responseBuildSteps);
+		if ((user.flags & UserFlags.STAFF) === 0n) {
+			return responsePayload;
+		}
 		return {
 			_timings: timings.finalize(),
 			...responsePayload,
@@ -1365,7 +1356,9 @@ export class RpcService {
 		afterUserId?: UserID;
 		limit?: number;
 	}): Promise<RpcResponseGuildCollectionData> {
-		await this.getGuildOrThrow(guildId);
+		if (!afterUserId) {
+			await this.getGuildOrThrow(guildId);
+		}
 		const chunkSize = this.resolveGuildCollectionLimit(limit);
 		const members = await this.guildRepository.listMembersPaginated(guildId, chunkSize + 1, afterUserId);
 		const hasMore = members.length > chunkSize;
@@ -1640,9 +1633,16 @@ export class RpcService {
 	}> {
 		const {userIds, guildId} = params;
 		const actualGuildId = guildId === createGuildID(0n) ? null : guildId;
-		const userGuildSettings = await Promise.all(
-			userIds.map((userId) => this.userRepository.findGuildSettings(userId, actualGuildId)),
+		const settled = await allSettledWithConcurrency(userIds, RPC_RESPONSE_MAP_CONCURRENCY, (userId) =>
+			this.userRepository.findGuildSettings(userId, actualGuildId),
 		);
+		const userGuildSettings: Array<UserGuildSettings | null> = [];
+		for (const result of settled) {
+			if (result.status === 'rejected') {
+				throw result.reason;
+			}
+			userGuildSettings.push(result.value);
+		}
 		return {user_guild_settings: userGuildSettings};
 	}
 
@@ -1874,15 +1874,15 @@ export class RpcService {
 
 	private async getUserBlockedIds(params: {userIds: Array<UserID>}): Promise<Record<string, Array<string>>> {
 		const {userIds} = params;
+		const settled = await allSettledWithConcurrency(userIds, RPC_RESPONSE_MAP_CONCURRENCY, (userId) =>
+			this.userRepository.listBlockedUserIds(userId),
+		);
 		const result: Record<string, Array<string>> = {};
-		const relationshipsPromises = userIds.map(async (userId) => {
-			const relationships = await this.userRepository.listRelationships(userId);
-			const blockedIds = relationships.filter((rel) => rel.type === 2).map((rel) => rel.targetUserId.toString());
-			return {userId, blockedIds};
-		});
-		const results = await Promise.all(relationshipsPromises);
-		for (const {userId, blockedIds} of results) {
-			result[userId.toString()] = blockedIds;
+		for (const [index, settledBlockedIds] of settled.entries()) {
+			if (settledBlockedIds.status === 'rejected') {
+				throw settledBlockedIds.reason;
+			}
+			result[userIds[index]!.toString()] = settledBlockedIds.value.map((blockedUserId) => blockedUserId.toString());
 		}
 		return result;
 	}

@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import {MessageNotifications} from '@fluxer/constants/src/NotificationConstants';
-import {describe, expect, it} from 'vitest';
-import type {ChannelUnreadStateInput} from './ChannelUnreadState';
+import type {ChannelUnreadStateInput} from '@app/features/app/components/layout/utils/ChannelUnreadState';
 import {
 	type ChannelUnreadStateValue,
 	createChannelUnreadSnapshot,
 	selectChannelUnreadState,
 	transitionChannelUnreadSnapshot,
-} from './ChannelUnreadStateMachine';
+} from '@app/features/app/components/layout/utils/ChannelUnreadStateMachine';
+import {MessageNotifications} from '@fluxer/constants/src/NotificationConstants';
+import {describe, expect, it} from 'vitest';
 
 function input(overrides: Partial<ChannelUnreadStateInput> = {}): ChannelUnreadStateInput {
 	return {
+		hasUnread: false,
 		unreadCount: 0,
 		mentionCount: 0,
 		isMuted: false,
@@ -38,6 +39,7 @@ describe('channelUnreadStateMachine', () => {
 		const snapshot = createChannelUnreadSnapshot(
 			input({
 				unreadBadgesLevel: MessageNotifications.NO_MESSAGES,
+				hasUnread: true,
 				unreadCount: 1,
 				mentionCount: 1,
 			}),
@@ -55,6 +57,7 @@ describe('channelUnreadStateMachine', () => {
 	it('transitions without preserving stale policy output', () => {
 		const legacySnapshot = createChannelUnreadSnapshot(
 			input({
+				hasUnread: true,
 				unreadCount: 2,
 				isMuted: true,
 				showFadedUnreadOnMutedChannels: false,
@@ -66,6 +69,7 @@ describe('channelUnreadStateMachine', () => {
 			type: 'channelUnread.updated',
 			input: input({
 				unreadBadgesLevel: MessageNotifications.ALL_MESSAGES,
+				hasUnread: true,
 				unreadCount: 2,
 				isMuted: true,
 			}),

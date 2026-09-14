@@ -1,17 +1,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import {describe, expect, it} from 'vitest';
-import type {VoiceEngineV2Event} from '../protocol/events';
-import type {VoiceEngineV2DiagnosticEntry} from '../protocol/types';
-import {transitionVoiceEngineV2} from './reducer';
-import {VOICE_ENGINE_V2_TERMINAL_OPERATIONS_KEPT_MAX} from './reducers/_helpers';
-import {selectVoiceEngineV2FailedSourceIds, selectVoiceEngineV2SourceLifecycle} from './selectors';
+import {transitionVoiceEngineV2} from '@fluxer/voice_engine_v2/src/core/reducer';
+import {VOICE_ENGINE_V2_TERMINAL_OPERATIONS_KEPT_MAX} from '@fluxer/voice_engine_v2/src/core/reducers/_helpers';
+import {
+	selectVoiceEngineV2FailedSourceIds,
+	selectVoiceEngineV2SourceLifecycle,
+} from '@fluxer/voice_engine_v2/src/core/selectors';
 import {
 	availableVoiceEngineV2Capabilities,
 	createVoiceEngineV2InitialSnapshot,
 	unavailableVoiceEngineV2Capabilities,
 	type VoiceEngineV2Snapshot,
-} from './state';
+} from '@fluxer/voice_engine_v2/src/core/state';
+import type {VoiceEngineV2Event} from '@fluxer/voice_engine_v2/src/protocol/events';
+import type {VoiceEngineV2DiagnosticEntry} from '@fluxer/voice_engine_v2/src/protocol/types';
+import {describe, expect, it} from 'vitest';
 
 function initialSnapshot(): VoiceEngineV2Snapshot {
 	return createVoiceEngineV2InitialSnapshot(availableVoiceEngineV2Capabilities());
@@ -119,94 +122,6 @@ describe('transitionVoiceEngineV2', () => {
 		expect(established.commands).toEqual([
 			{type: 'microphone.publish', operationId: 1, options: {deviceId: 'default'}},
 		]);
-	});
-
-	it('defers native microphone publish until the audio device module is ready', () => {
-		const queued = applyEvents(initialSnapshot(), [
-			{type: 'nativeAudioDeviceModule.statusChanged', status: 'warming'},
-			{type: 'microphone.publishRequested', options: {deviceId: 'default'}},
-		]);
-
-		const established = transitionVoiceEngineV2(queued, {
-			type: 'connection.externallyEstablished',
-			options: {url: 'wss://voice', token: ''},
-		});
-
-		expect(established.snapshot.connection.status).toBe('connected');
-		expect(established.snapshot.microphone.status).toBe('idle');
-		expect(established.snapshot.microphone.desired).toEqual({deviceId: 'default'});
-		expect(established.commands).toEqual([]);
-
-		const ready = transitionVoiceEngineV2(established.snapshot, {
-			type: 'nativeAudioDeviceModule.statusChanged',
-			status: 'ready',
-		});
-
-		expect(ready.snapshot.microphone.status).toBe('publishing');
-		expect(ready.commands).toEqual([{type: 'microphone.publish', operationId: 1, options: {deviceId: 'default'}}]);
-	});
-
-	it('fails deferred native microphone publish when the audio device module fails', () => {
-		const established = applyEvents(initialSnapshot(), [
-			{type: 'nativeAudioDeviceModule.statusChanged', status: 'warming'},
-			{type: 'microphone.publishRequested', options: {deviceId: 'default'}},
-			{type: 'connection.externallyEstablished', options: {url: 'wss://voice', token: ''}},
-		]);
-
-		const failed = transitionVoiceEngineV2(established, {
-			type: 'nativeAudioDeviceModule.statusChanged',
-			status: 'failed',
-			detail: 'ADM probe failed',
-		});
-
-		expect(failed.snapshot.microphone.status).toBe('failed');
-		expect(failed.snapshot.microphone.failure).toEqual({
-			code: 'deviceUnavailable',
-			capability: 'microphone',
-			message: 'ADM probe failed',
-		});
-		expect(failed.commands).toEqual([]);
-	});
-
-	it('does not republish an already published microphone on repeated ADM ready events', () => {
-		const established = applyEvents(initialSnapshot(), [
-			{type: 'nativeAudioDeviceModule.statusChanged', status: 'warming'},
-			{type: 'microphone.publishRequested', options: {deviceId: 'default'}},
-			{type: 'connection.externallyEstablished', options: {url: 'wss://voice', token: ''}},
-		]);
-		const ready = transitionVoiceEngineV2(established, {
-			type: 'nativeAudioDeviceModule.statusChanged',
-			status: 'ready',
-		});
-		const operationId = ready.commands[0]?.operationId ?? -1;
-		const published = transitionVoiceEngineV2(ready.snapshot, {
-			type: 'microphone.publishSucceeded',
-			operationId,
-		}).snapshot;
-
-		const repeated = transitionVoiceEngineV2(published, {
-			type: 'nativeAudioDeviceModule.statusChanged',
-			status: 'ready',
-		});
-
-		expect(repeated.snapshot.microphone.status).toBe('published');
-		expect(repeated.commands).toEqual([]);
-	});
-
-	it('does not let set-microphone-enabled implicitly publish while native ADM is warming', () => {
-		const established = applyEvents(initialSnapshot(), [
-			{type: 'nativeAudioDeviceModule.statusChanged', status: 'warming'},
-			{type: 'connection.externallyEstablished', options: {url: 'wss://voice', token: ''}},
-		]);
-
-		const enabled = transitionVoiceEngineV2(established, {
-			type: 'microphone.setEnabledRequested',
-			enabled: true,
-		});
-
-		expect(enabled.snapshot.microphone.enabled).toBe(true);
-		expect(enabled.snapshot.microphone.status).toBe('idle');
-		expect(enabled.commands).toEqual([]);
 	});
 
 	it('treats a repeated connection.externallyEstablished for the same endpoint as a no-op', () => {
@@ -933,6 +848,45 @@ describe('transitionVoiceEngineV2', () => {
 	it('selectors return null for unknown sources', () => {
 		const snapshot = initialSnapshot();
 		expect(selectVoiceEngineV2SourceLifecycle(snapshot, 'unknown')).toBeNull();
+	});
+
+	it('sourceLifecycle.removed drops the lifecycle slot for that source only', () => {
+		const snapshot = applyEvents(initialSnapshot(), [
+			{
+				type: 'sourceLifecycle.transitioned',
+				sourceId: 'source-removed',
+				kind: 'failed',
+				since: 11n,
+				attempts: 8,
+				fault: 'captureDeviceLost',
+				atMs: 11,
+			},
+			{
+				type: 'sourceLifecycle.transitioned',
+				sourceId: 'source-kept',
+				kind: 'active',
+				since: 12n,
+				attempts: 0,
+				fault: null,
+				atMs: 12,
+			},
+		]);
+
+		const transition = transitionVoiceEngineV2(snapshot, {type: 'sourceLifecycle.removed', sourceId: 'source-removed'});
+
+		expect(transition.commands).toEqual([]);
+		expect(selectVoiceEngineV2SourceLifecycle(transition.snapshot, 'source-removed')).toBeNull();
+		expect(selectVoiceEngineV2SourceLifecycle(transition.snapshot, 'source-kept')?.kind).toBe('active');
+		expect([...selectVoiceEngineV2FailedSourceIds(transition.snapshot)]).toEqual([]);
+	});
+
+	it('sourceLifecycle.removed for an unknown source leaves the snapshot untouched', () => {
+		const snapshot = initialSnapshot();
+
+		const transition = transitionVoiceEngineV2(snapshot, {type: 'sourceLifecycle.removed', sourceId: 'source-absent'});
+
+		expect(transition.commands).toEqual([]);
+		expect(transition.snapshot).toBe(snapshot);
 	});
 
 	it('selectVoiceEngineV2FailedSourceIds returns only failed lifecycle ids', () => {

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import type {GuildID, RoleID, UserID} from '@app/api/BrandedTypes';
+import type {IGuildRepositoryAggregate} from '@app/api/guild/repositories/IGuildRepositoryAggregate';
+import type {GuildMemberAuthService} from '@app/api/guild/services/member/GuildMemberAuthService';
+import type {GuildMemberValidationService} from '@app/api/guild/services/member/GuildMemberValidationService';
+import type {IGatewayService} from '@app/api/infrastructure/IGatewayService';
+import type {RequestCache} from '@app/api/middleware/RequestCacheMiddleware';
 import {UnknownGuildMemberError} from '@fluxer/errors/src/domains/guild/UnknownGuildMemberError';
-import type {GuildID, RoleID, UserID} from '../../../BrandedTypes';
-import type {IGatewayService} from '../../../infrastructure/IGatewayService';
-import type {RequestCache} from '../../../middleware/RequestCacheMiddleware';
-import type {IGuildRepositoryAggregate} from '../../repositories/IGuildRepositoryAggregate';
-import type {GuildMemberAuthService} from './GuildMemberAuthService';
-import type {GuildMemberValidationService} from './GuildMemberValidationService';
 
 export class GuildMemberRoleService {
 	constructor(
@@ -42,7 +42,7 @@ export class GuildMemberRoleService {
 		requestCache: RequestCache;
 	}): Promise<void> {
 		const {userId, targetId, guildId, roleId} = params;
-		const {guildData, canManageRoles} = await this.authService.getGuildAuthenticated({userId, guildId});
+		const {guildData, hasPermission, canManageRoles} = await this.authService.getGuildAuthenticated({userId, guildId});
 		const targetMember = await this.guildRepository.getMember(guildId, targetId);
 		if (!targetMember) throw new UnknownGuildMemberError();
 		await this.validationService.validateRoleAssignment({
@@ -51,6 +51,7 @@ export class GuildMemberRoleService {
 			userId,
 			targetId,
 			roleId,
+			hasPermission,
 			canManageRoles,
 		});
 		if (targetMember.roleIds.has(roleId)) return;
@@ -75,7 +76,7 @@ export class GuildMemberRoleService {
 		requestCache: RequestCache;
 	}): Promise<void> {
 		const {userId, targetId, guildId, roleId} = params;
-		const {guildData, canManageRoles} = await this.authService.getGuildAuthenticated({userId, guildId});
+		const {guildData, hasPermission, canManageRoles} = await this.authService.getGuildAuthenticated({userId, guildId});
 		const targetMember = await this.guildRepository.getMember(guildId, targetId);
 		if (!targetMember) throw new UnknownGuildMemberError();
 		await this.validationService.validateRoleAssignment({
@@ -84,6 +85,7 @@ export class GuildMemberRoleService {
 			userId,
 			targetId,
 			roleId,
+			hasPermission,
 			canManageRoles,
 		});
 		if (!targetMember.roleIds.has(roleId)) return;

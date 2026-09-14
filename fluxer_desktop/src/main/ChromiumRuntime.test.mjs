@@ -19,14 +19,6 @@ const transformedSource = esbuild.transformSync(source, {
 	target: 'node20',
 }).code;
 
-const WGC_DISABLED_FEATURES = [
-	'AllowWgcScreenCapturer',
-	'AllowWgcWindowCapturer',
-	'AllowWgcScreenZeroHz',
-	'AllowWgcWindowZeroHz',
-	'WebRtcWgcRequireBorder',
-];
-
 function loadChromiumRuntime(platform = 'win32') {
 	const appendedSwitches = [];
 	const app = {
@@ -66,24 +58,35 @@ function loadChromiumRuntime(platform = 'win32') {
 }
 
 describe('ChromiumRuntime Windows capture policy', () => {
-	test('adds all known WebRTC WGC capturer features to the Windows disable set', () => {
+	test('leaves the choice of Windows graphics capture to Chromium', () => {
 		const {module} = loadChromiumRuntime('win32');
-		const features = new Set(['ExistingFeature']);
+		const features = new Set(module.BASE_DISABLED_CHROMIUM_FEATURES);
 
-		module.addWindowsWebRtcWgcDisabledFeatures(features);
-
-		for (const feature of WGC_DISABLED_FEATURES) {
-			assert.equal(features.has(feature), true);
+		for (const [name, value] of Object.entries(module)) {
+			if (typeof value === 'function' && name.startsWith('addWindows') && name.endsWith('Features')) {
+				value(features);
+			}
 		}
-		assert.equal(features.has('ExistingFeature'), true);
+
+		assert.deepEqual(
+			[...features].filter((feature) => feature.includes('Wgc')),
+			[],
+		);
 	});
+});
 
-	test('does not add WGC feature switches on non-Windows platforms', () => {
-		const {module} = loadChromiumRuntime('linux');
-		const features = new Set(['ExistingFeature']);
+describe('ChromiumRuntime configured switch allowlist', () => {
+	test('rejects settings-supplied switches that would disable or shrink the HTTP cache', () => {
+		const {appendedSwitches, module} = loadChromiumRuntime('win32');
 
-		module.addWindowsWebRtcWgcDisabledFeatures(features);
+		module.appendConfiguredChromiumSwitches([
+			'disable-http-cache',
+			'disk-cache-size',
+			'disk-cache-dir',
+			'disable-gpu-shader-disk-cache',
+			'disable_metal',
+		]);
 
-		assert.deepEqual([...features], ['ExistingFeature']);
+		assert.deepEqual(appendedSwitches, [{name: 'disable_metal', value: undefined}]);
 	});
 });

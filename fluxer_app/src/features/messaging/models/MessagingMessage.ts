@@ -156,7 +156,6 @@ export class Message {
 	readonly embeds: ReadonlyArray<MessageEmbed>;
 	readonly attachments: ReadonlyArray<MessageAttachment>;
 	readonly stickerItems: ReadonlyArray<MessageStickerItem>;
-	readonly nsfwEmojis: ReadonlySet<string>;
 	readonly messageReference?: MessageReference;
 	readonly referencedMessage?: Message | null;
 	readonly messageSnapshots?: ReadonlyArray<MessageSnapshot>;
@@ -216,7 +215,6 @@ export class Message {
 		);
 		this.attachments = Object.freeze(message.attachments ?? []);
 		this.stickerItems = Object.freeze(message.stickers ?? []);
-		this.nsfwEmojis = Object.freeze(new Set(message.nsfw_emojis ?? []));
 		if (!options?.skipReactionHydration) {
 			if ('reactions' in message) {
 				MessageReactions.hydrateMessageReactions(this.id, message.reactions);
@@ -553,12 +551,12 @@ export class Message {
 export const messageMentionsCurrentUser = (message: WireMessage): boolean => {
 	const channel = Channels.getChannel(message.channel_id);
 	if (!channel) return false;
-	if (message.mention_everyone && !UserGuildSettings.isSuppressEveryoneEnabled(channel.guildId ?? null)) return true;
+	if (message.mention_everyone && !UserGuildSettings.isEveryoneMentionSuppressed(channel.guildId ?? null)) return true;
 	if (message.mentions?.some((user) => user.id === Authentication.currentUserId)) {
 		return true;
 	}
 	if (!channel.guildId) return false;
-	if (UserGuildSettings.isSuppressRolesEnabled(channel.guildId)) return false;
+	if (UserGuildSettings.isRoleMentionSuppressed(channel.guildId)) return false;
 	const guild = Guilds.getGuild(channel.guildId);
 	if (!guild) return false;
 	const guildMember = GuildMembers.getMember(guild.id, Authentication.currentUserId);

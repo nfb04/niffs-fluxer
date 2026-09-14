@@ -3,7 +3,23 @@
 import * as AccessibilityCommands from '@app/features/accessibility/commands/AccessibilityCommands';
 import Accessibility from '@app/features/accessibility/state/Accessibility';
 import {ShareThemeModal} from '@app/features/theme/components/modals/ShareThemeModal';
+import {remFromPx} from '@app/features/theme/layout/RemFromPx';
 import ThemeLibrary from '@app/features/theme/state/ThemeLibrary';
+import {
+	DEFAULT_EXPANDED_GROUP_IDS,
+	getTokenGroupLabelDescriptor,
+	getTokenVariableDefinition,
+	humanizeVariableName,
+	TOKEN_GROUPS,
+} from '@app/features/theme_studio/sections/TokenGroups';
+import styles from '@app/features/theme_studio/sections/TokensSection.module.css';
+import {broadcastThemeStudioMessage} from '@app/features/theme_studio/state/ThemeStudioBroadcast';
+import ThemeStudioState from '@app/features/theme_studio/state/ThemeStudioState';
+import {StudioButton} from '@app/features/theme_studio/ui/StudioButton';
+import {StudioEmptyState} from '@app/features/theme_studio/ui/StudioEmptyState';
+import {StudioSearchInput} from '@app/features/theme_studio/ui/StudioSearchInput';
+import {StudioSection} from '@app/features/theme_studio/ui/StudioSection';
+import {StudioTokenColor, StudioTokenFont, StudioTokenValue} from '@app/features/theme_studio/ui/StudioToken';
 import {showThemeStudioErrorModal} from '@app/features/theme_studio/utils/ThemeStudioErrorModalUtils';
 import * as ModalCommands from '@app/features/ui/commands/ModalCommands';
 import {modal} from '@app/features/ui/commands/ModalCommands';
@@ -18,20 +34,6 @@ import {ArrowCounterClockwiseIcon, ShareNetworkIcon} from '@phosphor-icons/react
 import {observer} from 'mobx-react-lite';
 import type React from 'react';
 import {useEffect, useMemo} from 'react';
-import {broadcastThemeStudioMessage} from '../state/ThemeStudioBroadcast';
-import ThemeStudioState from '../state/ThemeStudioState';
-import {StudioButton} from '../ui/StudioButton';
-import {StudioEmptyState} from '../ui/StudioEmptyState';
-import {StudioSearchInput} from '../ui/StudioSearchInput';
-import {StudioSection} from '../ui/StudioSection';
-import {StudioTokenColor, StudioTokenFont, StudioTokenValue} from '../ui/StudioToken';
-import {
-	DEFAULT_EXPANDED_GROUP_IDS,
-	getTokenVariableDefinition,
-	humanizeVariableName,
-	TOKEN_GROUPS,
-} from './TokenGroups';
-import styles from './TokensSection.module.css';
 
 const TOKEN_OVERRIDES_CLEARED_DESCRIPTOR = msg({
 	message: 'Token overrides cleared.',
@@ -138,7 +140,7 @@ export const TokensSection: React.FC<TokensSectionProps> = observer(({defaultVar
 						compact
 						leadingIcon={
 							<ArrowCounterClockwiseIcon
-								size={13}
+								size={remFromPx(13)}
 								weight="bold"
 								data-flx="theme-studio.tokens-section.arrow-counter-clockwise-icon"
 							/>
@@ -153,7 +155,11 @@ export const TokensSection: React.FC<TokensSectionProps> = observer(({defaultVar
 						variant="primary"
 						compact
 						leadingIcon={
-							<ShareNetworkIcon size={13} weight="bold" data-flx="theme-studio.tokens-section.share-network-icon" />
+							<ShareNetworkIcon
+								size={remFromPx(13)}
+								weight="bold"
+								data-flx="theme-studio.tokens-section.share-network-icon"
+							/>
 						}
 						onClick={handleShare}
 						data-flx="theme-studio.tokens-section.studio-button.share"
@@ -205,10 +211,11 @@ export const TokensSection: React.FC<TokensSectionProps> = observer(({defaultVar
 				) : (
 					groups.map(({group, vars}) => {
 						const isOpen = searchQuery.length > 0 || ThemeStudioState.isGroupExpanded(group.id);
+						const groupLabelDescriptor = getTokenGroupLabelDescriptor(group.id);
 						return (
 							<StudioSection
 								key={group.id}
-								title={group.fallbackLabel}
+								title={groupLabelDescriptor == null ? group.fallbackLabel : i18n._(groupLabelDescriptor)}
 								count={vars.length}
 								open={isOpen}
 								onToggle={(next) => {

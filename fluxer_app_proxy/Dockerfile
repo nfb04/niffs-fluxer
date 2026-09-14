@@ -5,6 +5,8 @@ ARG PUBLIC_ASSET_BASE_URL=""
 ARG PUBLIC_SELF_HOSTED_DESKTOP_DOWNLOAD_URL=""
 ARG FLUXER_APP_PROXY_TIME_FREEZE_ENABLED="true"
 ARG BUNDLE_LOCAL_ASSETS="true"
+ARG APP_ASSETS_REF=app-assets
+ARG APP_ASSETS_PLATFORM=$BUILDPLATFORM
 
 # ---------- Stage 1: Build the SPA (fluxer_app) ----------
 FROM node:24-bookworm-slim AS app-build
@@ -82,12 +84,19 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 	--mount=type=cache,target=/usr/local/cargo/git \
 	cd fluxer_app && pnpm build
 
-# Extract the full SPA asset tree for local serving by the app proxy.
+# ---------- Stage 2: The one canonical asset tree every architecture serves ----------
+# Stage for CI to extract the full dist (docker bake app-dist target)
+FROM alpine:3.21 AS app-dist
+COPY --from=app-build /usr/src/app/fluxer_app/dist /dist
+
 FROM alpine:3.21 AS app-assets
 ARG BUNDLE_LOCAL_ASSETS=true
 ARG PUBLIC_ASSET_BASE_URL=""
-COPY --from=app-build /usr/src/app/fluxer_app/dist /assets
-RUN if [ "${BUNDLE_LOCAL_ASSETS}" != "true" ]; then \
+COPY fluxer_app_proxy/scripts/precompress_assets.sh /usr/local/bin/precompress_assets.sh
+RUN apk add --no-cache brotli
+RUN --mount=type=bind,from=app-dist,source=/dist,target=/dist \
+	cp -a /dist /assets \
+	&& if [ "${BUNDLE_LOCAL_ASSETS}" != "true" ]; then \
 		case "${PUBLIC_ASSET_BASE_URL}" in \
 		http://* | https://*) ;; \
 		*) \
@@ -97,13 +106,12 @@ RUN if [ "${BUNDLE_LOCAL_ASSETS}" != "true" ]; then \
 			;; \
 		esac; \
 		find /assets/assets -type f ! -name 'fonts-*.txt' -delete; \
-	fi
+	fi \
+	&& /usr/local/bin/precompress_assets.sh /assets
 
-# Stage for CI to extract the full dist (docker bake app-dist target)
-FROM alpine:3.21 AS app-dist
-COPY --from=app-build /usr/src/app/fluxer_app/dist /dist
+FROM --platform=${APP_ASSETS_PLATFORM} ${APP_ASSETS_REF} AS app-static
 
-# ---------- Stage 2: Build the Rust proxy binary ----------
+# ---------- Stage 3: Build the Rust proxy binary ----------
 FROM rust:1-bookworm AS rust-builder
 
 ARG FLUXER_APP_PROXY_TIME_FREEZE_ENABLED="true"
@@ -113,20 +121,24 @@ WORKDIR /usr/src/app
 COPY Cargo.lock ./
 COPY fluxer_common/ fluxer_common/
 COPY fluxer_app_proxy/ fluxer_app_proxy/
-COPY fluxer_svc/ fluxer_svc/
+COPY packages/constants/src/AgeGeos.json packages/constants/src/AgeGeos.json
 
 RUN printf '%s\n' \
 	'[workspace]' \
 	'members = [' \
 	'    "fluxer_app_proxy",' \
 	'    "fluxer_common",' \
-	'    "fluxer_svc",' \
 	']' \
 	'resolver = "2"' \
 	'' \
 	'[workspace.package]' \
 	'edition = "2024"' \
 	'license = "AGPL-3.0-or-later"' \
+	'' \
+	'[profile.release]' \
+	'lto = "fat"' \
+	'codegen-units = 1' \
+	'strip = "symbols"' \
 	> Cargo.toml
 
 RUN if [ "${FLUXER_APP_PROXY_TIME_FREEZE_ENABLED}" = "false" ]; then \
@@ -136,29 +148,45 @@ RUN if [ "${FLUXER_APP_PROXY_TIME_FREEZE_ENABLED}" = "false" ]; then \
 	fi \
 	&& cp target/release/fluxer_app_proxy /usr/local/bin/fluxer-app-proxy
 
-# ---------- Stage 3: Runtime ----------
+# ---------- Stage 4: Runtime ----------
 FROM debian:bookworm-slim
 
 ARG BUILD_VERSION=""
+ARG SOURCE_SHA=""
+ARG SOURCE_DATE=""
+
+LABEL org.opencontainers.image.title="fluxer-app-proxy"
+LABEL org.opencontainers.image.description="Fluxer web app and edge proxy"
+LABEL org.opencontainers.image.licenses="AGPL-3.0-or-later"
+LABEL org.opencontainers.image.vendor="Fluxer"
+LABEL org.opencontainers.image.url="https://fluxer.app"
+LABEL org.opencontainers.image.documentation="https://docs.fluxer.app"
+LABEL org.opencontainers.image.source="https://github.com/fluxerapp/fluxer"
+LABEL org.opencontainers.image.version="${BUILD_VERSION}"
+LABEL org.opencontainers.image.revision="${SOURCE_SHA}"
+LABEL org.opencontainers.image.created="${SOURCE_DATE}"
+LABEL app.fluxer.build-version="${BUILD_VERSION}"
 
 WORKDIR /srv/app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-	ca-certificates curl \
+	ca-certificates curl libjemalloc2 \
 	&& rm -rf /var/lib/apt/lists/*
 
 COPY --from=rust-builder /usr/local/bin/fluxer-app-proxy /usr/local/bin/fluxer-app-proxy
-COPY --from=app-assets /assets ./static/
+COPY --from=app-static /assets ./static/
 
 ENV BUILD_VERSION="${BUILD_VERSION}"
 ENV FLUXER_APP_PROXY_HOST="0.0.0.0"
 ENV FLUXER_APP_PROXY_PORT="8080"
+ENV LD_PRELOAD=libjemalloc.so.2
+ENV MALLOC_CONF="background_thread:true,metadata_thp:auto,dirty_decay_ms:5000,muzzy_decay_ms:5000"
 
 USER 65532:65532
 
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-	CMD curl -f http://localhost:8080/_health || exit 1
+	CMD curl -f http://127.0.0.1:${FLUXER_APP_PROXY_PORT:-8080}/_ready || exit 1
 
 CMD ["/usr/local/bin/fluxer-app-proxy"]

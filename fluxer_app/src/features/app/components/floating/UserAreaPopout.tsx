@@ -18,13 +18,13 @@ import {COPY_USERNAME_DESCRIPTOR, UNKNOWN_DESCRIPTOR} from '@app/features/i18n/u
 import type {Account} from '@app/features/platform/state/AuthSession';
 import {formatClientBuildInfo, getClientInfo, getClientInfoSync} from '@app/features/platform/utils/ClientInfo';
 import Presence from '@app/features/presence/state/Presence';
+import {remFromPx} from '@app/features/theme/layout/RemFromPx';
 import {getUserAccentColor} from '@app/features/theme/utils/AccentColorUtils';
 import {Button} from '@app/features/ui/button/Button';
 import * as ModalCommands from '@app/features/ui/commands/ModalCommands';
 import {modal} from '@app/features/ui/commands/ModalCommands';
 import * as PopoutCommands from '@app/features/ui/commands/PopoutCommands';
 import * as TextCopyCommands from '@app/features/ui/commands/TextCopyCommands';
-import * as ToastCommands from '@app/features/ui/commands/ToastCommands';
 import {MockAvatar} from '@app/features/ui/components/MockAvatar';
 import {StatusIndicator} from '@app/features/ui/components/StatusIndicator';
 import FocusRing from '@app/features/ui/focus_ring/FocusRing';
@@ -51,9 +51,8 @@ import Users from '@app/features/user/state/Users';
 import * as NicknameUtils from '@app/features/user/utils/NicknameUtils';
 import * as ProfileDisplayUtils from '@app/features/user/utils/ProfileDisplayUtils';
 import {createMockProfile} from '@app/features/user/utils/ProfileUtils';
-import {COPIED_STATS_JSON_DESCRIPTOR} from '@app/features/voice/components/StatsForNerdsCopyDescriptors';
+import {copyVoiceDiagnostics} from '@app/features/voice/commands/VoiceDiagnosticsCommands';
 import MediaEngine from '@app/features/voice/engine/MediaEngineFacade';
-import {buildStatsForNerdsCopyPayload, collectStatsForNerdsSnapshot} from '@app/features/voice/utils/StatsForNerdsCopy';
 import {MEDIA_PROXY_PROFILE_BANNER_SIZE_POPOUT} from '@fluxer/constants/src/MediaProxyAssetSizes';
 import {StatusTypes} from '@fluxer/constants/src/StatusConstants';
 import type {MessageDescriptor} from '@lingui/core';
@@ -300,7 +299,10 @@ const SwitchAccountsMenu = observer(
 						const isCurrent = account.userId === currentAccountId;
 						const avatarUrl = getAccountAvatarUrl(account);
 						const displayName = getAccountDisplayName(account, '???');
-						const discriminator = account.userData?.discriminator ?? '0000';
+						const userData = account.userData;
+						const accountTag = userData
+							? NicknameUtils.formatTagForStreamerMode(`${userData.username}#${userData.discriminator}`)
+							: displayName;
 						return (
 							<FocusRing
 								key={account.userId}
@@ -343,7 +345,7 @@ const SwitchAccountsMenu = observer(
 												className={styles.accountMenuDiscriminator}
 												data-flx="app.floating.user-area-popout.switch-accounts-menu.account-menu-discriminator"
 											>
-												#{discriminator}
+												{accountTag}
 											</span>
 										</span>
 										{isCurrent && (
@@ -458,12 +460,7 @@ export const UserAreaPopout = observer(() => {
 			});
 	}, [i18n]);
 	const handleCopyStats = useCallback(() => {
-		const data = collectStatsForNerdsSnapshot();
-		void buildStatsForNerdsCopyPayload(data).then((payload) => {
-			void navigator.clipboard.writeText(JSON.stringify(payload, null, 2)).then(() => {
-				ToastCommands.createToast({type: 'success', children: i18n._(COPIED_STATS_JSON_DESCRIPTOR)});
-			});
-		});
+		void copyVoiceDiagnostics(i18n);
 	}, [i18n]);
 	const handleCopyUserTag = useCallback(() => {
 		if (!currentUser) {
@@ -514,7 +511,7 @@ export const UserAreaPopout = observer(() => {
 	const accentColor = getUserAccentColor(currentUser, profileData?.accent_color);
 	const borderColor = accentColor;
 	const bannerColor = accentColor;
-	const displayName = currentUser ? NicknameUtils.getNickname(currentUser) : '';
+	const displayName = currentUser ? NicknameUtils.getNickname(currentUser, null) : '';
 	const customStatus = currentUserId ? Presence.getCustomStatus(currentUserId) : null;
 	const hasCustomStatus = Boolean(normalizeCustomStatus(customStatus));
 	const popoutContainerRef = useRef<HTMLDivElement | null>(null);
@@ -564,7 +561,7 @@ export const UserAreaPopout = observer(() => {
 											aria-label={i18n._(COPY_USERNAME_DESCRIPTOR)}
 											data-flx="app.floating.user-area-popout.copy-username-button.copy-user-tag"
 										>
-											<CopyIcon size={14} weight="fill" data-flx="app.floating.user-area-popout.copy-icon" />
+											<CopyIcon size={remFromPx(14)} weight="fill" data-flx="app.floating.user-area-popout.copy-icon" />
 										</button>
 									</FocusRing>
 								</Tooltip>
@@ -592,7 +589,7 @@ export const UserAreaPopout = observer(() => {
 										data-flx="app.floating.user-area-popout.custom-status-placeholder.open-custom-status.button"
 									>
 										<SmileyIcon
-											size={14}
+											size={remFromPx(14)}
 											weight="regular"
 											className={styles.customStatusPlaceholderIcon}
 											data-flx="app.floating.user-area-popout.custom-status-placeholder-icon"
@@ -672,7 +669,7 @@ export const UserAreaPopout = observer(() => {
 									<ActionButton
 										icon={
 											<UsersThreeIcon
-												size={16}
+												size={remFromPx(16)}
 												weight="bold"
 												data-flx="app.floating.user-area-popout.users-three-icon"
 											/>
@@ -687,7 +684,7 @@ export const UserAreaPopout = observer(() => {
 								<ActionButton
 									icon={
 										<IdentificationBadgeIcon
-											size={16}
+											size={remFromPx(16)}
 											weight="bold"
 											data-flx="app.floating.user-area-popout.identification-badge-icon"
 										/>
@@ -700,7 +697,13 @@ export const UserAreaPopout = observer(() => {
 									<>
 										<div className={styles.actionDivider} data-flx="app.floating.user-area-popout.action-divider--3" />
 										<ActionButton
-											icon={<InfoIcon size={16} weight="bold" data-flx="app.floating.user-area-popout.info-icon" />}
+											icon={
+												<InfoIcon
+													size={remFromPx(16)}
+													weight="bold"
+													data-flx="app.floating.user-area-popout.info-icon"
+												/>
+											}
 											label={<Trans>Copy build info</Trans>}
 											onClick={handleCopyBuildInfo}
 											data-flx="app.floating.user-area-popout.action-button.copy-build-info"
@@ -709,7 +712,7 @@ export const UserAreaPopout = observer(() => {
 										<ActionButton
 											icon={
 												<ChartLineIcon
-													size={16}
+													size={remFromPx(16)}
 													weight="bold"
 													data-flx="app.floating.user-area-popout.chart-line-icon"
 												/>
@@ -726,7 +729,13 @@ export const UserAreaPopout = observer(() => {
 								<Button
 									variant="primary"
 									fitContainer
-									leftIcon={<PencilIcon size={16} weight="bold" data-flx="app.floating.user-area-popout.pencil-icon" />}
+									leftIcon={
+										<PencilIcon
+											size={remFromPx(16)}
+											weight="bold"
+											data-flx="app.floating.user-area-popout.pencil-icon"
+										/>
+									}
 									onClick={openEditProfile}
 									className={styles.editProfileButton}
 									data-flx="app.floating.user-area-popout.edit-profile-button.open-edit-profile"

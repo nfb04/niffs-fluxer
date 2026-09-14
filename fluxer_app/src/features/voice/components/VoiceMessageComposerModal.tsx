@@ -3,7 +3,9 @@
 import {showGenericErrorModal} from '@app/features/app/components/alerts/GenericErrorModalCommands';
 import * as Modal from '@app/features/app/components/dialogs/Modal';
 import {SOMETHING_WENT_WRONG_DESCRIPTOR} from '@app/features/i18n/utils/CommonMessageDescriptors';
+import {getCachedNumberFormat} from '@app/features/i18n/utils/IntlCache';
 import {Logger} from '@app/features/platform/utils/AppLogger';
+import {remFromPx} from '@app/features/theme/layout/RemFromPx';
 import {Button} from '@app/features/ui/button/Button';
 import * as ModalCommands from '@app/features/ui/commands/ModalCommands';
 import {AudioWaveform, computePeaks} from '@app/features/voice/components/AudioWaveform';
@@ -109,11 +111,6 @@ function pickRecorderMime(): string | undefined {
 		if (MediaRecorder.isTypeSupported(candidate)) return candidate;
 	}
 	return undefined;
-}
-
-function formatSeconds(value: number): string {
-	const safe = Math.max(0, value);
-	return `${safe.toFixed(2)}s`;
 }
 
 function formatElapsedMs(value: number): string {
@@ -425,6 +422,18 @@ export const VoiceMessageComposerModal: React.FC<VoiceMessageComposerModalProps>
 	const selectionDuration = Math.max(0, endSeconds - startSeconds);
 	const totalDuration = audioBuffer?.duration ?? 0;
 
+	const formatSeconds = useCallback(
+		(value: number) =>
+			getCachedNumberFormat(i18n.locale, {
+				style: 'unit',
+				unit: 'second',
+				unitDisplay: 'narrow',
+				minimumFractionDigits: 2,
+				maximumFractionDigits: 2,
+			}).format(Math.max(0, value)),
+		[i18n.locale],
+	);
+
 	const handleSelectionChange = useCallback(
 		(next: {startSeconds: number; endSeconds: number}) => {
 			stopPlayback();
@@ -480,7 +489,11 @@ export const VoiceMessageComposerModal: React.FC<VoiceMessageComposerModalProps>
 	const send = useCallback(() => {
 		if (!audioBuffer || !recordedBlob || sentRef.current) return;
 		if (selectionDuration < MIN_DURATION_SECONDS) {
-			setErrorMessage(i18n._(TOO_SHORT_DESCRIPTOR, {seconds: MIN_DURATION_SECONDS.toFixed(1)}));
+			setErrorMessage(
+				i18n._(TOO_SHORT_DESCRIPTOR, {
+					seconds: getCachedNumberFormat(i18n.locale, {maximumFractionDigits: 1}).format(MIN_DURATION_SECONDS),
+				}),
+			);
 			return;
 		}
 		sentRef.current = true;
@@ -579,11 +592,21 @@ export const VoiceMessageComposerModal: React.FC<VoiceMessageComposerModalProps>
 								>
 									<span className={styles.buttonInner} data-flx="voice.voice-message-composer-modal.button-inner">
 										{isPlaying ? (
-											<PauseIcon size={14} weight="fill" data-flx="voice.voice-message-composer-modal.pause-icon" />
+											<PauseIcon
+												size={remFromPx(14)}
+												weight="fill"
+												data-flx="voice.voice-message-composer-modal.pause-icon"
+											/>
 										) : (
-											<PlayIcon size={14} weight="fill" data-flx="voice.voice-message-composer-modal.play-icon" />
+											<PlayIcon
+												size={remFromPx(14)}
+												weight="fill"
+												data-flx="voice.voice-message-composer-modal.play-icon"
+											/>
 										)}
-										{isPlaying ? i18n._(PAUSE_DESCRIPTOR) : i18n._(PLAY_DESCRIPTOR)}
+										<flx-i18n data-flx="voice.voice-message-composer-modal.flx-i18n">
+											{isPlaying ? i18n._(PAUSE_DESCRIPTOR) : i18n._(PLAY_DESCRIPTOR)}
+										</flx-i18n>
 									</span>
 								</Button>
 								<Button
@@ -594,7 +617,7 @@ export const VoiceMessageComposerModal: React.FC<VoiceMessageComposerModalProps>
 								>
 									<span className={styles.buttonInner} data-flx="voice.voice-message-composer-modal.button-inner--2">
 										<ArrowCounterClockwiseIcon
-											size={14}
+											size={remFromPx(14)}
 											weight="bold"
 											data-flx="voice.voice-message-composer-modal.arrow-counter-clockwise-icon"
 										/>
@@ -622,7 +645,7 @@ export const VoiceMessageComposerModal: React.FC<VoiceMessageComposerModalProps>
 						data-flx="voice.voice-message-composer-modal.stop-button"
 					>
 						<span className={styles.buttonInner} data-flx="voice.voice-message-composer-modal.button-inner--3">
-							<StopIcon size={14} weight="fill" data-flx="voice.voice-message-composer-modal.stop-icon" />
+							<StopIcon size={remFromPx(14)} weight="fill" data-flx="voice.voice-message-composer-modal.stop-icon" />
 							{i18n._(STOP_BUTTON_DESCRIPTOR)}
 						</span>
 					</Button>
@@ -635,7 +658,7 @@ export const VoiceMessageComposerModal: React.FC<VoiceMessageComposerModalProps>
 					>
 						<span className={styles.buttonInner} data-flx="voice.voice-message-composer-modal.button-inner--4">
 							<PaperPlaneRightIcon
-								size={14}
+								size={remFromPx(14)}
 								weight="fill"
 								data-flx="voice.voice-message-composer-modal.paper-plane-right-icon"
 							/>
@@ -649,7 +672,11 @@ export const VoiceMessageComposerModal: React.FC<VoiceMessageComposerModalProps>
 						data-flx="voice.voice-message-composer-modal.retry-button"
 					>
 						<span className={styles.buttonInner} data-flx="voice.voice-message-composer-modal.button-inner--5">
-							<MicrophoneIcon size={14} weight="fill" data-flx="voice.voice-message-composer-modal.microphone-icon" />
+							<MicrophoneIcon
+								size={remFromPx(14)}
+								weight="fill"
+								data-flx="voice.voice-message-composer-modal.microphone-icon"
+							/>
 							{i18n._(RECORD_BUTTON_DESCRIPTOR)}
 						</span>
 					</Button>

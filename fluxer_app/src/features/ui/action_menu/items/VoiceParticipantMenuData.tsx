@@ -43,7 +43,7 @@ import {useRoleHierarchy} from '@app/features/permissions/hooks/useRoleHierarchy
 import Permission from '@app/features/permissions/state/Permission';
 import * as PermissionUtils from '@app/features/permissions/utils/PermissionUtils';
 import {Logger} from '@app/features/platform/utils/AppLogger';
-import {ComponentDispatch} from '@app/features/platform/utils/ComponentBus';
+import {ComponentBus} from '@app/features/platform/utils/ComponentBus';
 import {ChangeFriendNicknameModal} from '@app/features/relationship/components/modals/ChangeFriendNicknameModal';
 import Relationships from '@app/features/relationship/state/Relationships';
 import * as RelationshipActionUtils from '@app/features/relationship/utils/RelationshipActionUtils';
@@ -85,9 +85,15 @@ import {
 	TurnOffCameraIcon,
 	TurnOffStreamIcon,
 	UnfocusIcon,
+	ViewDetailsIcon,
 	ViewProfileIcon,
 	VoiceCallIcon,
 } from '@app/features/ui/action_menu/ContextMenuIcons';
+import {
+	normalizeVoiceParticipantMenuRequest,
+	type VoiceParticipantMenuRequest,
+} from '@app/features/ui/action_menu/items/VoiceParticipantMenuTypes';
+import {buildVoiceParticipantStreamMenu} from '@app/features/ui/action_menu/items/VoiceParticipantStreamMenuBuilder';
 import {
 	BAN_MEMBER_DESCRIPTOR,
 	BLOCKED_USER_DM_WARNING_DESCRIPTOR,
@@ -99,15 +105,13 @@ import {
 	FOCUS_THIS_PERSON_DESCRIPTOR,
 	MENTION_DESCRIPTOR,
 	MESSAGE_DESCRIPTOR,
-	MUTE_DESCRIPTOR,
 	MUTE_DEVICE_DESCRIPTOR,
+	MUTE_MICROPHONE_DESCRIPTOR,
+	MUTE_PLAYBACK_DESCRIPTOR,
 	POP_OUT_CAMERA_DESCRIPTOR,
-	POP_OUT_STREAM_DESCRIPTOR,
-	PRIORITIZE_SPEAKERS_DESCRIPTOR,
-	SHOW_MY_OWN_CAMERA_DESCRIPTOR,
-	SHOW_MY_SCREEN_SHARE_DESCRIPTOR,
+	POP_OUT_USER_DESCRIPTOR,
+	PREVIEW_CAMERA_DESCRIPTOR,
 	SHOW_NON_VIDEO_PARTICIPANTS_DESCRIPTOR,
-	STREAM_VOLUME_DESCRIPTOR,
 	TURN_OFF_ALL_DEVICE_CAMERAS_DESCRIPTOR,
 	TURN_OFF_DEVICE_CAMERA_DESCRIPTOR,
 	TURN_OFF_DEVICE_STREAM_DESCRIPTOR,
@@ -125,6 +129,7 @@ import type {
 	MenuSliderType,
 	MenuSubmenuItemType,
 } from '@app/features/ui/menu_bottom_sheet/MenuBottomSheet';
+import {formatRoundedPercentage} from '@app/features/ui/utils/PercentageFormatting';
 import * as UserProfileCommands from '@app/features/user/commands/UserProfileCommands';
 import {ChangeNicknameModal} from '@app/features/user/components/modals/ChangeNicknameModal';
 import {UserSettingsModal} from '@app/features/user/components/modals/UserSettingsModal';
@@ -134,10 +139,10 @@ import Users from '@app/features/user/state/Users';
 import * as NicknameUtils from '@app/features/user/utils/NicknameUtils';
 import * as VoiceCallLayoutCommands from '@app/features/voice/commands/VoiceCallLayoutCommands';
 import * as VoiceSettingsCommands from '@app/features/voice/commands/VoiceSettingsCommands';
-import {HideOwnCameraConfirmModal} from '@app/features/voice/components/modals/HideOwnCameraConfirmModal';
-import {HideOwnScreenShareConfirmModal} from '@app/features/voice/components/modals/HideOwnScreenShareConfirmModal';
+import {CameraPreviewModalInRoom} from '@app/features/voice/components/modals/CameraPreviewModal';
 import MediaEngine from '@app/features/voice/engine/MediaEngineFacade';
 import CallMediaPrefs from '@app/features/voice/state/CallMediaPrefs';
+import EntranceSoundListenerPrefs from '@app/features/voice/state/EntranceSoundListenerPrefs';
 import ParticipantVolume from '@app/features/voice/state/ParticipantVolume';
 import PopoutWindowManager, {
 	isVoicePopoutSupported,
@@ -145,7 +150,6 @@ import PopoutWindowManager, {
 } from '@app/features/voice/state/PopoutWindowManager';
 import StreamAudioPrefs from '@app/features/voice/state/StreamAudioPrefs';
 import VoiceCallLayout from '@app/features/voice/state/VoiceCallLayout';
-import VoicePrompts from '@app/features/voice/state/VoicePrompts';
 import VoiceSettings from '@app/features/voice/state/VoiceSettings';
 import * as CallUtils from '@app/features/voice/utils/CallUtils';
 import {hasActiveDirectCallWithUser} from '@app/features/voice/utils/PrivateCallMenuUtils';
@@ -160,7 +164,6 @@ import {
 	VOICE_DISCONNECT_DESCRIPTOR,
 	VOICE_DISCONNECT_DEVICE_DESCRIPTOR,
 	VOICE_MUTE_ALL_DEVICES_DESCRIPTOR,
-	VOICE_STOP_WATCHING_DESCRIPTOR,
 	VOICE_UNDEAFEN_ALL_DEVICES_DESCRIPTOR,
 	VOICE_UNMUTE_ALL_DEVICES_DESCRIPTOR,
 	VOICE_USER_VOLUME_DESCRIPTOR,
@@ -175,53 +178,28 @@ import {useCallback, useMemo} from 'react';
 
 const logger = new Logger('VoiceParticipantMenuData');
 
-const ADVANCED_ACTIONS_DESCRIPTOR = msg({
-	message: 'Advanced',
-	comment: 'Voice participant context menu submenu label for IDs and diagnostics.',
+const ENTRANCE_SOUND_SUBMENU_DESCRIPTOR = msg({
+	message: 'Entrance sound',
+	comment: 'Voice menu submenu label for per-user entrance sound controls.',
 });
-const DEVICE_CONTROLS_DESCRIPTOR = msg({
-	message: 'Device controls',
-	comment: 'Voice participant context menu submenu label for actions that affect one or more voice devices.',
+const MUTE_ENTRANCE_SOUND_DESCRIPTOR = msg({
+	message: 'Mute entrance sound',
+	comment: "Voice menu checkbox label that locally silences a user's entrance sound.",
 });
-const DISPLAY_OPTIONS_DESCRIPTOR = msg({
-	message: 'Display options',
-	comment: 'Voice participant context menu submenu label for call display and diagnostics preferences.',
-});
-const MEDIA_CONTROLS_DESCRIPTOR = msg({
-	message: 'Media controls',
-	comment: 'Voice participant context menu submenu label for camera, stream, and video actions.',
-});
-const MODERATION_ACTIONS_DESCRIPTOR = msg({
-	message: 'Moderation',
-	comment: 'Voice participant context menu submenu label for member moderation actions.',
-});
-const RELATIONSHIP_ACTIONS_DESCRIPTOR = msg({
-	message: 'Relationship',
-	comment: 'Voice participant context menu submenu label for friend and block actions.',
-});
-const STREAM_CONTROLS_DESCRIPTOR = msg({
-	message: 'Stream controls',
-	comment: 'Voice participant context menu submenu label for incoming screen share audio controls.',
-});
-const USER_ACTIONS_DESCRIPTOR = msg({
-	message: 'User actions',
-	comment: 'Voice participant context menu submenu label for lower-frequency profile and communication actions.',
+const ENTRANCE_SOUND_VOLUME_DESCRIPTOR = msg({
+	message: 'Entrance sound volume',
+	comment: "Voice menu slider label for a user's entrance sound playback volume.",
 });
 
-type VoiceParticipantMenuLeafItem = MenuItemType | MenuCheckboxType | MenuSliderType;
+type VoiceParticipantMenuLeafItem = MenuItemType | MenuCheckboxType | MenuSliderType | MenuSubmenuItemType;
 
-export interface VoiceParticipantMenuDataOptions {
+export interface VoiceParticipantMenuDataOptions extends VoiceParticipantMenuRequest {
 	user: User;
 	guildId?: string;
 	connectionId?: string;
 	isGroupedItem?: boolean;
 	isParentGroupedItem?: boolean;
-	streamKey?: string;
-	isScreenShare?: boolean;
-	isWatching?: boolean;
-	hasScreenShareAudio?: boolean;
-	isOwnScreenShare?: boolean;
-	onStopWatching?: () => void;
+	groupContainsLocalConnection?: boolean;
 	onClose: () => void;
 	hiddenConnectionCount?: number;
 	deviceConnectionCount?: number;
@@ -231,6 +209,7 @@ export interface VoiceParticipantMenuDataOptions {
 
 export interface VoiceParticipantMenuData {
 	groups: Array<MenuGroupType>;
+	guildManagementGroupIndex: number;
 	member: GuildMember | null;
 	isCurrentUser: boolean;
 	developerMode: boolean;
@@ -249,18 +228,17 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 		connectionId,
 		isGroupedItem = false,
 		isParentGroupedItem = false,
-		streamKey,
-		isScreenShare = false,
-		isWatching = false,
-		hasScreenShareAudio = false,
-		isOwnScreenShare = false,
-		onStopWatching,
+		groupContainsLocalConnection = false,
+		surface,
+		source: requestedSource,
 		onClose,
 		hiddenConnectionCount = 0,
 		deviceConnectionCount = 0,
 		isDeviceGroupExpanded = false,
 		onToggleDeviceGroup,
 	} = options;
+	const source = normalizeVoiceParticipantMenuRequest({surface, source: requestedSource});
+	const streamKey = source.kind === 'screen-share' ? source.streamKey : undefined;
 	const {i18n} = useLingui();
 	const member = GuildMembers.getMember(guildId ?? '', user.id);
 	const isCurrentUser = user.id === Authentication.currentUserId;
@@ -270,6 +248,7 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 	const isBlocked = relationshipType === RelationshipTypes.BLOCKED;
 	const hasActiveDirectCall = hasActiveDirectCallWithUser(user.id);
 	const canMuteMembers = guildId ? Permission.can(Permissions.MUTE_MEMBERS, {guildId}) : false;
+	const canDeafenMembers = guildId ? Permission.can(Permissions.DEAFEN_MEMBERS, {guildId}) : false;
 	const canMoveMembers = guildId ? Permission.can(Permissions.MOVE_MEMBERS, {guildId}) : false;
 	const canKickMembers = guildId ? Permission.can(Permissions.KICK_MEMBERS, {guildId}) : false;
 	const canBanMembers = guildId ? Permission.can(Permissions.BAN_MEMBERS, {guildId}) : false;
@@ -331,17 +310,30 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 		: MediaEngine.getCurrentUserVoiceState();
 	const isCurrentUserConnectedToVoice = currentUserVoiceStateInGuild !== null || MediaEngine.connectionId !== null;
 	const connectionVoiceState = connectionId ? MediaEngine.getVoiceStateByConnectionId(connectionId) : null;
+	const allVoiceStates = MediaEngine.getAllVoiceStates();
+	const targetHasVoiceStateInLocalRoom =
+		MediaEngine.channelId !== null &&
+		Object.values(allVoiceStates).some((guildData) =>
+			Object.values(guildData[MediaEngine.channelId ?? ''] ?? {}).some((voiceState) => voiceState.user_id === user.id),
+		);
+	const isTargetInLocalVoiceRoom =
+		MediaEngine.connected &&
+		MediaEngine.connectionId !== null &&
+		MediaEngine.channelId !== null &&
+		(connectionVoiceState?.channel_id === MediaEngine.channelId || (!connectionId && targetHasVoiceStateInLocalRoom));
 	const currentUserVoiceState = MediaEngine.getCurrentUserVoiceState();
 	const currentConnectionId = MediaEngine.connectionId;
 	const currentConnectionVoiceState = currentConnectionId
 		? MediaEngine.getVoiceStateByConnectionId(currentConnectionId)
 		: null;
-	const showMyOwnCamera = VoiceSettings.showMyOwnCamera;
 	const showMyOwnScreenShare = VoiceSettings.showMyOwnScreenShare;
 	const showNonVideoParticipants = VoiceSettings.showNonVideoParticipants;
-	const prioritizeSpeakingParticipants = VoiceSettings.prioritizeSpeakingParticipants;
+	const pauseOwnScreenSharePreviewOnUnfocus = VoiceSettings.pauseOwnScreenSharePreviewOnUnfocus;
 	const showConnectionVolumeControls = VoiceSettings.showConnectionVolumeControls;
 	const participantVolume = ParticipantVolume.getVolume(user.id);
+	const isParticipantLocallyMuted = ParticipantVolume.isLocalMuted(user.id);
+	const entranceSoundMuted = EntranceSoundListenerPrefs.isMuted(user.id);
+	const entranceSoundVolume = EntranceSoundListenerPrefs.getVolume(user.id);
 	const connectionVolume = connectionId ? ParticipantVolume.getConnectionVolume(connectionId) : 100;
 	const streamVolume = streamKey ? StreamAudioPrefs.getVolume(streamKey) : 100;
 	const isStreamMuted = streamKey ? StreamAudioPrefs.isMuted(streamKey) : false;
@@ -349,7 +341,6 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 	const participantIdentity = connectionId ? buildVoiceParticipantIdentity(user.id, connectionId) : '';
 	const isVideoDisabled =
 		callId && participantIdentity ? CallMediaPrefs.isVideoDisabled(callId, participantIdentity) : false;
-	const allVoiceStates = MediaEngine.getAllVoiceStates();
 	const pinnedParticipantIdentity = VoiceCallLayout.pinnedParticipantIdentity;
 	const pinnedParticipantSource = VoiceCallLayout.pinnedParticipantSource;
 	const memberMute = member?.mute ?? false;
@@ -382,23 +373,20 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 			})
 			.map((channel) => ({id: channel.id, name: channel.name ?? ''}));
 	}, [guildId, userVoiceState?.channel_id]);
-	const groups = useMemo(() => {
+	const menuAssembly = useMemo(() => {
 		const menuGroups: Array<MenuGroupType> = [];
 		const hasDeviceGroup = deviceConnectionCount > 1 || hasMultipleConnections;
-		const secondarySubmenus: Array<MenuSubmenuItemType> = [];
-		const streamControlActions: Array<MenuCheckboxType | MenuSliderType> = [];
+		const isDeviceScopedMenu = isGroupedItem || isParentGroupedItem;
+		const focusActions: Array<MenuItemType> = [];
 		const mediaActions: Array<MenuItemType | MenuCheckboxType> = [];
 		const deviceActions: Array<MenuItemType> = [];
+		const popoutActions: Array<MenuItemType> = [];
 		const displayActions: Array<MenuCheckboxType> = [];
-		const userActions: Array<MenuItemType> = [];
-		const relationshipSubmenuActions: Array<MenuItemType> = [];
-		const moderationSubmenuActions: Array<MenuItemType | MenuCheckboxType> = [];
+		const volumeActions: Array<MenuSliderType> = [];
+		const voiceActions: Array<VoiceParticipantMenuLeafItem> = [];
+		const relationshipActions: Array<MenuItemType> = [];
+		const moderationActions: Array<MenuItemType | MenuCheckboxType> = [];
 		const advancedActions: Array<VoiceParticipantMenuLeafItem> = [];
-		const addSecondarySubmenu = (label: string, items: Array<VoiceParticipantMenuLeafItem>) => {
-			if (items.length > 0) {
-				secondarySubmenus.push({label, items});
-			}
-		};
 		const createCopyDeviceIdAction = (targetConnectionId: string): MenuItemType => ({
 			icon: (
 				<CopyIdIcon
@@ -408,7 +396,9 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 			),
 			label: i18n._(COPY_DEVICE_ID_DESCRIPTOR),
 			onClick: () => {
-				TextCopyCommands.copy(i18n, targetConnectionId, true).catch(() => {});
+				TextCopyCommands.copy(i18n, targetConnectionId, true).catch((error) => {
+					logger.error('Failed to copy voice device id', {targetConnectionId, error});
+				});
 				onClose();
 			},
 		});
@@ -419,9 +409,11 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 			maxValue: 200,
 			onChange: (value: number) => {
 				ParticipantVolume.setVolume(user.id, value);
-				MediaEngine.applyLocalAudioPreferencesForUser(user.id);
+				if (isTargetInLocalVoiceRoom) {
+					MediaEngine.applyLocalAudioPreferencesForUser(user.id);
+				}
 			},
-			onFormat: (value: number) => `${Math.round(value)}%`,
+			onFormat: (value: number) => formatRoundedPercentage(i18n.locale, value),
 			factoryDefaultValue: 100,
 		});
 		const buildConnectionVolumeSlider = (targetConnectionId: string): MenuSliderType => ({
@@ -431,9 +423,11 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 			maxValue: 200,
 			onChange: (value: number) => {
 				ParticipantVolume.setConnectionVolume(targetConnectionId, value);
-				MediaEngine.applyLocalAudioPreferencesForUser(user.id);
+				if (isTargetInLocalVoiceRoom) {
+					MediaEngine.applyLocalAudioPreferencesForUser(user.id);
+				}
 			},
-			onFormat: (value: number) => `${Math.round(value)}%`,
+			onFormat: (value: number) => formatRoundedPercentage(i18n.locale, value),
 			factoryDefaultValue: 100,
 		});
 		const buildVolumeControls = (targetConnectionId?: string): Array<MenuSliderType> => {
@@ -443,54 +437,46 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 			}
 			return volumeControls;
 		};
-		const streamRootActions: Array<MenuItemType> = [];
-		if (isScreenShare && !isOwnScreenShare && streamKey) {
-			if (isWatching && onStopWatching) {
-				streamRootActions.push({
-					icon: (
-						<TurnOffStreamIcon
-							size={16}
-							data-flx="ui.action-menu.items.voice-participant-menu-data.groups.turn-off-stream-icon"
-						/>
-					),
-					label: i18n._(VOICE_STOP_WATCHING_DESCRIPTOR),
-					onClick: () => {
-						onStopWatching();
-						onClose();
-					},
-				});
-			}
-			if (hasScreenShareAudio) {
-				streamControlActions.push({
-					label: i18n._(STREAM_VOLUME_DESCRIPTOR),
-					value: streamVolume,
+		const buildEntranceSoundControls = (): MenuSubmenuItemType => ({
+			label: i18n._(ENTRANCE_SOUND_SUBMENU_DESCRIPTOR),
+			items: [
+				{
+					label: i18n._(MUTE_ENTRANCE_SOUND_DESCRIPTOR),
+					checked: entranceSoundMuted,
+					onChange: (checked: boolean) => EntranceSoundListenerPrefs.setMuted(user.id, checked),
+				},
+				{
+					label: i18n._(ENTRANCE_SOUND_VOLUME_DESCRIPTOR),
+					value: entranceSoundVolume,
 					minValue: 0,
 					maxValue: 200,
-					onChange: (value: number) => {
-						StreamAudioPrefs.setVolume(streamKey, value);
-						MediaEngine.applyLocalAudioPreferencesForUser(user.id);
-					},
-					onFormat: (value: number) => `${Math.round(value)}%`,
+					onChange: (value: number) => EntranceSoundListenerPrefs.setVolume(user.id, value),
+					onFormat: (value: number) => formatRoundedPercentage(i18n.locale, value),
 					factoryDefaultValue: 100,
-				});
-				streamControlActions.push({
-					icon: (
-						<LocalMuteIcon
-							size={16}
-							data-flx="ui.action-menu.items.voice-participant-menu-data.groups.local-mute-icon"
-						/>
-					),
-					label: i18n._(MUTE_DESCRIPTOR),
-					checked: isStreamMuted,
-					onChange: (checked: boolean) => {
-						StreamAudioPrefs.setMuted(streamKey, checked);
-						MediaEngine.applyLocalAudioPreferencesForUser(user.id);
-					},
-				});
-			}
-		}
-		if (streamRootActions.length > 0) {
-			menuGroups.push({items: streamRootActions});
+				},
+			],
+		});
+		if (source.kind === 'screen-share') {
+			const streamGroups = buildVoiceParticipantStreamMenu({
+				i18n,
+				userId: user.id,
+				guildId,
+				connectionId,
+				channelId: connectionVoiceState?.channel_id ?? null,
+				participantIdentity,
+				displayName,
+				isCurrentUserConnectedToVoice: isTargetInLocalVoiceRoom,
+				source,
+				streamVolume,
+				isStreamMuted,
+				showMyOwnScreenShare,
+				pauseOwnScreenSharePreviewOnUnfocus,
+				onClose,
+			});
+			return {
+				groups: streamGroups,
+				guildManagementGroupIndex: streamGroups.length,
+			};
 		}
 		const primaryActions: Array<MenuItemType> = [];
 		primaryActions.push({
@@ -505,12 +491,19 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 				ModalCommands.runAfterBottomSheetClose(onClose, () => UserProfileCommands.openUserProfile(user.id, guildId));
 			},
 		});
-		if (connectionId && guildId && isCurrentUserConnectedToVoice) {
+		const connectionParticipant = connectionId
+			? MediaEngine.getParticipantByUserIdAndConnectionId(user.id, connectionId)
+			: null;
+		const isCameraLive =
+			source.kind === 'camera' && Boolean(connectionParticipant?.isCameraEnabled || connectionVoiceState?.self_video);
+		const focusSource = source.kind === 'camera' ? (isCameraLive ? 'camera' : undefined) : source.focusSource;
+		const shouldShowFocus = focusSource !== undefined && (surface === 'call-tile' || surface === 'participant-list');
+		if (shouldShowFocus && connectionId && isTargetInLocalVoiceRoom) {
 			const identity = buildVoiceParticipantIdentity(user.id, connectionId);
+			const liveKitFocusSource = focusSource === 'screen-share' ? Track.Source.ScreenShare : Track.Source.Camera;
 			const isFocused =
 				pinnedParticipantIdentity === identity &&
-				(pinnedParticipantSource == null ||
-					pinnedParticipantSource === (isScreenShare ? Track.Source.ScreenShare : Track.Source.Camera));
+				(pinnedParticipantSource == null || pinnedParticipantSource === liveKitFocusSource);
 			const allStates = MediaEngine.getAllVoiceStates();
 			let connectionCount = 0;
 			Object.values(allStates).forEach((guildData) => {
@@ -526,7 +519,7 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 				if (hasMultipleConnectionsForFocus) return i18n._(FOCUS_THIS_DEVICE_DESCRIPTOR);
 				return i18n._(FOCUS_THIS_PERSON_DESCRIPTOR);
 			})();
-			primaryActions.push({
+			focusActions.push({
 				icon: isFocused ? (
 					<UnfocusIcon size={16} data-flx="ui.action-menu.items.voice-participant-menu-data.groups.unfocus-icon" />
 				) : (
@@ -540,10 +533,7 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 						VoiceCallLayoutCommands.markUserOverride();
 					} else {
 						VoiceCallLayoutCommands.setLayoutMode('focus');
-						VoiceCallLayoutCommands.setPinnedParticipant(
-							identity,
-							isScreenShare ? Track.Source.ScreenShare : Track.Source.Camera,
-						);
+						VoiceCallLayoutCommands.setPinnedParticipant(identity, liveKitFocusSource);
 						VoiceCallLayoutCommands.markUserOverride();
 					}
 					onClose();
@@ -551,47 +541,54 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 			});
 		}
 		const popoutChannelId = connectionVoiceState?.channel_id ?? null;
-		if (connectionId && popoutChannelId && isCurrentUserConnectedToVoice && isVoicePopoutSupported()) {
-			const connectionParticipant = MediaEngine.getParticipantByUserIdAndConnectionId(user.id, connectionId);
-			const isCameraLive = Boolean(connectionParticipant?.isCameraEnabled || connectionVoiceState?.self_video);
-			const isStreamLive = Boolean(connectionParticipant?.isScreenShareEnabled || connectionVoiceState?.self_stream);
-			const openTilePopout = (source: VoiceTilePopoutSource): void => {
-				PopoutWindowManager.openTilePopout({
+		const isParticipantPopoutSurface = surface === 'call-tile' || surface === 'call-avatar';
+		const participantPopoutSource: VoiceTilePopoutSource | null =
+			isCameraLive && isTargetInLocalVoiceRoom ? 'camera' : isParticipantPopoutSurface ? 'user' : null;
+		if (participantPopoutSource && connectionId && popoutChannelId && isVoicePopoutSupported()) {
+			const openParticipantPopout = (): void => {
+				const didOpen = PopoutWindowManager.openTilePopout({
 					participantIdentity,
-					source,
+					source: participantPopoutSource,
 					userId: user.id,
 					connectionId,
 					channelId: popoutChannelId,
 					guildId: guildId ?? null,
 					title: displayName,
 				});
-				onClose();
+				if (didOpen) onClose();
 			};
-			primaryActions.push({
+			popoutActions.push({
 				icon: (
 					<PopOutIcon
 						size={16}
 						data-flx="ui.action-menu.items.voice-participant-menu-data.groups.pop-out-camera-icon"
 					/>
 				),
-				label: i18n._(POP_OUT_CAMERA_DESCRIPTOR),
-				disabled: !isCameraLive,
-				onClick: () => openTilePopout('camera'),
-			});
-			primaryActions.push({
-				icon: (
-					<PopOutIcon
-						size={16}
-						data-flx="ui.action-menu.items.voice-participant-menu-data.groups.pop-out-stream-icon"
-					/>
-				),
-				label: i18n._(POP_OUT_STREAM_DESCRIPTOR),
-				disabled: !isStreamLive,
-				onClick: () => openTilePopout('screen_share'),
+				label: i18n._(participantPopoutSource === 'camera' ? POP_OUT_CAMERA_DESCRIPTOR : POP_OUT_USER_DESCRIPTOR),
+				onClick: openParticipantPopout,
 			});
 		}
-		if (canMention) {
-			userActions.push({
+		if (isCurrentUser && !isCameraLive && (surface === 'call-tile' || surface === 'call-avatar')) {
+			mediaActions.push({
+				icon: (
+					<ViewDetailsIcon
+						size={16}
+						data-flx="ui.action-menu.items.voice-participant-menu-data.menu-assembly.view-details-icon"
+					/>
+				),
+				label: i18n._(PREVIEW_CAMERA_DESCRIPTOR),
+				onClick: () => {
+					ModalCommands.pushAfterBottomSheetClose(
+						onClose,
+						modal(() => (
+							<CameraPreviewModalInRoom data-flx="ui.action-menu.items.voice-participant-menu-data.on-click.camera-preview-modal-in-room" />
+						)),
+					);
+				},
+			});
+		}
+		if (surface === 'participant-list' && canMention) {
+			primaryActions.push({
 				icon: (
 					<MentionUserIcon
 						size={16}
@@ -601,7 +598,7 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 				label: i18n._(MENTION_DESCRIPTOR),
 				onClick: () => {
 					onClose();
-					ComponentDispatch.dispatch('INSERT_MENTION', {userId: user.id});
+					ComponentBus.dispatch('INSERT_MENTION', {userId: user.id});
 				},
 			});
 		}
@@ -617,17 +614,8 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 				onClick: isBlocked ? handleOpenBlockedDm : handleMessage,
 			});
 		}
-		userActions.push({
-			icon: <AddNoteIcon size={16} data-flx="ui.action-menu.items.voice-participant-menu-data.groups.add-note-icon" />,
-			label: i18n._(ADD_NOTE_DESCRIPTOR),
-			onClick: () => {
-				ModalCommands.runAfterBottomSheetClose(onClose, () =>
-					UserProfileCommands.openUserProfile(user.id, guildId, true),
-				);
-			},
-		});
 		if (!isCurrentUser && relationshipType === RelationshipTypes.FRIEND) {
-			userActions.push({
+			relationshipActions.push({
 				icon: (
 					<ChangeNicknameIcon
 						size={16}
@@ -649,7 +637,7 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 			});
 		}
 		if (!isCurrentUser && !user.bot && !hasActiveDirectCall) {
-			userActions.push({
+			primaryActions.push({
 				icon: (
 					<VoiceCallIcon size={16} data-flx="ui.action-menu.items.voice-participant-menu-data.groups.voice-call-icon" />
 				),
@@ -666,6 +654,19 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 							}
 						})();
 					});
+				},
+			});
+		}
+		if (!isCurrentUser) {
+			primaryActions.push({
+				icon: (
+					<AddNoteIcon size={16} data-flx="ui.action-menu.items.voice-participant-menu-data.groups.add-note-icon" />
+				),
+				label: i18n._(ADD_NOTE_DESCRIPTOR),
+				onClick: () => {
+					ModalCommands.runAfterBottomSheetClose(onClose, () =>
+						UserProfileCommands.openUserProfile(user.id, guildId, true),
+					);
 				},
 			});
 		}
@@ -698,7 +699,10 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 		}
 		if (isCurrentUser) {
 			const selfRootActions: Array<MenuItemType | MenuCheckboxType> = [];
-			if (isGroupedItem && connectionId) {
+			const canUseCurrentConnectionAsRoot = !isParentGroupedItem || groupContainsLocalConnection;
+			const useConnectionSpecificControls =
+				connectionId !== undefined && (isGroupedItem || connectionId !== MediaEngine.connectionId);
+			if (useConnectionSpecificControls) {
 				const isSelfMuted = connectionVoiceState?.self_mute ?? false;
 				const isSelfDeafened = connectionVoiceState?.self_deaf ?? false;
 				const isCameraOn = connectionVoiceState?.self_video ?? false;
@@ -726,7 +730,7 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 						VoiceStateCommands.toggleSelfDeafenForConnection(connectionId);
 					},
 				});
-				if (isCameraOn) {
+				if (isCameraOn && isDeviceScopedMenu) {
 					selfRootActions.push({
 						icon: (
 							<TurnOffCameraIcon
@@ -741,7 +745,7 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 						},
 					});
 				}
-				if (isStreaming) {
+				if (isStreaming && isDeviceScopedMenu) {
 					selfRootActions.push({
 						icon: (
 							<TurnOffStreamIcon
@@ -756,8 +760,8 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 						},
 					});
 				}
-				advancedActions.push(createCopyDeviceIdAction(connectionId));
-			} else {
+				if (isDeviceScopedMenu) advancedActions.push(createCopyDeviceIdAction(connectionId));
+			} else if (currentConnectionId && canUseCurrentConnectionAsRoot) {
 				const isSelfMuted = currentUserVoiceState?.self_mute ?? false;
 				const isSelfDeafened = currentUserVoiceState?.self_deaf ?? false;
 				const isCameraOn = currentConnectionVoiceState?.self_video ?? false;
@@ -769,7 +773,7 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 							data-flx="ui.action-menu.items.voice-participant-menu-data.groups.self-mute-icon--2"
 						/>
 					),
-					label: i18n._(MUTE_DESCRIPTOR),
+					label: i18n._(MUTE_MICROPHONE_DESCRIPTOR),
 					checked: isSelfMuted,
 					onChange: () => {
 						VoiceStateCommands.toggleSelfMute(null);
@@ -788,7 +792,7 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 						VoiceStateCommands.toggleSelfDeaf(null);
 					},
 				});
-				if (isCameraOn) {
+				if (isCameraOn && isDeviceScopedMenu) {
 					selfRootActions.push({
 						icon: (
 							<TurnOffCameraIcon
@@ -805,7 +809,7 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 						},
 					});
 				}
-				if (isStreaming) {
+				if (isStreaming && isDeviceScopedMenu) {
 					selfRootActions.push({
 						icon: (
 							<TurnOffStreamIcon
@@ -822,30 +826,36 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 						},
 					});
 				}
-				mediaActions.push({
-					icon: (
-						<SettingsIcon size={16} data-flx="ui.action-menu.items.voice-participant-menu-data.groups.settings-icon" />
-					),
-					label: getVoiceVideoSettingsLabel(i18n),
-					onClick: () => {
-						ModalCommands.pushAfterBottomSheetClose(
-							onClose,
-							modal(() => (
-								<UserSettingsModal
-									initialTab="voice_video"
-									data-flx="ui.action-menu.items.voice-participant-menu-data.on-click.user-settings-modal"
-								/>
-							)),
-						);
-					},
-				});
-				if (currentConnectionId) {
+				if (isDeviceScopedMenu) {
+					mediaActions.push({
+						icon: (
+							<SettingsIcon
+								size={16}
+								data-flx="ui.action-menu.items.voice-participant-menu-data.groups.settings-icon"
+							/>
+						),
+						label: getVoiceVideoSettingsLabel(i18n),
+						onClick: () => {
+							ModalCommands.pushAfterBottomSheetClose(
+								onClose,
+								modal(() => (
+									<UserSettingsModal
+										initialTab="voice_video"
+										data-flx="ui.action-menu.items.voice-participant-menu-data.on-click.user-settings-modal"
+									/>
+								)),
+							);
+						},
+					});
+				}
+				if (currentConnectionId && isDeviceScopedMenu) {
 					advancedActions.push(createCopyDeviceIdAction(currentConnectionId));
 				}
 			}
-			if (guildId) {
-				const cid = connectionId ?? MediaEngine.connectionId ?? null;
-				const isCurrentDevice = !connectionId || connectionId === MediaEngine.connectionId;
+			const targetConnectionId = connectionId ?? (canUseCurrentConnectionAsRoot ? currentConnectionId : null);
+			const targetGuildId = guildId ?? connectionVoiceState?.guild_id ?? null;
+			const isCurrentDevice = targetConnectionId !== null && targetConnectionId === currentConnectionId;
+			if (isDeviceScopedMenu && targetConnectionId && (isCurrentDevice || targetGuildId)) {
 				selfRootActions.push({
 					icon: (
 						<DisconnectIcon
@@ -857,8 +867,8 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 					onClick: async () => {
 						if (isCurrentDevice) {
 							await MediaEngine.disconnectFromVoiceChannel('user');
-						} else if (cid) {
-							MediaEngine.disconnectRemoteDevice(guildId, cid);
+						} else if (targetGuildId) {
+							MediaEngine.disconnectRemoteDevice(targetGuildId, targetConnectionId);
 						}
 						onClose();
 					},
@@ -866,96 +876,67 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 				});
 			}
 			if (selfRootActions.length > 0) {
-				menuGroups.push({items: selfRootActions});
+				voiceActions.push(...selfRootActions);
 			}
 			if (connectionId && connectionId !== currentConnectionId && isCurrentUserConnectedToVoice) {
-				menuGroups.push({items: buildVolumeControls(connectionId)});
+				volumeActions.push(...buildVolumeControls(connectionId));
 			}
-			const displayPrefs: Array<MenuCheckboxType> = [
-				{
-					label: i18n._(SHOW_MY_OWN_CAMERA_DESCRIPTOR),
-					checked: showMyOwnCamera,
-					onChange: (checked) => {
-						if (!checked) {
-							if (VoicePrompts.getSkipHideOwnCameraConfirm()) {
-								VoiceSettingsCommands.update({showMyOwnCamera: false});
-							} else {
-								ModalCommands.pushAfterBottomSheetClose(
-									onClose,
-									modal(() => (
-										<HideOwnCameraConfirmModal data-flx="ui.action-menu.items.voice-participant-menu-data.on-change.hide-own-camera-confirm-modal" />
-									)),
-								);
-							}
-						} else {
-							VoiceSettingsCommands.update({showMyOwnCamera: true});
-						}
-					},
-				},
-				{
-					label: i18n._(SHOW_MY_SCREEN_SHARE_DESCRIPTOR),
-					checked: showMyOwnScreenShare,
-					onChange: (checked) => {
-						if (!checked) {
-							if (VoicePrompts.getSkipHideOwnScreenShareConfirm()) {
-								VoiceSettingsCommands.update({showMyOwnScreenShare: false});
-							} else {
-								ModalCommands.pushAfterBottomSheetClose(
-									onClose,
-									modal(() => (
-										<HideOwnScreenShareConfirmModal data-flx="ui.action-menu.items.voice-participant-menu-data.on-change.hide-own-screen-share-confirm-modal" />
-									)),
-								);
-							}
-						} else {
-							VoiceSettingsCommands.update({showMyOwnScreenShare: true});
-						}
-					},
-				},
-				{
-					label: i18n._(SHOW_NON_VIDEO_PARTICIPANTS_DESCRIPTOR),
-					checked: showNonVideoParticipants,
-					onChange: (checked) => VoiceSettingsCommands.update({showNonVideoParticipants: checked}),
-				},
-				{
-					label: i18n._(PRIORITIZE_SPEAKERS_DESCRIPTOR),
-					checked: prioritizeSpeakingParticipants,
-					onChange: (checked) => VoiceSettings.setPrioritizeSpeakingParticipants(checked),
-				},
-			];
-			displayActions.push(...displayPrefs);
 		} else {
-			if (isCurrentUserConnectedToVoice) {
-				menuGroups.push({items: buildVolumeControls(connectionId)});
-				if (connectionId) {
-					mediaActions.push({
-						icon: (
-							<LocalDisableVideoIcon
-								size={16}
-								data-flx="ui.action-menu.items.voice-participant-menu-data.groups.local-disable-video-icon"
-							/>
-						),
-						label: i18n._(DISABLE_VIDEO_LOCALLY_DESCRIPTOR),
-						checked: isVideoDisabled,
-						onChange: (checked: boolean) => {
-							const activeCallId = MediaEngine.connectionId;
-							if (!activeCallId) {
-								const error = new Error('Cannot toggle local video without an active voice connection');
-								logger.error('Voice participant menu action invoked without connection id', {
-									participantIdentity,
-									connectionId,
-									callId,
-								});
-								throw error;
-							}
-							MediaEngine.setLocalVideoDisabled(participantIdentity, checked);
-						},
-					});
-				}
+			volumeActions.push(...buildVolumeControls(connectionId));
+			voiceActions.push(
+				{
+					icon: (
+						<LocalMuteIcon
+							size={16}
+							data-flx="ui.action-menu.items.voice-participant-menu-data.menu-assembly.local-mute-icon"
+						/>
+					),
+					label: i18n._(MUTE_PLAYBACK_DESCRIPTOR),
+					checked: isParticipantLocallyMuted,
+					onChange: (checked: boolean) => {
+						ParticipantVolume.setLocalMute(user.id, checked);
+						if (isTargetInLocalVoiceRoom) {
+							MediaEngine.applyLocalAudioPreferencesForUser(user.id);
+						}
+					},
+				},
+				buildEntranceSoundControls(),
+			);
+			if (isTargetInLocalVoiceRoom && connectionId && source.kind === 'camera') {
+				mediaActions.push({
+					icon: (
+						<LocalDisableVideoIcon
+							size={16}
+							data-flx="ui.action-menu.items.voice-participant-menu-data.groups.local-disable-video-icon"
+						/>
+					),
+					label: i18n._(DISABLE_VIDEO_LOCALLY_DESCRIPTOR),
+					checked: isVideoDisabled,
+					onChange: (checked: boolean) => {
+						const activeCallId = MediaEngine.connectionId;
+						if (!activeCallId) {
+							const error = new Error('Cannot toggle local video without an active voice connection');
+							logger.error('Voice participant menu action invoked without connection id', {
+								participantIdentity,
+								connectionId,
+								callId,
+							});
+							throw error;
+						}
+						MediaEngine.setLocalVideoDisabled(participantIdentity, checked);
+					},
+				});
 			}
-			if (connectionId) {
+			if (connectionId && isDeviceScopedMenu) {
 				advancedActions.push(createCopyDeviceIdAction(connectionId));
 			}
+		}
+		if (surface === 'call-tile' || surface === 'call-avatar') {
+			displayActions.push({
+				label: i18n._(SHOW_NON_VIDEO_PARTICIPANTS_DESCRIPTOR),
+				checked: showNonVideoParticipants,
+				onChange: (checked: boolean) => VoiceSettingsCommands.update({showNonVideoParticipants: checked}),
+			});
 		}
 		if (isParentGroupedItem && hasMultipleConnections && guildId) {
 			const bulkActions: Array<MenuItemType> = [];
@@ -1042,7 +1023,7 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 				if (isCurrentUser) {
 					deviceActions.push(...bulkActions);
 				} else {
-					moderationSubmenuActions.push(...bulkActions);
+					moderationActions.push(...bulkActions);
 				}
 			}
 		}
@@ -1052,7 +1033,7 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 			const hasManageNicknamesPermission = Permission.can(Permissions.MANAGE_NICKNAMES, {guildId});
 			const canManageNicknames =
 				(isCurrentUser && hasChangeNicknamePermission) || (!isCurrentUser && hasManageNicknamesPermission);
-			if (canManageNicknames) {
+			if (canManageNicknames && !isCurrentUser) {
 				guildActions.push({
 					icon: (
 						<ChangeNicknameIcon
@@ -1077,15 +1058,15 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 				});
 			}
 			if (guildActions.length > 0) {
-				userActions.push(...guildActions);
+				relationshipActions.push(...guildActions);
 			}
 		}
 		if (!isCurrentUser) {
-			const relationshipActions: Array<MenuItemType> = [];
+			const nextRelationshipActions: Array<MenuItemType> = [];
 			if (!RuntimeConfig.directMessagesDisabled) {
 				switch (relationshipType) {
 					case RelationshipTypes.FRIEND:
-						relationshipActions.push({
+						nextRelationshipActions.push({
 							icon: (
 								<RemoveFriendIcon
 									size={16}
@@ -1104,7 +1085,7 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 						});
 						break;
 					case RelationshipTypes.INCOMING_REQUEST:
-						relationshipActions.push({
+						nextRelationshipActions.push({
 							icon: (
 								<AcceptFriendRequestIcon
 									size={16}
@@ -1121,7 +1102,7 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 								);
 							},
 						});
-						relationshipActions.push({
+						nextRelationshipActions.push({
 							icon: (
 								<IgnoreFriendRequestIcon
 									size={16}
@@ -1141,7 +1122,7 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 						break;
 					default:
 						if (!user.bot && Users.currentUser?.verified !== false) {
-							relationshipActions.push({
+							nextRelationshipActions.push({
 								icon: (
 									<SendFriendRequestIcon
 										size={16}
@@ -1159,7 +1140,7 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 			}
 			if (!user.system) {
 				if (relationshipType === RelationshipTypes.BLOCKED) {
-					relationshipActions.push({
+					nextRelationshipActions.push({
 						icon: (
 							<BlockUserIcon
 								size={16}
@@ -1177,7 +1158,7 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 						},
 					});
 				} else {
-					relationshipActions.push({
+					nextRelationshipActions.push({
 						icon: (
 							<BlockUserIcon
 								size={16}
@@ -1197,58 +1178,62 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 					});
 				}
 			}
-			if (relationshipActions.length > 0) {
-				relationshipSubmenuActions.push(...relationshipActions);
+			if (nextRelationshipActions.length > 0) {
+				relationshipActions.push(...nextRelationshipActions);
 			}
 		}
-		if (!isCurrentUser && guildId && member) {
-			const moderationActions: Array<MenuItemType | MenuCheckboxType> = [];
-			if (canMuteMembers && canManageTarget(user.id)) {
+		if (guildId && member) {
+			const nextModerationActions: Array<MenuItemType | MenuCheckboxType> = [];
+			if ((canMuteMembers || canDeafenMembers) && (isCurrentUser || canManageTarget(user.id))) {
 				const isGuildMuted = memberMute;
 				const isGuildDeafened = memberDeaf;
-				moderationActions.push({
-					icon: (
-						<GuildMuteIcon
-							size={16}
-							data-flx="ui.action-menu.items.voice-participant-menu-data.groups.guild-mute-icon"
-						/>
-					),
-					label: i18n._(VOICE_COMMUNITY_MUTE_DESCRIPTOR),
-					checked: isGuildMuted,
-					onChange: async (checked: boolean) => {
-						try {
-							await GuildMemberCommands.update(guildId, user.id, {mute: checked});
-							if (checked) SoundCommands.playSound(SoundType.Mute);
-							else SoundCommands.playSound(SoundType.Unmute);
-						} catch (error) {
-							logger.error('Failed to update community mute:', error);
-							showVoiceMemberModerationFailedModal(error, VOICE_COMMUNITY_MUTE_DESCRIPTOR);
-						}
-					},
-				});
-				moderationActions.push({
-					icon: (
-						<GuildDeafenIcon
-							size={16}
-							data-flx="ui.action-menu.items.voice-participant-menu-data.groups.guild-deafen-icon"
-						/>
-					),
-					label: i18n._(VOICE_COMMUNITY_DEAFEN_DESCRIPTOR),
-					checked: isGuildDeafened,
-					onChange: async (checked: boolean) => {
-						try {
-							await GuildMemberCommands.update(guildId, user.id, {deaf: checked});
-							if (checked) SoundCommands.playSound(SoundType.Deaf);
-							else SoundCommands.playSound(SoundType.Undeaf);
-						} catch (error) {
-							logger.error('Failed to update community deafen:', error);
-							showVoiceMemberModerationFailedModal(error, VOICE_COMMUNITY_DEAFEN_DESCRIPTOR);
-						}
-					},
-				});
+				if (canMuteMembers) {
+					nextModerationActions.push({
+						icon: (
+							<GuildMuteIcon
+								size={16}
+								data-flx="ui.action-menu.items.voice-participant-menu-data.groups.guild-mute-icon"
+							/>
+						),
+						label: i18n._(VOICE_COMMUNITY_MUTE_DESCRIPTOR),
+						checked: isGuildMuted,
+						onChange: async (checked: boolean) => {
+							try {
+								await GuildMemberCommands.update(guildId, user.id, {mute: checked});
+								if (checked) SoundCommands.playSound(SoundType.Mute);
+								else SoundCommands.playSound(SoundType.Unmute);
+							} catch (error) {
+								logger.error('Failed to update community mute:', error);
+								showVoiceMemberModerationFailedModal(error, VOICE_COMMUNITY_MUTE_DESCRIPTOR);
+							}
+						},
+					});
+				}
+				if (canDeafenMembers) {
+					nextModerationActions.push({
+						icon: (
+							<GuildDeafenIcon
+								size={16}
+								data-flx="ui.action-menu.items.voice-participant-menu-data.groups.guild-deafen-icon"
+							/>
+						),
+						label: i18n._(VOICE_COMMUNITY_DEAFEN_DESCRIPTOR),
+						checked: isGuildDeafened,
+						onChange: async (checked: boolean) => {
+							try {
+								await GuildMemberCommands.update(guildId, user.id, {deaf: checked});
+								if (checked) SoundCommands.playSound(SoundType.Deaf);
+								else SoundCommands.playSound(SoundType.Undeaf);
+							} catch (error) {
+								logger.error('Failed to update community deafen:', error);
+								showVoiceMemberModerationFailedModal(error, VOICE_COMMUNITY_DEAFEN_DESCRIPTOR);
+							}
+						},
+					});
+				}
 			}
-			if (canMoveMembers && canManageTarget(user.id) && !isParentGroupedItem) {
-				moderationActions.push({
+			if (!isCurrentUser && canMoveMembers && canManageTarget(user.id) && !isParentGroupedItem) {
+				nextModerationActions.push({
 					icon: (
 						<DisconnectIcon
 							size={16}
@@ -1273,7 +1258,7 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 			}
 			if (canTimeoutTarget) {
 				const isTimedOut = memberTimedOut;
-				moderationActions.push({
+				nextModerationActions.push({
 					icon: (
 						<TimeoutIcon size={16} data-flx="ui.action-menu.items.voice-participant-menu-data.groups.timeout-icon" />
 					),
@@ -1307,7 +1292,7 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 				});
 			}
 			if (canKickTarget) {
-				moderationActions.push({
+				nextModerationActions.push({
 					icon: (
 						<KickMemberIcon
 							size={16}
@@ -1331,7 +1316,7 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 				});
 			}
 			if (canBanTarget) {
-				moderationActions.push({
+				nextModerationActions.push({
 					icon: (
 						<BanMemberIcon
 							size={16}
@@ -1354,8 +1339,8 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 					danger: true,
 				});
 			}
-			if (moderationActions.length > 0) {
-				moderationSubmenuActions.push(...moderationActions);
+			if (nextModerationActions.length > 0) {
+				moderationActions.push(...nextModerationActions);
 			}
 		}
 		if (developerMode) {
@@ -1384,26 +1369,33 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 				TextCopyCommands.copy(i18n, user.id, true);
 			},
 		});
-		addSecondarySubmenu(i18n._(STREAM_CONTROLS_DESCRIPTOR), streamControlActions);
-		addSecondarySubmenu(i18n._(MEDIA_CONTROLS_DESCRIPTOR), mediaActions);
-		addSecondarySubmenu(i18n._(DEVICE_CONTROLS_DESCRIPTOR), deviceActions);
-		addSecondarySubmenu(i18n._(DISPLAY_OPTIONS_DESCRIPTOR), displayActions);
-		addSecondarySubmenu(i18n._(USER_ACTIONS_DESCRIPTOR), userActions);
-		addSecondarySubmenu(i18n._(RELATIONSHIP_ACTIONS_DESCRIPTOR), relationshipSubmenuActions);
-		addSecondarySubmenu(i18n._(MODERATION_ACTIONS_DESCRIPTOR), moderationSubmenuActions);
-		addSecondarySubmenu(i18n._(ADVANCED_ACTIONS_DESCRIPTOR), advancedActions);
-		if (secondarySubmenus.length > 0) {
-			menuGroups.push({items: secondarySubmenus});
-		}
-		return menuGroups;
+		if (!isCurrentUser && volumeActions.length > 0) menuGroups.push({items: volumeActions});
+		const participantActions: Array<VoiceParticipantMenuLeafItem> = [
+			...voiceActions,
+			...focusActions,
+			...mediaActions,
+			...relationshipActions,
+		];
+		if (participantActions.length > 0) menuGroups.push({items: participantActions});
+		if (isCurrentUser && volumeActions.length > 0) menuGroups.push({items: volumeActions});
+		if (deviceActions.length > 0) menuGroups.push({items: deviceActions});
+		const guildManagementGroupIndex = menuGroups.length;
+		const visualActions: Array<VoiceParticipantMenuLeafItem> = [...popoutActions, ...displayActions];
+		if (visualActions.length > 0) menuGroups.push({items: visualActions});
+		if (moderationActions.length > 0) menuGroups.push({items: moderationActions});
+		if (advancedActions.length > 0) menuGroups.push({items: advancedActions});
+		return {groups: menuGroups, guildManagementGroupIndex};
 	}, [
 		i18n.locale,
 		user,
 		guildId,
 		connectionId,
+		surface,
+		source,
 		isCurrentUser,
 		isGroupedItem,
 		isParentGroupedItem,
+		groupContainsLocalConnection,
 		member,
 		developerMode,
 		relationshipType,
@@ -1411,6 +1403,7 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 		canMention,
 		focusedChannelId,
 		canMuteMembers,
+		canDeafenMembers,
 		canMoveMembers,
 		canManageTarget,
 		canKickTarget,
@@ -1429,24 +1422,22 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 		currentUserVoiceState,
 		currentUserVoiceStateInGuild,
 		isCurrentUserConnectedToVoice,
+		isTargetInLocalVoiceRoom,
 		currentConnectionId,
 		currentConnectionVoiceState,
-		showMyOwnCamera,
 		showMyOwnScreenShare,
 		showNonVideoParticipants,
-		prioritizeSpeakingParticipants,
+		pauseOwnScreenSharePreviewOnUnfocus,
 		showConnectionVolumeControls,
 		participantVolume,
+		isParticipantLocallyMuted,
+		entranceSoundMuted,
+		entranceSoundVolume,
 		connectionVolume,
 		isVideoDisabled,
 		callId,
 		participantIdentity,
 		streamKey,
-		isScreenShare,
-		isWatching,
-		hasScreenShareAudio,
-		isOwnScreenShare,
-		onStopWatching,
 		streamVolume,
 		isStreamMuted,
 		hiddenConnectionCount,
@@ -1455,7 +1446,8 @@ export function useVoiceParticipantMenuData(options: VoiceParticipantMenuDataOpt
 		onToggleDeviceGroup,
 	]);
 	return {
-		groups,
+		groups: menuAssembly.groups,
+		guildManagementGroupIndex: menuAssembly.guildManagementGroupIndex,
 		member,
 		isCurrentUser,
 		developerMode,

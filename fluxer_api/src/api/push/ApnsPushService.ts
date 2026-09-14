@@ -3,10 +3,10 @@
 import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {type ClientHttp2Session, connect, constants} from 'node:http2';
-import {importPKCS8, SignJWT} from 'jose';
-import {Config} from '../Config';
-import type {PushProviderEnvironment} from '../config/APIConfig';
-import {Logger} from '../Logger';
+import {Config} from '@app/api/Config';
+import type {PushProviderEnvironment} from '@app/api/config/APIConfig';
+import {Logger} from '@app/api/Logger';
+import {type CryptoKey, importPKCS8, SignJWT} from 'jose';
 
 const APNS_PROVIDER_TOKEN_TTL_SECONDS = 50 * 60;
 const APNS_REQUEST_TIMEOUT_MS = 5000;
@@ -45,6 +45,7 @@ interface Http2Response {
 }
 
 const providerTokenCache = new Map<string, CachedProviderToken>();
+const apnsSigningKeys = new Map<string, Promise<CryptoKey>>();
 const apnsSessions = new Map<string, ClientHttp2Session>();
 
 export async function sendApnsPush(params: SendApnsPushParams): Promise<SendApnsPushResult> {
@@ -105,7 +106,7 @@ async function getProviderToken(): Promise<string | null> {
 	if (cached && cached.expiresAtSeconds > nowSeconds) {
 		return cached.token;
 	}
-	const key = await importPKCS8(privateKey, 'ES256');
+	const key = await apnsSigningKey(privateKey);
 	const token = await new SignJWT({})
 		.setProtectedHeader({alg: 'ES256', kid: cfg.keyId})
 		.setIssuer(cfg.teamId)
@@ -123,6 +124,27 @@ async function resolveApnsPrivateKey(): Promise<string | null> {
 	if (!cfg.privateKeyPath) return null;
 	const pem = await readFile(cfg.privateKeyPath, 'utf8');
 	return normalizePem(pem);
+}
+
+export async function ensureApnsSigningKey(): Promise<void> {
+	if (!Config.push.apns.enabled) return;
+	const privateKey = await resolveApnsPrivateKey();
+	if (!privateKey) return;
+	await apnsSigningKey(privateKey);
+	Logger.info('APNs signing key loaded');
+}
+
+async function apnsSigningKey(privateKey: string): Promise<CryptoKey> {
+	const cached = apnsSigningKeys.get(privateKey);
+	if (cached) return await cached;
+	const pending = importPKCS8(privateKey, 'ES256');
+	apnsSigningKeys.set(privateKey, pending);
+	try {
+		return await pending;
+	} catch (error) {
+		apnsSigningKeys.delete(privateKey);
+		throw error;
+	}
 }
 
 function normalizePem(value: string): string {
@@ -143,7 +165,7 @@ function buildApnsHeaders(params: {
 		'apns-topic': params.topic,
 		'apns-push-type': isClear ? APNS_PUSH_TYPE_BACKGROUND : APNS_PUSH_TYPE_ALERT,
 		'apns-priority': isClear ? '5' : '10',
-		'apns-expiration': String(Math.floor(Date.now() / 1000) + (isClear ? 300 : 86400)),
+		'apns-expiration': String(Math.floor(Date.now() / 1000) + (isClear ? 3600 : 86400)),
 		'content-type': 'application/json',
 	};
 	if (collapseId && Buffer.byteLength(collapseId) <= 64) {
@@ -155,18 +177,11 @@ function buildApnsHeaders(params: {
 function buildApnsPayload(payload: Record<string, unknown>): Record<string, unknown> {
 	if (isClearNotificationPayload(payload)) {
 		const data = isRecord(payload.data) ? payload.data : {};
-		const badge = normalizeBadgeCount(data.badge_count);
-		const aps: Record<string, unknown> = {
-			'content-available': 1,
-		};
-		if (badge !== undefined) {
-			aps.badge = badge;
-		}
 		return {
 			...data,
 			type: 'notification_clear',
 			action: 'clear_channel',
-			aps,
+			aps: {'content-available': 1},
 		};
 	}
 	const data = isRecord(payload.data) ? payload.data : {};
@@ -177,16 +192,18 @@ function buildApnsPayload(payload: Record<string, unknown>): Record<string, unkn
 	const channelId = optionalString(data.channel_id);
 	const threadId =
 		optionalString(data.notification_tag) ?? (channelId ? `channel:${channelId}` : undefined) ?? 'fluxer-message';
-	const imageUrl = firstString([payload.image_url, notification.image, notification.icon, payload.icon]);
+	const imageUrl = firstString([payload.image_url, notification.image]);
 	const aps: Record<string, unknown> = {
 		alert: {title, body},
 		sound: APNS_DEFAULT_SOUND,
-		badge,
 		'thread-id': threadId,
 		category: APNS_CATEGORY_MESSAGE,
 		'interruption-level': 'active',
 		'relevance-score': 0.5,
 	};
+	if (badge !== undefined) {
+		aps.badge = badge;
+	}
 	if (imageUrl) {
 		aps['mutable-content'] = 1;
 	}
@@ -292,13 +309,13 @@ function isPermanentApnsFailure(statusCode: number, reason: string): boolean {
 	return reason === 'Unregistered';
 }
 
-function normalizeBadgeCount(value: unknown): number {
+function normalizeBadgeCount(value: unknown): number | undefined {
 	if (typeof value === 'number' && Number.isFinite(value)) return Math.max(0, Math.floor(value));
 	if (typeof value === 'string') {
 		const parsed = Number.parseInt(value, 10);
-		return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+		return Number.isFinite(parsed) ? Math.max(0, parsed) : undefined;
 	}
-	return 0;
+	return undefined;
 }
 
 function firstString(values: Array<unknown>): string | undefined {
@@ -321,4 +338,5 @@ export const ApnsPushServiceTestHooks = {
 	buildApnsPayload,
 	buildApnsHeaders,
 	isPermanentApnsFailure,
+	apnsSigningKey,
 };

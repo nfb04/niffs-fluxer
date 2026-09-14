@@ -581,10 +581,6 @@
 				{
 					"name": "animated",
 					"type": "boolean"
-				},
-				{
-					"name": "nsfw",
-					"type": "boolean"
 				}
 			]
 		},
@@ -793,6 +789,10 @@
 					"type": "timestamp"
 				},
 				{
+					"name": "attempt_id",
+					"type": "text"
+				},
+				{
 					"name": "started_at",
 					"type": "timestamp"
 				},
@@ -802,6 +802,10 @@
 				},
 				{
 					"name": "failed_at",
+					"type": "timestamp"
+				},
+				{
+					"name": "terminal_failed_at",
 					"type": "timestamp"
 				},
 				{
@@ -3969,84 +3973,6 @@
 			"options": "default_time_to_live = 86400 AND gc_grace_seconds = 864000 AND compaction = {'class': 'TimeWindowCompactionStrategy', 'compaction_window_unit': 'HOURS', 'compaction_window_size': '1'}"
 		},
 		{
-			"name": "expression_packs",
-			"columns": [
-				{
-					"name": "pack_id",
-					"type": "bigint"
-				},
-				{
-					"name": "pack_type",
-					"type": "text"
-				},
-				{
-					"name": "creator_id",
-					"type": "bigint"
-				},
-				{
-					"name": "name",
-					"type": "text"
-				},
-				{
-					"name": "description",
-					"type": "text"
-				},
-				{
-					"name": "created_at",
-					"type": "timestamp"
-				},
-				{
-					"name": "updated_at",
-					"type": "timestamp"
-				},
-				{
-					"name": "version",
-					"type": "int"
-				}
-			],
-			"primary_key": "(pack_id)",
-			"options": ""
-		},
-		{
-			"name": "expression_packs_by_creator",
-			"columns": [
-				{
-					"name": "creator_id",
-					"type": "bigint"
-				},
-				{
-					"name": "pack_id",
-					"type": "bigint"
-				},
-				{
-					"name": "pack_type",
-					"type": "text"
-				},
-				{
-					"name": "name",
-					"type": "text"
-				},
-				{
-					"name": "description",
-					"type": "text"
-				},
-				{
-					"name": "created_at",
-					"type": "timestamp"
-				},
-				{
-					"name": "updated_at",
-					"type": "timestamp"
-				},
-				{
-					"name": "version",
-					"type": "int"
-				}
-			],
-			"primary_key": "((creator_id), pack_id)",
-			"options": ""
-		},
-		{
 			"name": "favorite_memes",
 			"columns": [
 				{
@@ -5333,10 +5259,6 @@
 				{
 					"name": "version",
 					"type": "int"
-				},
-				{
-					"name": "nsfw",
-					"type": "boolean"
 				}
 			],
 			"primary_key": "((guild_id), emoji_id)",
@@ -5363,10 +5285,6 @@
 				},
 				{
 					"name": "animated",
-					"type": "boolean"
-				},
-				{
-					"name": "nsfw",
 					"type": "boolean"
 				}
 			],
@@ -5595,10 +5513,6 @@
 				{
 					"name": "version",
 					"type": "int"
-				},
-				{
-					"name": "nsfw",
-					"type": "boolean"
 				}
 			],
 			"primary_key": "((guild_id), sticker_id)",
@@ -5633,10 +5547,6 @@
 				},
 				{
 					"name": "animated",
-					"type": "boolean"
-				},
-				{
-					"name": "nsfw",
 					"type": "boolean"
 				}
 			],
@@ -6284,7 +6194,7 @@
 				}
 			],
 			"primary_key": "(bucket_day, created_at, job_id)",
-			"options": "CLUSTERING ORDER BY (created_at DESC, job_id DESC)"
+			"options": "CLUSTERING ORDER BY (created_at DESC, job_id DESC) AND default_time_to_live = 7776000"
 		},
 		{
 			"name": "jobs_by_id",
@@ -6375,7 +6285,7 @@
 				}
 			],
 			"primary_key": "(job_id)",
-			"options": ""
+			"options": "default_time_to_live = 7776000"
 		},
 		{
 			"name": "latest_risk_context_by_user",
@@ -6572,10 +6482,6 @@
 				{
 					"name": "version",
 					"type": "int"
-				},
-				{
-					"name": "nsfw_emojis",
-					"type": "set<bigint>"
 				}
 			],
 			"primary_key": "((channel_id, bucket), message_id)",
@@ -6906,29 +6812,6 @@
 			],
 			"primary_key": "((user_id), token_)",
 			"options": "CLUSTERING ORDER BY (token_ DESC) AND default_time_to_live = 2592000 AND gc_grace_seconds = 864000 AND compaction = {'class': 'TimeWindowCompactionStrategy', 'compaction_window_unit': 'DAYS', 'compaction_window_size': '1'}"
-		},
-		{
-			"name": "pack_installations",
-			"columns": [
-				{
-					"name": "user_id",
-					"type": "bigint"
-				},
-				{
-					"name": "pack_id",
-					"type": "bigint"
-				},
-				{
-					"name": "pack_type",
-					"type": "text"
-				},
-				{
-					"name": "installed_at",
-					"type": "timestamp"
-				}
-			],
-			"primary_key": "((user_id), pack_id)",
-			"options": ""
 		},
 		{
 			"name": "password_change_tickets",
@@ -7910,57 +7793,6 @@
 			"options": "CLUSTERING ORDER BY (message_id DESC)"
 		},
 		{
-			"name": "scheduled_messages",
-			"columns": [
-				{
-					"name": "user_id",
-					"type": "bigint"
-				},
-				{
-					"name": "scheduled_message_id",
-					"type": "bigint"
-				},
-				{
-					"name": "channel_id",
-					"type": "bigint"
-				},
-				{
-					"name": "payload",
-					"type": "text"
-				},
-				{
-					"name": "scheduled_at",
-					"type": "timestamp"
-				},
-				{
-					"name": "scheduled_local_at",
-					"type": "text"
-				},
-				{
-					"name": "timezone",
-					"type": "text"
-				},
-				{
-					"name": "status",
-					"type": "text"
-				},
-				{
-					"name": "status_reason",
-					"type": "text"
-				},
-				{
-					"name": "created_at",
-					"type": "timestamp"
-				},
-				{
-					"name": "invalidated_at",
-					"type": "timestamp"
-				}
-			],
-			"primary_key": "((user_id), scheduled_message_id)",
-			"options": "CLUSTERING ORDER BY (scheduled_message_id DESC)"
-		},
-		{
 			"name": "suspicious_email_domains",
 			"columns": [
 				{
@@ -8031,49 +7863,6 @@
 			"options": "default_time_to_live = 15552000 AND gc_grace_seconds = 864000 AND compaction = {'class': 'TimeWindowCompactionStrategy', 'compaction_window_unit': 'DAYS', 'compaction_window_size': '7'}"
 		},
 		{
-			"name": "pneumatic_post_deliveries",
-			"columns": [
-				{
-					"name": "user_id",
-					"type": "bigint"
-				},
-				{
-					"name": "dispatch_key",
-					"type": "text"
-				},
-				{
-					"name": "status",
-					"type": "text"
-				},
-				{
-					"name": "claimed_at",
-					"type": "timestamp"
-				},
-				{
-					"name": "sent_at",
-					"type": "timestamp"
-				},
-				{
-					"name": "channel_id",
-					"type": "bigint"
-				},
-				{
-					"name": "message_id",
-					"type": "bigint"
-				},
-				{
-					"name": "locale",
-					"type": "text"
-				},
-				{
-					"name": "error_message",
-					"type": "text"
-				}
-			],
-			"primary_key": "((user_id), dispatch_key)",
-			"options": "CLUSTERING ORDER BY (dispatch_key ASC)"
-		},
-		{
 			"name": "user_connections",
 			"columns": [
 				{
@@ -8113,6 +7902,10 @@
 					"type": "text"
 				},
 				{
+					"name": "oauth_grant_id",
+					"type": "text"
+				},
+				{
 					"name": "verified_at",
 					"type": "timestamp"
 				},
@@ -8125,8 +7918,24 @@
 					"type": "timestamp"
 				},
 				{
+					"name": "revision",
+					"type": "text"
+				},
+				{
 					"name": "version",
 					"type": "int"
+				},
+				{
+					"name": "membership",
+					"type": "text"
+				},
+				{
+					"name": "credential_payload",
+					"type": "text"
+				},
+				{
+					"name": "credential_expires_at",
+					"type": "timestamp"
 				}
 			],
 			"primary_key": "((user_id), connection_type, connection_id)",
@@ -8392,6 +8201,10 @@
 					"type": "timestamp"
 				},
 				{
+					"name": "attempt_id",
+					"type": "text"
+				},
+				{
 					"name": "started_at",
 					"type": "timestamp"
 				},
@@ -8401,6 +8214,10 @@
 				},
 				{
 					"name": "failed_at",
+					"type": "timestamp"
+				},
+				{
+					"name": "terminal_failed_at",
 					"type": "timestamp"
 				},
 				{
@@ -8782,6 +8599,10 @@
 					"type": "timestamp"
 				},
 				{
+					"name": "deletion_started_at",
+					"type": "timestamp"
+				},
+				{
 					"name": "pending_bulk_message_deletion_at",
 					"type": "timestamp"
 				},
@@ -9102,6 +8923,10 @@
 				{
 					"name": "longitude",
 					"type": "double"
+				},
+				{
+					"name": "soft_connection_limit",
+					"type": "int"
 				}
 			],
 			"primary_key": "((region_id), server_id)",
@@ -9237,92 +9062,6 @@
 			],
 			"primary_key": "((guild_id), webhook_id)",
 			"options": ""
-		},
-		{
-			"name": "gateway_hotpatch_events_by_build",
-			"columns": [
-				{
-					"name": "build_sha",
-					"type": "text"
-				},
-				{
-					"name": "event_id",
-					"type": "timeuuid"
-				},
-				{
-					"name": "schema_version",
-					"type": "int"
-				},
-				{
-					"name": "kind",
-					"type": "text"
-				},
-				{
-					"name": "created_at",
-					"type": "timestamp"
-				},
-				{
-					"name": "created_by",
-					"type": "text"
-				},
-				{
-					"name": "signer_key_id",
-					"type": "text"
-				},
-				{
-					"name": "bundle_sha256",
-					"type": "blob"
-				},
-				{
-					"name": "signature",
-					"type": "blob"
-				},
-				{
-					"name": "bundle",
-					"type": "blob"
-				}
-			],
-			"primary_key": "((build_sha), event_id)",
-			"options": "CLUSTERING ORDER BY (event_id ASC)"
-		},
-		{
-			"name": "gateway_hotpatch_applied_by_node",
-			"columns": [
-				{
-					"name": "build_sha",
-					"type": "text"
-				},
-				{
-					"name": "node_name",
-					"type": "text"
-				},
-				{
-					"name": "event_id",
-					"type": "timeuuid"
-				},
-				{
-					"name": "applied_at",
-					"type": "timestamp"
-				},
-				{
-					"name": "module_count",
-					"type": "int"
-				},
-				{
-					"name": "bundle_sha256",
-					"type": "blob"
-				},
-				{
-					"name": "status",
-					"type": "text"
-				},
-				{
-					"name": "error",
-					"type": "text"
-				}
-			],
-			"primary_key": "((build_sha, node_name), event_id)",
-			"options": "CLUSTERING ORDER BY (event_id ASC)"
 		}
 	],
 	"indexes": [

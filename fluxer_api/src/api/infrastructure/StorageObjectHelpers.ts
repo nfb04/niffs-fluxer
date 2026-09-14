@@ -4,10 +4,10 @@ import {execFile} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import fs from 'node:fs';
 import {promisify} from 'node:util';
+import {Logger} from '@app/api/Logger';
+import {isJsonRecord, parseJsonArray} from '@app/api/utils/JsonBoundaryUtils';
 import sharp from 'sharp';
 import {temporaryFile} from 'tempy';
-import {Logger} from '../Logger';
-import {isJsonRecord, parseJsonArray} from '../utils/JsonBoundaryUtils';
 
 const execFilePromise = promisify(execFile);
 
@@ -171,7 +171,6 @@ export async function stripNonJpegImageMetadataForUpload(
 			return {body: await image.gif().toBuffer(), contentType: 'image/gif'};
 		case 'webp':
 			return {body: await image.webp({lossless: true}).toBuffer(), contentType: 'image/webp'};
-		case 'avif':
 		case 'heif':
 			return {body: await image.avif().toBuffer(), contentType: 'image/avif'};
 		case 'tiff':
@@ -460,7 +459,6 @@ async function stripNonJpegImageFileToFile(
 		case 'webp':
 			await image.webp({lossless: true}).toFile(outputPath);
 			return {contentType: 'image/webp', ...dimensions};
-		case 'avif':
 		case 'heif':
 			await image.avif().toFile(outputPath);
 			return {contentType: 'image/avif', ...dimensions};

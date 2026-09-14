@@ -24,6 +24,8 @@ class ChannelSearchContext {
 	activeSearchQuery: string = '';
 	activeSearchSegments: Array<SearchSegment> = [];
 	isSearchActive = false;
+	unsearchableQuery = '';
+	isInputFocused = false;
 	searchRefreshKey = 0;
 	machineSnapshot: SearchMachineSnapshot = createSearchMachineSnapshot();
 	scrollPosition = 0;
@@ -73,13 +75,36 @@ class ChannelSearch {
 		const context = this.getContext(contextId);
 		context.activeSearchQuery = query;
 		context.activeSearchSegments = [...segments];
+		context.unsearchableQuery = '';
 		context.isSearchActive = true;
 		context.searchRefreshKey += 1;
+	}
+
+	setUnsearchableSearch(contextId: string, query: string): void {
+		const context = this.getContext(contextId);
+		context.activeSearchQuery = '';
+		context.activeSearchSegments = [];
+		context.unsearchableQuery = query;
+		context.isSearchActive = true;
+		context.searchRefreshKey += 1;
+		context.lastSearchQuery = '';
+		context.lastSearchSegments = [];
+		context.lastSearchRefreshKey = null;
+		context.lastSearchScope = null;
+		context.lastSearchSortMode = null;
+		context.machineSnapshot = transitionSearchMachineSnapshot(context.machineSnapshot, {
+			type: 'channelSearch.reset',
+		});
 	}
 
 	setIsSearchActive(contextId: string, value: boolean): void {
 		const context = this.getContext(contextId);
 		context.isSearchActive = value;
+	}
+
+	setInputFocused(contextId: string, focused: boolean): void {
+		const context = this.getContext(contextId);
+		context.isInputFocused = focused;
 	}
 
 	closeSearch(contextId: string): void {
@@ -88,6 +113,7 @@ class ChannelSearch {
 		context.searchSegments = [];
 		context.activeSearchQuery = '';
 		context.activeSearchSegments = [];
+		context.unsearchableQuery = '';
 		context.isSearchActive = false;
 		context.searchRefreshKey = 0;
 		context.lastSearchRefreshKey = null;

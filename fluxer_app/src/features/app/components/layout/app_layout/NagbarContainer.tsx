@@ -2,16 +2,21 @@
 
 import {type NagbarState, NagbarType} from '@app/features/app/components/layout/app_layout/AppLayoutTypes';
 import styles from '@app/features/app/components/layout/app_layout/NagbarContainer.module.css';
+import {BuildEnvironmentNagbar} from '@app/features/app/components/layout/app_layout/nagbars/BuildEnvironmentNagbar';
+import {ConnectionNagbar} from '@app/features/app/components/layout/app_layout/nagbars/ConnectionNagbar';
 import {CorruptedInstallationNagbar} from '@app/features/app/components/layout/app_layout/nagbars/CorruptedInstallationNagbar';
 import {DesktopDownloadNagbar} from '@app/features/app/components/layout/app_layout/nagbars/DesktopDownloadNagbar';
 import {DesktopNotificationNagbar} from '@app/features/app/components/layout/app_layout/nagbars/DesktopNotificationNagbar';
+import {DesktopUpdateReadyNagbar} from '@app/features/app/components/layout/app_layout/nagbars/DesktopUpdateReadyNagbar';
 import {EmailVerificationNagbar} from '@app/features/app/components/layout/app_layout/nagbars/EmailVerificationNagbar';
 import {GiftInventoryNagbar} from '@app/features/app/components/layout/app_layout/nagbars/GiftInventoryNagbar';
 import {GuildMembershipCtaNagbar} from '@app/features/app/components/layout/app_layout/nagbars/GuildMembershipCtaNagbar';
+import {LegacyPriceOptInNagbar} from '@app/features/app/components/layout/app_layout/nagbars/LegacyPriceOptInNagbar';
 import {LinuxInputAccessNagbar} from '@app/features/app/components/layout/app_layout/nagbars/LinuxInputAccessNagbar';
 import {PremiumExpiredNagbar} from '@app/features/app/components/layout/app_layout/nagbars/PremiumExpiredNagbar';
 import {PremiumGracePeriodNagbar} from '@app/features/app/components/layout/app_layout/nagbars/PremiumGracePeriodNagbar';
 import {PremiumOnboardingNagbar} from '@app/features/app/components/layout/app_layout/nagbars/PremiumOnboardingNagbar';
+import {PriceAnnouncementNagbar} from '@app/features/app/components/layout/app_layout/nagbars/PriceAnnouncementNagbar';
 import {ScheduledMaintenanceNagbar} from '@app/features/app/components/layout/app_layout/nagbars/ScheduledMaintenanceNagbar';
 import {StreamerModeNagbar} from '@app/features/app/components/layout/app_layout/nagbars/StreamerModeNagbar';
 import {TermsAcceptanceNagbar} from '@app/features/app/components/layout/app_layout/nagbars/TermsAcceptanceNagbar';
@@ -28,6 +33,13 @@ interface NagbarContainerProps {
 	nagbars: Array<NagbarState>;
 }
 
+class UnexpectedNagbarTypeError extends Error {
+	constructor(nagbarType: never) {
+		super(`Unexpected nagbar type: ${String(nagbarType)}`);
+		this.name = 'UnexpectedNagbarTypeError';
+	}
+}
+
 export const NagbarContainer: React.FC<NagbarContainerProps> = observer(({nagbars}) => {
 	const mobileLayout = MobileLayout;
 	const showPremiumFeatures = shouldShowPremiumFeatures();
@@ -36,6 +48,22 @@ export const NagbarContainer: React.FC<NagbarContainerProps> = observer(({nagbar
 		<div className={styles.container} data-flx="app.app-layout.nagbar-container.container">
 			{nagbars.map((nagbar) => {
 				switch (nagbar.type) {
+					case NagbarType.BUILD_ENVIRONMENT:
+						return (
+							<BuildEnvironmentNagbar
+								key={nagbar.type}
+								isMobile={mobileLayout.enabled}
+								data-flx="app.app-layout.nagbar-container.build-environment-nagbar"
+							/>
+						);
+					case NagbarType.CONNECTION:
+						return (
+							<ConnectionNagbar
+								key={nagbar.type}
+								isMobile={mobileLayout.enabled}
+								data-flx="app.app-layout.nagbar-container.connection-nagbar"
+							/>
+						);
 					case NagbarType.CORRUPTED_INSTALLATION:
 						return (
 							<CorruptedInstallationNagbar
@@ -111,6 +139,24 @@ export const NagbarContainer: React.FC<NagbarContainerProps> = observer(({nagbar
 								data-flx="app.app-layout.nagbar-container.premium-onboarding-nagbar"
 							/>
 						);
+					case NagbarType.PRICE_ANNOUNCEMENT:
+						if (!showPremiumFeatures) return null;
+						return (
+							<PriceAnnouncementNagbar
+								key={nagbar.type}
+								isMobile={mobileLayout.enabled}
+								data-flx="app.app-layout.nagbar-container.price-announcement-nagbar"
+							/>
+						);
+					case NagbarType.LEGACY_PRICE_OPT_IN:
+						if (!showPremiumFeatures) return null;
+						return (
+							<LegacyPriceOptInNagbar
+								key={nagbar.type}
+								isMobile={mobileLayout.enabled}
+								data-flx="app.app-layout.nagbar-container.legacy-price-opt-in-nagbar"
+							/>
+						);
 					case NagbarType.GIFT_INVENTORY:
 						if (!showPremiumFeatures) return null;
 						return (
@@ -126,6 +172,14 @@ export const NagbarContainer: React.FC<NagbarContainerProps> = observer(({nagbar
 								key={nagbar.type}
 								isMobile={mobileLayout.enabled}
 								data-flx="app.app-layout.nagbar-container.desktop-download-nagbar"
+							/>
+						);
+					case NagbarType.DESKTOP_UPDATE_READY:
+						return (
+							<DesktopUpdateReadyNagbar
+								key={nagbar.type}
+								isMobile={mobileLayout.enabled}
+								data-flx="app.app-layout.nagbar-container.desktop-update-ready-nagbar"
 							/>
 						);
 					case NagbarType.GUILD_MEMBERSHIP_CTA:
@@ -177,7 +231,7 @@ export const NagbarContainer: React.FC<NagbarContainerProps> = observer(({nagbar
 							/>
 						);
 					default:
-						return null;
+						throw new UnexpectedNagbarTypeError(nagbar.type);
 				}
 			})}
 		</div>

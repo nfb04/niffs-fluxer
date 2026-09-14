@@ -5,7 +5,6 @@ use std::time::Duration;
 use url::Url;
 
 const METADATA_TIMEOUT: Duration = Duration::from_secs(5);
-const EXTERNAL_PROXY_VERSION_PREFIX: &str = "v2/";
 
 pub struct MediaProxyClient {
     http_client: reqwest::Client,
@@ -113,35 +112,22 @@ impl MediaProxyClient {
         }
     }
 
-    pub fn external_proxy_url(&self, input_url: &str) -> Option<String> {
-        if input_url == self.public_endpoint
+    pub fn is_own_url(&self, input_url: &str) -> bool {
+        input_url == self.public_endpoint
             || input_url.starts_with(&format!("{}/", self.public_endpoint))
-        {
+    }
+
+    pub fn external_proxy_url(&self, input_url: &str) -> Option<String> {
+        if self.is_own_url(input_url) {
             return Some(input_url.to_owned());
         }
         let parsed = Url::parse(input_url).ok()?;
-        let encoded = base64::Engine::encode(
-            &base64::engine::general_purpose::URL_SAFE_NO_PAD,
+        fluxer_common::external_media_path::build_external_media_proxy_url(
+            &self.public_endpoint,
             parsed.as_str(),
-        );
-        let path = format!("{EXTERNAL_PROXY_VERSION_PREFIX}{encoded}");
-        let signature = create_signature(&path, &self.secret_key);
-        Some(format!(
-            "{}/external/{}/{}",
-            self.public_endpoint, signature, path
-        ))
+            self.secret_key.as_bytes(),
+        )
     }
-}
-
-fn create_signature(input: &str, secret: &str) -> String {
-    use hmac::{Hmac, KeyInit, Mac};
-    let mut mac =
-        Hmac::<sha2::Sha256>::new_from_slice(secret.as_bytes()).expect("hmac accepts any key size");
-    mac.update(input.as_bytes());
-    base64::Engine::encode(
-        &base64::engine::general_purpose::URL_SAFE_NO_PAD,
-        mac.finalize().into_bytes(),
-    )
 }
 
 #[cfg(test)]
@@ -178,7 +164,21 @@ mod tests {
     }
 
     #[test]
-    fn external_proxy_url_uses_public_endpoint_and_v2_path() {
+    fn own_urls_are_recognised_by_their_public_endpoint() {
+        let mp = MediaProxyClient::new_with_public_endpoint(
+            "http://media-proxy:8080",
+            "secret",
+            Some("https://chat.example.test/media/"),
+            reqwest::Client::new(),
+        );
+        assert!(mp.is_own_url("https://chat.example.test/media"));
+        assert!(mp.is_own_url("https://chat.example.test/media/attachments/1/2/cat.gif"));
+        assert!(!mp.is_own_url("https://chat.example.test/mediafiles/1.gif"));
+        assert!(!mp.is_own_url("https://static.klipy.com/ii/c8/28/HkAKKCzZ.webp"));
+    }
+
+    #[test]
+    fn external_proxy_url_uses_public_endpoint_and_plain_path() {
         let client = reqwest::Client::new();
         let mp = MediaProxyClient::new_with_public_endpoint(
             "http://media-proxy:8080/",
@@ -191,15 +191,18 @@ mod tests {
             .expect("proxy url");
 
         assert!(proxy.starts_with("https://media.example.test/external/"));
-        assert!(proxy.contains("/v2/"));
+        assert!(proxy.contains("/https/"));
 
-        let encoded = proxy.rsplit('/').next().expect("encoded path segment");
-        let decoded =
-            base64::Engine::decode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, encoded)
-                .expect("valid base64");
+        let path = proxy
+            .split_once("/external/")
+            .expect("external segment")
+            .1
+            .split_once('/')
+            .expect("signature segment")
+            .1;
         assert_eq!(
-            String::from_utf8(decoded).expect("utf8"),
-            "https://pbs.twimg.com/media/a.jpg?name=orig"
+            "https://pbs.twimg.com/media/a.jpg?name=orig",
+            fluxer_common::external_media_path::reconstruct_original_url(path).expect("decodes")
         );
         assert_eq!(
             mp.external_proxy_url("https://media.example.test/external/already"),

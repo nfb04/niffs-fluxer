@@ -10,18 +10,15 @@ import * as DraftCommands from '@app/features/messaging/commands/DraftCommands';
 import * as MessageCommands from '@app/features/messaging/commands/MessageCommands';
 import {AttachmentUploadConnectivityModal} from '@app/features/messaging/components/alerts/AttachmentUploadConnectivityModal';
 import {FileSizeTooLargeModal} from '@app/features/messaging/components/alerts/FileSizeTooLargeModal';
-import {MessageEditFailedModal} from '@app/features/messaging/components/alerts/MessageEditFailedModal';
-import {MessageEditTooQuickModal} from '@app/features/messaging/components/alerts/MessageEditTooQuickModal';
 import {MessageSendFailedModal} from '@app/features/messaging/components/alerts/MessageSendFailedModal';
 import {MessageSendTooQuickModal} from '@app/features/messaging/components/alerts/MessageSendTooQuickModal';
 import {
 	type MessageLocalSendRateLimitState,
-	type MessageQueueRequestOutcomeStatus,
 	resolveMessageLocalSendRateLimitDecision,
-	resolveMessageQueuePayloadRouteDecision,
 	resolveMessageQueueRequestOutcomeDecision,
 	resolveMessageQueueSendExecutionDecision,
 } from '@app/features/messaging/state/MessageQueueStateMachine';
+import {planTextareaAttachmentCancellation} from '@app/features/messaging/state/TextareaAttachmentUploadCancellation';
 import {
 	type ChunkedUploadPart,
 	type ChunkedUploadPlan,
@@ -32,12 +29,10 @@ import {exceedsMultipartFallbackRequestSize} from '@app/features/messaging/utils
 import {prepareAttachmentsForNonce} from '@app/features/messaging/utils/MessageAttachmentUtils';
 import {
 	type ApiAttachmentMetadata,
-	type ApiMessageEditAttachmentMetadata,
 	buildMessageCreateRequest,
 	type MessageCreateRequest,
-	type MessageEditRequest,
-	normalizeMessageEditContent,
 } from '@app/features/messaging/utils/MessageRequestUtils';
+import {resolveRetryAfterMs} from '@app/features/messaging/utils/RetryAfterUtils';
 import {MatureContentRejectedModal} from '@app/features/moderation/components/alerts/MatureContentRejectedModal';
 import {http} from '@app/features/platform/transport/RestTransport';
 import {HttpError} from '@app/features/platform/types/EndpointError';
@@ -49,7 +44,7 @@ import * as ModalCommands from '@app/features/ui/commands/ModalCommands';
 import {modal} from '@app/features/ui/commands/ModalCommands';
 import {formatUserSettingsPath} from '@app/features/user/components/settings_utils/SettingsConstants';
 import PrivacyPreferences from '@app/features/user/state/PrivacyPreferences';
-import {Queue, type QueueEntry} from '@app/lib/list/ListQueue';
+import {Queue} from '@app/lib/list/ListQueue';
 import {APIErrorCodes} from '@fluxer/constants/src/ApiErrorCodes';
 import type {
 	AllowedMentions,
@@ -79,19 +74,19 @@ const YOUR_MESSAGE_COULD_NOT_BE_DELIVERED_BECAUSE_IT_DESCRIPTOR = msg({
 		'Your message could not be delivered because it was flagged by our safety systems. If you believe this is a mistake, please contact support.',
 	comment: 'Label in the message queue state.',
 });
-const YOUR_MESSAGE_COULD_NOT_BE_DELIVERED_BECAUSE_IT_2_DESCRIPTOR = msg({
-	message:
-		'Your message could not be delivered because it contains mature emoji or stickers that are not allowed in this context.',
-	comment: 'Label in the message queue state.',
-});
 const logger = new Logger('MessageQueue');
 const DEFAULT_MAX_SIZE = 5;
 const DEV_MESSAGE_DELAY = 3000;
 const LOCAL_SEND_RATE_LIMIT_MAX_SENDS = 5;
 const LOCAL_SEND_RATE_LIMIT_WINDOW_MS = 2000;
 const LOCAL_SEND_RATE_LIMIT_BLOCK_MS = 3000;
+const LOCAL_SEND_RATE_LIMIT_TRACKED_CHANNELS_MAX = 128;
+const LOCAL_SEND_RESERVATION_TTL_MS = 30 * 1000;
+const LOCAL_SEND_RESERVATIONS_MAX = 128;
 const LOCAL_SEND_RATE_LIMIT_MODAL_KEY_PREFIX = 'message-local-send-rate-limit';
 const TEXTAREA_ATTACHMENT_UPLOAD_CACHE_TTL_MS = 5 * 60 * 1000;
+const MESSAGE_SEND_RATE_LIMIT_MAX_AUTOMATIC_RETRIES = 2;
+const MESSAGE_SEND_RATE_LIMIT_MAX_AUTOMATIC_DELAY_MS = 30 * 1000;
 
 interface BaseMessagePayload {
 	channelId: string;
@@ -100,6 +95,7 @@ interface BaseMessagePayload {
 interface SendMessagePayload extends BaseMessagePayload {
 	type: 'send';
 	nonce: string;
+	rateLimitRetryCount?: number;
 	content: string;
 	hasAttachments?: boolean;
 	preparedAttachments?: Array<ApiAttachmentMetadata>;
@@ -112,16 +108,7 @@ interface SendMessagePayload extends BaseMessagePayload {
 	tts?: boolean;
 }
 
-interface EditMessagePayload extends BaseMessagePayload {
-	type: 'edit';
-	messageId: string;
-	content?: string;
-	allowedMentions?: AllowedMentions;
-	flags?: number;
-	attachments?: Array<ApiMessageEditAttachmentMetadata>;
-}
-
-export type MessageQueuePayload = SendMessagePayload | EditMessagePayload;
+export type MessageQueuePayload = SendMessagePayload;
 type MessageQueueCompletion<TResult> = {
 	retry: RetryError | null;
 	result?: TResult;
@@ -134,7 +121,6 @@ export interface RetryError {
 
 export interface ApiErrorBody {
 	code?: number | string;
-	retry_after?: number;
 	message?: string;
 }
 
@@ -213,8 +199,30 @@ function createAbortError(): DOMException {
 }
 
 const getApiErrorBody = (error: HttpError): ApiErrorBody | undefined => {
-	return typeof error?.body === 'object' && error.body !== null ? (error.body as ApiErrorBody) : undefined;
+	return typeof error.body === 'object' && error.body !== null ? (error.body as ApiErrorBody) : undefined;
 };
+
+interface MessageRateLimitRetry {
+	retryAfterMs: number | null;
+	automaticRetryDelayMs: number | null;
+}
+
+function resolveMessageRateLimitRetry(error: HttpError): MessageRateLimitRetry {
+	const retryAfterMs = resolveRetryAfterMs(error);
+	if (retryAfterMs === null) {
+		return {retryAfterMs: null, automaticRetryDelayMs: null};
+	}
+	let automaticRetryDelayMs: number | null = null;
+	if (retryAfterMs <= MESSAGE_SEND_RATE_LIMIT_MAX_AUTOMATIC_DELAY_MS) {
+		automaticRetryDelayMs = retryAfterMs;
+	}
+	return {retryAfterMs, automaticRetryDelayMs};
+}
+
+function retryAfterMsToWholeSeconds(retryAfterMs: number | null): number | null {
+	if (retryAfterMs === null) return null;
+	return Math.ceil(retryAfterMs / 1000);
+}
 const isAbortError = (error: unknown): boolean => {
 	return error instanceof DOMException && error.name === 'AbortError';
 };
@@ -225,21 +233,16 @@ const isNetworkRequestError = (error: unknown): boolean => {
 	return error instanceof Error && error.message === 'Network error during request';
 };
 
-function isSendPayload(payload: MessageQueuePayload): payload is SendMessagePayload {
-	return payload.type === 'send';
-}
-
 function isRateLimitError(error: HttpError): boolean {
-	return error?.status === 429;
-}
-
-function getRequestErrorOutcomeStatus(error: HttpError): MessageQueueRequestOutcomeStatus {
-	if (isRateLimitError(error)) return 'rateLimit';
-	return 'failure';
+	if (error.status !== 429) return false;
+	return !isSlowmodeError(error);
 }
 
 function isSlowmodeError(error: HttpError): boolean {
-	return error?.status === 400 && getApiErrorBody(error)?.code === APIErrorCodes.SLOWMODE_RATE_LIMITED;
+	if (error.status !== 400 && error.status !== 429) return false;
+	const body = getApiErrorBody(error);
+	if (body === undefined) return false;
+	return body.code === APIErrorCodes.SLOWMODE_RATE_LIMITED;
 }
 
 function isFeatureDisabledError(error: HttpError): boolean {
@@ -292,7 +295,7 @@ export class MessageQueue extends Queue<MessageQueuePayload, RestResponse<Messag
 	private readonly textareaAttachmentUploads = new Map<number, TextareaAttachmentUpload>();
 	private readonly textareaAttachmentUploadDisposers = new Map<string, () => void>();
 	private readonly localSendLimiters = new Map<string, MessageLocalSendRateLimitState>();
-	private readonly localSendReservations = new Set<string>();
+	private readonly localSendReservations = new Map<string, number>();
 
 	constructor(maxSize = DEFAULT_MAX_SIZE) {
 		super({logger, defaultRetryAfter: 100});
@@ -311,21 +314,51 @@ export class MessageQueue extends Queue<MessageQueuePayload, RestResponse<Messag
 		return this.queueLength >= this.maxSize;
 	}
 
+	override enqueue(
+		message: MessageQueuePayload,
+		success: (result?: RestResponse<Message>, error?: unknown) => void,
+	): void {
+		if (!this.isFull()) {
+			super.enqueue(message, success);
+			return;
+		}
+		const error = new Error(`Message queue capacity of ${this.maxSize} entries was reached`);
+		logger.error('Rejected message queue entry because capacity was reached', error);
+		this.handleSendError(message.channelId, message.nonce, error, i18n, message.hasAttachments);
+		try {
+			success(undefined, error);
+		} catch (callbackError) {
+			logger.error('Message queue rejection callback failed', callbackError);
+		}
+	}
+
 	reserveLocalSend(channelId: string, nonce: string): boolean {
 		const reservationKey = this.getLocalSendReservationKey(channelId, nonce);
-		if (this.localSendReservations.has(reservationKey)) {
-			return true;
+		const now = Date.now();
+		this.pruneExpiredLocalSendReservations(now);
+		const existingExpiry = this.localSendReservations.get(reservationKey);
+		if (existingExpiry !== undefined) {
+			if (existingExpiry > now) return true;
+			this.localSendReservations.delete(reservationKey);
 		}
 		if (!this.consumeLocalSendAllowance(channelId)) {
 			return false;
 		}
-		this.localSendReservations.add(reservationKey);
+		while (this.localSendReservations.size >= LOCAL_SEND_RESERVATIONS_MAX) {
+			const oldestReservationKey = this.localSendReservations.keys().next().value;
+			if (oldestReservationKey === undefined) break;
+			this.localSendReservations.delete(oldestReservationKey);
+		}
+		this.localSendReservations.set(reservationKey, now + LOCAL_SEND_RESERVATION_TTL_MS);
 		return true;
 	}
 
 	consumeLocalSendReservation(channelId: string, nonce: string): boolean {
-		if (this.localSendReservations.delete(this.getLocalSendReservationKey(channelId, nonce))) {
-			return true;
+		const reservationKey = this.getLocalSendReservationKey(channelId, nonce);
+		const expiresAt = this.localSendReservations.get(reservationKey);
+		if (expiresAt !== undefined) {
+			this.localSendReservations.delete(reservationKey);
+			if (expiresAt > Date.now()) return true;
 		}
 		return this.consumeLocalSendAllowance(channelId);
 	}
@@ -341,32 +374,38 @@ export class MessageQueue extends Queue<MessageQueuePayload, RestResponse<Messag
 		message: MessageQueuePayload,
 		completed: (err: RetryError | null, result?: RestResponse<Message>, error?: unknown) => void,
 	): Promise<unknown> | undefined {
-		const route = resolveMessageQueuePayloadRouteDecision({
-			payloadType: (message as {type?: string}).type,
-		});
-		switch (route.type) {
-			case 'send':
-				return this.handleSend(message as SendMessagePayload, completed);
-			case 'edit':
-				return this.handleEdit(message as EditMessagePayload, completed);
-			case 'unknown':
-				logger.error('Unknown message type, completing with null');
-				completed(null, undefined, new Error('Unknown message queue payload'));
-				return undefined;
-		}
+		return this.handleSend(message, completed);
 	}
 
 	private consumeLocalSendAllowance(channelId: string): boolean {
+		const now = Date.now();
 		const previous = this.localSendLimiters.get(channelId);
+		let windowStartedAt: number | null = null;
+		let sentCount = 0;
+		let blockedUntil: number | null = null;
+		if (previous !== undefined) {
+			windowStartedAt = previous.windowStartedAt;
+			sentCount = previous.sentCount;
+			blockedUntil = previous.blockedUntil;
+		}
 		const decision = resolveMessageLocalSendRateLimitDecision({
-			windowStartedAt: previous?.windowStartedAt ?? null,
-			sentCount: previous?.sentCount ?? 0,
-			blockedUntil: previous?.blockedUntil ?? null,
-			now: Date.now(),
+			windowStartedAt,
+			sentCount,
+			blockedUntil,
+			now,
 			maxSends: LOCAL_SEND_RATE_LIMIT_MAX_SENDS,
 			windowMs: LOCAL_SEND_RATE_LIMIT_WINDOW_MS,
 			blockMs: LOCAL_SEND_RATE_LIMIT_BLOCK_MS,
 		});
+		this.localSendLimiters.delete(channelId);
+		if (this.localSendLimiters.size >= LOCAL_SEND_RATE_LIMIT_TRACKED_CHANNELS_MAX) {
+			this.removeExpiredLocalSendLimiters(now);
+		}
+		while (this.localSendLimiters.size >= LOCAL_SEND_RATE_LIMIT_TRACKED_CHANNELS_MAX) {
+			const oldestChannelId = this.localSendLimiters.keys().next().value;
+			if (oldestChannelId === undefined) break;
+			this.localSendLimiters.delete(oldestChannelId);
+		}
 		this.localSendLimiters.set(channelId, decision.next);
 		switch (decision.type) {
 			case 'allow':
@@ -403,6 +442,21 @@ export class MessageQueue extends Queue<MessageQueuePayload, RestResponse<Messag
 		return `${channelId}:${nonce}`;
 	}
 
+	private removeExpiredLocalSendLimiters(now: number): void {
+		for (const [channelId, state] of this.localSendLimiters) {
+			const windowExpired =
+				state.windowStartedAt === null || now - state.windowStartedAt >= LOCAL_SEND_RATE_LIMIT_WINDOW_MS;
+			const blockExpired = state.blockedUntil === null || now >= state.blockedUntil;
+			if (windowExpired && blockExpired) this.localSendLimiters.delete(channelId);
+		}
+	}
+
+	private pruneExpiredLocalSendReservations(now: number): void {
+		for (const [reservationKey, expiresAt] of this.localSendReservations) {
+			if (expiresAt <= now) this.localSendReservations.delete(reservationKey);
+		}
+	}
+
 	cancelRequest(nonce: string): void {
 		logger.info('Cancel message send:', nonce);
 		const messageUpload = CloudUpload.getMessageUpload(nonce);
@@ -414,30 +468,14 @@ export class MessageQueue extends Queue<MessageQueuePayload, RestResponse<Messag
 		this.abortControllers.delete(nonce);
 	}
 
-	cancelPendingSendRequests(channelId: string): Array<SendMessagePayload> {
-		const cancelled: Array<SendMessagePayload> = [];
-		const remaining: Array<QueueEntry<MessageQueuePayload, RestResponse<Message> | undefined>> = [];
-		while (this.queue.length > 0) {
-			const entry = this.queue.shift()!;
-			if (isSendPayload(entry.message) && entry.message.channelId === channelId) {
-				cancelled.push(entry.message);
-				this.cancelRequest(entry.message.nonce);
-			} else {
-				remaining.push(entry);
-			}
-		}
-		this.queue.push(...remaining);
-		logger.info('Cancel pending send requests', cancelled.length);
-		return cancelled;
-	}
-
 	async sendImmediately(payload: SendMessagePayload): Promise<RestResponse<Message> | undefined> {
 		while (true) {
 			const completion = await this.drainSendImmediately(payload);
 			if (completion.retry === null) {
 				return completion.result;
 			}
-			const delay = completion.retry.retryAfter ?? this.defaultRetryAfter;
+			const retryAfter = completion.retry.retryAfter;
+			const delay = retryAfter === undefined ? this.defaultRetryAfter : retryAfter;
 			logger.info(`Pausing immediate send retry for ${delay}ms due to retry request`);
 			await new Promise<void>((resolve) => window.setTimeout(resolve, delay));
 		}
@@ -610,16 +648,15 @@ export class MessageQueue extends Queue<MessageQueuePayload, RestResponse<Messag
 	}
 
 	private cancelTextareaAttachmentUploads(attachmentIds: ReadonlyArray<number>): void {
-		const channelIds = new Set<string>();
-		for (const attachmentId of attachmentIds) {
-			const upload = this.textareaAttachmentUploads.get(attachmentId);
-			if (!upload) continue;
-			channelIds.add(upload.channelId);
-			upload.requestAbortController.abort();
+		const plan = planTextareaAttachmentCancellation(this.textareaAttachmentUploads, attachmentIds);
+		for (const {attachmentId, upload} of plan.cancelled) {
 			upload.abortController.abort();
 			this.textareaAttachmentUploads.delete(attachmentId);
 		}
-		for (const channelId of channelIds) {
+		for (const controller of plan.requestControllersToAbort) {
+			controller.abort();
+		}
+		for (const channelId of plan.channelIds) {
 			this.disposeTextareaAttachmentUploadPrunerIfIdle(channelId);
 		}
 	}
@@ -874,7 +911,7 @@ export class MessageQueue extends Queue<MessageQueuePayload, RestResponse<Messag
 			case 'retryRateLimit': {
 				const rateLimitOutcome = outcome as {status: 'rateLimit'; error: HttpError};
 				logger.error(`Failed to send message to channel ${channelId}:`, rateLimitOutcome.error);
-				this.handleSendRateLimit(rateLimitOutcome.error, completed);
+				this.handleSendRateLimit(payload, rateLimitOutcome.error, completed);
 				return;
 			}
 			case 'completeFailure': {
@@ -1179,13 +1216,23 @@ export class MessageQueue extends Queue<MessageQueuePayload, RestResponse<Messag
 	}
 
 	private handleSendRateLimit(
+		payload: SendMessagePayload,
 		error: HttpError,
 		completed: (err: RetryError | null, result?: RestResponse<Message>, error?: unknown) => void,
 	): void {
-		const retryAfterSeconds = getApiErrorBody(error)?.retry_after ?? 0;
-		const retryAfterMs = retryAfterSeconds > 0 ? retryAfterSeconds * 1000 : undefined;
-		completed({retryAfter: retryAfterMs}, undefined, error);
-		this.handleRateLimitError(retryAfterSeconds);
+		const retry = resolveMessageRateLimitRetry(error);
+		const retryCount = payload.rateLimitRetryCount === undefined ? 0 : payload.rateLimitRetryCount;
+		if (retry.automaticRetryDelayMs !== null && retryCount < MESSAGE_SEND_RATE_LIMIT_MAX_AUTOMATIC_RETRIES) {
+			payload.rateLimitRetryCount = retryCount + 1;
+			completed({retryAfter: retry.automaticRetryDelayMs}, undefined, error);
+			return;
+		}
+		MessageCommands.sendError(payload.channelId, payload.nonce);
+		if (payload.hasAttachments) {
+			this.restoreFailedMessage(payload.channelId, payload.nonce);
+		}
+		completed(null, undefined, error);
+		this.handleRateLimitError(retryAfterMsToWholeSeconds(retry.retryAfterMs));
 	}
 
 	private handleSendError(
@@ -1231,14 +1278,6 @@ export class MessageQueue extends Queue<MessageQueuePayload, RestResponse<Messag
 			MessageCommands.createOptimistic(channelId, systemMessage.toJSON());
 			return;
 		}
-		if (getApiErrorBody(error)?.code === APIErrorCodes.NSFW_EMOJI_STICKER_BLOCKED) {
-			const systemMessage = createSystemMessage(
-				channelId,
-				i18n._(YOUR_MESSAGE_COULD_NOT_BE_DELIVERED_BECAUSE_IT_2_DESCRIPTOR),
-			);
-			MessageCommands.createOptimistic(channelId, systemMessage.toJSON());
-			return;
-		}
 		this.showErrorModal(error, channelId, hasAttachments);
 	}
 
@@ -1265,7 +1304,19 @@ export class MessageQueue extends Queue<MessageQueuePayload, RestResponse<Messag
 				)),
 			);
 		} else if (error instanceof HttpError && isSlowmodeError(error)) {
-			const retryAfterMs = SlowmodeCommands.retryAfterSecondsToMs(getApiErrorBody(error)?.retry_after);
+			const retry = resolveMessageRateLimitRetry(error);
+			const retryAfterMs = SlowmodeCommands.clampSlowmodeRetryAfterMs(retry.retryAfterMs);
+			if (retryAfterMs <= 0) {
+				ModalCommands.push(
+					modal(() => (
+						<MessageSendFailedModal
+							hasAttachments={hasAttachments}
+							data-flx="messaging.message-queue.message-send-failed-modal--invalid-slowmode-retry"
+						/>
+					)),
+				);
+				return;
+			}
 			const retryAfter = Math.ceil(retryAfterMs / 1000);
 			if (channelId) {
 				SlowmodeCommands.updateSlowmodeRemaining(channelId, retryAfterMs);
@@ -1304,113 +1355,25 @@ export class MessageQueue extends Queue<MessageQueuePayload, RestResponse<Messag
 		}
 	}
 
-	private handleRateLimitError(retryAfter: number, onRetry?: () => void): void {
+	private handleRateLimitError(retryAfter: number | null, onRetry?: () => void): void {
 		ModalCommands.push(
-			modal(() => (
-				<MessageSendTooQuickModal
-					retryAfter={retryAfter}
-					onRetry={onRetry}
-					data-flx="messaging.message-queue.message-send-too-quick-modal"
-				/>
-			)),
-		);
-	}
-
-	private async handleEdit(
-		payload: EditMessagePayload,
-		completed: (err: RetryError | null, result?: RestResponse<Message>, error?: unknown) => void,
-	): Promise<void> {
-		const {channelId, messageId, content, allowedMentions, flags, attachments} = payload;
-		const abortController = new AbortController();
-		this.abortControllers.set(messageId, abortController);
-		try {
-			logger.debug(`Editing message ${messageId} in channel ${channelId}`);
-			const body = this.buildEditRequestBody(content, allowedMentions, flags, attachments);
-			const response = await http.patch<Message>(Endpoints.CHANNEL_MESSAGE(channelId, messageId), {
-				body,
-				signal: abortController.signal,
-				suppressContentBlockedModal: true,
-			});
-			logger.debug(`Successfully edited message ${messageId} in channel ${channelId}`);
-			completed(null, response);
-		} catch (error) {
-			const responseErr = error as HttpError;
-			logger.error(`Failed to edit message ${messageId} in channel ${channelId}:`, error);
-			const outcomeDecision = resolveMessageQueueRequestOutcomeDecision({
-				status: getRequestErrorOutcomeStatus(responseErr),
-			});
-			switch (outcomeDecision.type) {
-				case 'retryRateLimit':
-					this.handleEditRateLimit(responseErr, completed);
-					break;
-				case 'completeFailure':
-				case 'completeSuccess':
-					this.showEditErrorModal(responseErr);
-					completed(null, undefined, responseErr);
-					break;
-			}
-		} finally {
-			this.abortControllers.delete(messageId);
-		}
-	}
-
-	private buildEditRequestBody(
-		content?: string,
-		allowedMentions?: AllowedMentions,
-		flags?: number,
-		attachments?: Array<ApiMessageEditAttachmentMetadata>,
-	): MessageEditRequest {
-		const body: MessageEditRequest = {};
-		if (content !== undefined) {
-			body.content = normalizeMessageEditContent(content);
-		}
-		if (allowedMentions !== undefined) {
-			body.allowed_mentions = allowedMentions;
-		}
-		if (flags !== undefined) {
-			body.flags = flags;
-		}
-		if (attachments !== undefined) {
-			body.attachments = attachments;
-		}
-		return body;
-	}
-
-	private handleEditRateLimit(
-		error: HttpError,
-		completed: (err: RetryError | null, result?: RestResponse<Message>, error?: unknown) => void,
-	): void {
-		const retryAfterSeconds = getApiErrorBody(error)?.retry_after ?? 0;
-		const retryAfterMs = retryAfterSeconds > 0 ? retryAfterSeconds * 1000 : undefined;
-		completed({retryAfter: retryAfterMs}, undefined, error);
-		this.handleEditRateLimitError(retryAfterSeconds);
-	}
-
-	private showEditErrorModal(error: HttpError): void {
-		if (isFeatureDisabledError(error)) {
-			ModalCommands.push(
-				modal(() => (
-					<FeatureTemporarilyDisabledModal data-flx="messaging.message-queue.feature-temporarily-disabled-modal--2" />
-				)),
-			);
-		} else if (getApiErrorBody(error)?.code === APIErrorCodes.CONTENT_BLOCKED) {
-			void import('@app/features/auth/components/ContentBlockedHandler').then((m) => m.showContentBlockedModal());
-		} else {
-			ModalCommands.push(
-				modal(() => <MessageEditFailedModal data-flx="messaging.message-queue.message-edit-failed-modal" />),
-			);
-		}
-	}
-
-	private handleEditRateLimitError(retryAfter: number, onRetry?: () => void): void {
-		ModalCommands.push(
-			modal(() => (
-				<MessageEditTooQuickModal
-					retryAfter={retryAfter}
-					onRetry={onRetry}
-					data-flx="messaging.message-queue.message-edit-too-quick-modal"
-				/>
-			)),
+			modal(() => {
+				if (retryAfter === null) {
+					return (
+						<MessageSendTooQuickModal
+							onRetry={onRetry}
+							data-flx="messaging.message-queue.message-send-too-quick-modal"
+						/>
+					);
+				}
+				return (
+					<MessageSendTooQuickModal
+						retryAfter={retryAfter}
+						onRetry={onRetry}
+						data-flx="messaging.message-queue.message-send-too-quick-modal"
+					/>
+				);
+			}),
 		);
 	}
 }

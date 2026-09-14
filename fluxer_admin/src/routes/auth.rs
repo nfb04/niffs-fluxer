@@ -187,7 +187,7 @@ async fn oauth2_callback_finish(
 
     let session_cookie_value =
         session::create_session(&user.id, &token.access_token, &config.secret_key_base);
-    let secure = if config.is_production() {
+    let secure = if config.secure_cookies() {
         "; Secure"
     } else {
         ""
@@ -348,7 +348,7 @@ fn oauth_callback_page(config: &AdminConfig, code: Option<&str>, state: Option<&
     )
 }
 
-fn json_string(value: &str) -> String {
+pub(crate) fn json_string(value: &str) -> String {
     serde_json::to_string(value)
         .expect("JSON string serialization cannot fail")
         .replace('<', "\\u003c")

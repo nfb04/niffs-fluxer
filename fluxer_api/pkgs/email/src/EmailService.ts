@@ -127,7 +127,7 @@ export class EmailService implements IEmailService {
 	async sendUnbanNotification(
 		email: string,
 		username: string,
-		reason: string,
+		reason: string | null,
 		locale: string | null = null,
 	): Promise<boolean> {
 		return this.sendTemplatedEmail(email, 'unban_notification', locale, {username, reason});
@@ -223,6 +223,19 @@ export class EmailService implements IEmailService {
 		locale: string | null = null,
 	): Promise<boolean> {
 		return this.sendTemplatedEmail(email, 'password_change_verification', locale, {
+			username,
+			code,
+			expiresAt: new Date(Date.now() + ms('10 minutes')),
+		});
+	}
+
+	async sendMfaBackupCodesVerification(
+		email: string,
+		username: string,
+		code: string,
+		locale: string | null = null,
+	): Promise<boolean> {
+		return this.sendTemplatedEmail(email, 'mfa_backup_codes_view', locale, {
 			username,
 			code,
 			expiresAt: new Date(Date.now() + ms('10 minutes')),

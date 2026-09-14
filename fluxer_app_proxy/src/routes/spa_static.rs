@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-use crate::discovery_cache::DiscoveryResponse;
-use crate::state::AppState;
+use crate::config::HttpEndpoint;
+use crate::discovery_cache::discovery_endpoint;
+use crate::state::{AppState, MAX_STATIC_TEXT_FILE_BYTES, read_bounded_file};
 use crate::time_freeze::{
     TimeFreezeConfig, describe_decision, load_time_freeze_config_for_request,
     time_freeze_debug_header,
@@ -24,7 +25,7 @@ fn serve_frozen_file(
         return (None, debug_header);
     }
 
-    if let Some(snapshot) = &config.snapshot
+    if let Some(snapshot) = config.snapshot
         && let Some((bytes, content_type)) = pick(snapshot)
     {
         let mut response = bytes.to_vec().into_response();
@@ -50,8 +51,7 @@ pub async fn version_json(State(state): State<AppState>, headers: HeaderMap) -> 
         return resp;
     }
 
-    let mut result =
-        serve_static_text_file(&state.config.static_dir, "version.json", "application/json");
+    let mut result = serve_static_text_file(&state, "version.json", "application/json").await;
 
     if result.status() == StatusCode::NOT_FOUND && !state.config.build_version.is_empty() {
         let body = serde_json::json!({ "version": state.config.build_version });
@@ -68,21 +68,23 @@ pub async fn version_json(State(state): State<AppState>, headers: HeaderMap) -> 
 pub async fn manifest_json(State(state): State<AppState>) -> Response {
     let static_cdn_endpoint = runtime_static_cdn_endpoint(&state).await;
     serve_static_text_file_with_cdn(
-        &state.config.static_dir,
+        &state,
         "manifest.json",
         "application/manifest+json",
-        static_cdn_endpoint.as_deref(),
+        static_cdn_endpoint.as_ref(),
     )
+    .await
 }
 
 pub async fn browserconfig_xml(State(state): State<AppState>) -> Response {
     let static_cdn_endpoint = runtime_static_cdn_endpoint(&state).await;
     serve_static_text_file_with_cdn(
-        &state.config.static_dir,
+        &state,
         "browserconfig.xml",
         "application/xml; charset=utf-8",
-        static_cdn_endpoint.as_deref(),
+        static_cdn_endpoint.as_ref(),
     )
+    .await
 }
 
 pub async fn service_worker(State(state): State<AppState>, headers: HeaderMap) -> Response {
@@ -96,17 +98,14 @@ pub async fn service_worker(State(state): State<AppState>, headers: HeaderMap) -
     if let Some(resp) = frozen {
         return resp;
     }
-    let mut result = serve_static_text_file(
-        &state.config.static_dir,
-        "sw.js",
-        "application/javascript; charset=utf-8",
-    );
+    let mut result =
+        serve_static_text_file(&state, "sw.js", "application/javascript; charset=utf-8").await;
     set_time_freeze_header(&mut result, debug_header.as_deref());
     result
 }
 
 pub async fn service_worker_map(State(state): State<AppState>) -> Response {
-    serve_static_text_file(&state.config.static_dir, "sw.js.map", "application/json")
+    serve_static_text_file(&state, "sw.js.map", "application/json").await
 }
 
 fn set_time_freeze_header(response: &mut Response, value: Option<&str>) {
@@ -125,7 +124,7 @@ fn set_time_freeze_header(response: &mut Response, value: Option<&str>) {
     let _ = (response, value);
 }
 
-async fn runtime_static_cdn_endpoint(state: &AppState) -> Option<String> {
+async fn runtime_static_cdn_endpoint(state: &AppState) -> Option<HttpEndpoint> {
     if let Some(discovery) = state.discovery_cache.get().await
         && let Some(endpoint) = discovery_endpoint(&discovery, "static_cdn")
     {
@@ -135,34 +134,28 @@ async fn runtime_static_cdn_endpoint(state: &AppState) -> Option<String> {
     state.config.static_cdn_endpoint.clone()
 }
 
-fn discovery_endpoint(discovery: &DiscoveryResponse, key: &str) -> Option<String> {
-    discovery
-        .data
-        .get("endpoints")
-        .and_then(|endpoints| endpoints.get(key))
-        .and_then(|value| value.as_str())
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(ToOwned::to_owned)
+async fn serve_static_text_file(state: &AppState, filename: &str, content_type: &str) -> Response {
+    serve_static_text_file_with_cdn(state, filename, content_type, None).await
 }
 
-fn serve_static_text_file(static_dir: &str, filename: &str, content_type: &str) -> Response {
-    serve_static_text_file_with_cdn(static_dir, filename, content_type, None)
-}
-
-fn serve_static_text_file_with_cdn(
-    static_dir: &str,
+async fn serve_static_text_file_with_cdn(
+    state: &AppState,
     filename: &str,
     content_type: &str,
-    static_cdn_endpoint: Option<&str>,
+    static_cdn_endpoint: Option<&HttpEndpoint>,
 ) -> Response {
+    let static_dir = state.config.static_dir.as_str();
     let file_path = Path::new(static_dir).join(filename);
 
-    let resolved = match file_path.canonicalize() {
+    let Ok(_read_slot) = state.budgets.local_read_slots.try_acquire() else {
+        return super::capacity_refused_response();
+    };
+
+    let resolved = match tokio::fs::canonicalize(&file_path).await {
         Ok(p) => p,
         Err(_) => return StatusCode::NOT_FOUND.into_response(),
     };
-    let base = match Path::new(static_dir).canonicalize() {
+    let base = match tokio::fs::canonicalize(static_dir).await {
         Ok(p) => p,
         Err(_) => return StatusCode::NOT_FOUND.into_response(),
     };
@@ -170,12 +163,16 @@ fn serve_static_text_file_with_cdn(
         return StatusCode::NOT_FOUND.into_response();
     }
 
-    let content = match std::fs::read(&resolved) {
+    let content = match read_bounded_file(&resolved, MAX_STATIC_TEXT_FILE_BYTES).await {
         Ok(bytes) => bytes,
-        Err(_) => return StatusCode::NOT_FOUND.into_response(),
+        Err(error) if error.is_not_found() => return StatusCode::NOT_FOUND.into_response(),
+        Err(error) => {
+            tracing::error!(file = filename, %error, "refusing to serve static text file");
+            return StatusCode::NOT_FOUND.into_response();
+        }
     };
 
-    let replacement = static_cdn_endpoint.unwrap_or("").trim_end_matches('/');
+    let replacement = static_cdn_endpoint.map_or("", HttpEndpoint::as_str);
     let body: axum::body::Body = match std::str::from_utf8(&content) {
         Ok(text) => text
             .replace("{{STATIC_CDN_ENDPOINT}}", replacement)
@@ -240,10 +237,8 @@ pub fn is_font_mime(mime_type: &str) -> bool {
     )
 }
 
-pub fn is_static_asset(path: &str) -> bool {
-    let filename = path.rsplit('/').next().unwrap_or(path);
-    filename.contains('.')
-}
+pub const LONG_LIVED_ASSET_CACHE_CONTROL: &str = "public, max-age=31536000, immutable";
+pub const REVALIDATED_ASSET_CACHE_CONTROL: &str = "public, max-age=3600, must-revalidate";
 
 pub fn is_hashed_asset(path: &str) -> bool {
     let filename = path.rsplit('/').next().unwrap_or(path);
@@ -251,13 +246,21 @@ pub fn is_hashed_asset(path: &str) -> bool {
         return false;
     };
     let stem = &filename[..last_dot];
-    if is_content_hash(stem) {
+    if stem.split('.').next().is_some_and(is_content_hash) {
         return true;
     }
     ['.', '-'].iter().any(|sep| {
         stem.rfind(*sep)
             .is_some_and(|sep_pos| is_content_hash(&stem[sep_pos + 1..]))
     })
+}
+
+pub fn asset_cache_control(path: &str) -> &'static str {
+    if is_hashed_asset(path) {
+        LONG_LIVED_ASSET_CACHE_CONTROL
+    } else {
+        REVALIDATED_ASSET_CACHE_CONTROL
+    }
 }
 
 fn is_content_hash(value: &str) -> bool {
@@ -338,18 +341,6 @@ mod tests {
     }
 
     #[test]
-    fn static_asset_with_ext() {
-        assert!(is_static_asset("/assets/app.js"));
-        assert!(is_static_asset("style.css"));
-    }
-
-    #[test]
-    fn static_asset_without_ext() {
-        assert!(!is_static_asset("/channels/me"));
-        assert!(!is_static_asset("/login"));
-    }
-
-    #[test]
     fn hashed_asset_positive() {
         assert!(is_hashed_asset("app.a1b2c3d4.js"));
         assert!(is_hashed_asset("style-abcdef01.css"));
@@ -363,9 +354,35 @@ mod tests {
     }
 
     #[test]
+    fn hashed_asset_accepts_the_contenthash_worker_bundle_name() {
+        assert!(
+            is_hashed_asset("assets/2d715e4730758083.worker.js"),
+            "rspack emits workers as assets/[contenthash:16].worker.js"
+        );
+    }
+
+    #[test]
     fn hashed_asset_negative() {
         assert!(!is_hashed_asset("app.js"));
         assert!(!is_hashed_asset("style.css"));
         assert!(!is_hashed_asset("a79f1c3119cd700d/app.js"));
+    }
+
+    #[test]
+    fn the_bundled_font_licences_are_not_treated_as_content_hashed() {
+        assert!(!is_hashed_asset("assets/fonts-NOTICE.txt"));
+        assert!(!is_hashed_asset("assets/fonts-LICENSE-IBM-PLEX.txt"));
+    }
+
+    #[test]
+    fn only_a_content_hashed_asset_is_promised_to_never_change() {
+        assert_eq!(
+            asset_cache_control("assets/469e0b8f10c496a1.css"),
+            LONG_LIVED_ASSET_CACHE_CONTROL
+        );
+        assert_eq!(
+            asset_cache_control("assets/fonts-NOTICE.txt"),
+            REVALIDATED_ASSET_CACHE_CONTROL
+        );
     }
 }

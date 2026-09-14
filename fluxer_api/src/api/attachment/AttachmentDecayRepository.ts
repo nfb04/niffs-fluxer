@@ -1,9 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type {AttachmentID, ChannelID, MessageID} from '../BrandedTypes';
-import {BatchBuilder, fetchMany, fetchManyInChunks, fetchOne} from '../database/CassandraQueryExecution';
-import {AttachmentDecayByExpiry, AttachmentDecayById} from '../Tables';
-import type {AttachmentDecayRow} from '../types/AttachmentDecayTypes';
+import type {AttachmentID, ChannelID, MessageID} from '@app/api/BrandedTypes';
+import {
+	BatchBuilder,
+	deleteOneOrMany,
+	fetchMany,
+	fetchManyInChunks,
+	fetchOne,
+} from '@app/api/database/CassandraQueryExecution';
+import {AttachmentDecayByExpiry, AttachmentDecayById} from '@app/api/Tables';
+import type {AttachmentDecayRow} from '@app/api/types/AttachmentDecayTypes';
 
 interface AttachmentDecayExpiryRow {
 	expiry_bucket: number;
@@ -71,6 +77,20 @@ export class AttachmentDecayRepository {
 	async fetchExpiredByBucket(bucket: number, currentTime: Date, limit = 200): Promise<Array<AttachmentDecayExpiryRow>> {
 		const query = createFetchExpiredByBucketQuery(limit);
 		return fetchMany(query.bind({expiry_bucket: bucket, current_time: currentTime}));
+	}
+
+	async deleteExpiryRecord(params: {
+		expiry_bucket: number;
+		expires_at: Date;
+		attachment_id: AttachmentID;
+	}): Promise<void> {
+		await deleteOneOrMany(
+			AttachmentDecayByExpiry.deleteByPk({
+				expiry_bucket: params.expiry_bucket,
+				expires_at: params.expires_at,
+				attachment_id: params.attachment_id,
+			}),
+		);
 	}
 
 	async deleteRecords(params: {expiry_bucket: number; expires_at: Date; attachment_id: AttachmentID}): Promise<void> {

@@ -12,6 +12,7 @@ import {
 	DOMAIN_DESCRIPTOR,
 	VERIFY_DESCRIPTOR,
 } from '@app/features/i18n/utils/CommonMessageDescriptors';
+import {remFromPx} from '@app/features/theme/layout/RemFromPx';
 import {Button} from '@app/features/ui/button/Button';
 import * as ModalCommands from '@app/features/ui/commands/ModalCommands';
 import * as TextCopyCommands from '@app/features/ui/commands/TextCopyCommands';
@@ -94,14 +95,14 @@ const CopyButton = ({copied, disabled = false, label, onClick}: CopyButtonProps)
 		{copied ? (
 			<CheckCircleIcon
 				className={styles.copyIcon}
-				size={16}
+				size={remFromPx(16)}
 				weight="bold"
 				data-flx="connection.add-connection-modal.copy-button.copy-icon"
 			/>
 		) : (
 			<ClipboardIcon
 				className={styles.copyIcon}
-				size={16}
+				size={remFromPx(16)}
 				data-flx="connection.add-connection-modal.copy-button.copy-icon--2"
 			/>
 		)}
@@ -149,7 +150,7 @@ export const AddConnectionModal = observer(({defaultType}: AddConnectionModalPro
 			if (type === ConnectionTypes.BLUESKY) {
 				identifier = identifier.replace(/^https?:\/\/bsky\.app\/profile\//i, '').replace(/^@/, '');
 			}
-			if (UserConnection.hasConnectionByTypeAndName(type, identifier)) {
+			if (type === ConnectionTypes.DOMAIN && UserConnection.hasConnectionByTypeAndName(type, identifier)) {
 				initiateForm.setError('identifier', {
 					type: 'validate',
 					message: i18n._(YOU_ALREADY_HAVE_THIS_CONNECTION_DESCRIPTOR),

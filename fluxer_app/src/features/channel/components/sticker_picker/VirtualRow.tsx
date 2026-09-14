@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type {VirtualRow} from '@app/features/channel/components/sticker_picker/hooks/useVirtualRows';
+import {STICKER_CATEGORY_HEADER_HEIGHT} from '@app/features/channel/components/sticker_picker/StickerPickerConstants';
 import styles from '@app/features/channel/components/sticker_picker/VirtualRow.module.css';
 import type {Channel} from '@app/features/channel/models/Channel';
 import * as StickerPickerCommands from '@app/features/emoji/commands/StickerPickerCommands';
@@ -19,23 +20,19 @@ import {useLingui} from '@lingui/react/macro';
 import {CaretDownIcon, ClockIcon, StarIcon} from '@phosphor-icons/react';
 import {clsx} from 'clsx';
 import {observer} from 'mobx-react-lite';
-import React, {useEffect, useRef, useState} from 'react';
-
-const STICKER_ROW_HEIGHT = 92;
-const CATEGORY_HEADER_HEIGHT = 32;
-const OVERSCAN_ROWS = 5;
+import React from 'react';
 
 interface VirtualRowRendererProps {
 	row: VirtualRow;
 	handleHover: (sticker: GuildSticker | null, row?: number, column?: number) => void;
 	handleSelect: (sticker: GuildSticker, shiftKey?: boolean) => void;
 	gridColumns?: number;
-	hoveredSticker: GuildSticker | null;
+	cellTrackWidth?: number;
 	selectedRow: number;
 	selectedColumn: number;
 	stickerRowIndex: number;
 	shouldScrollOnSelection?: boolean;
-	stickerRefs: React.MutableRefObject<Map<string, HTMLButtonElement>>;
+	stickerRefs: React.RefObject<Map<string, HTMLButtonElement>>;
 	channel?: Channel | null;
 }
 
@@ -43,7 +40,7 @@ interface StickerButtonProps {
 	sticker: GuildSticker;
 	stickerKey: string;
 	isSelected: boolean;
-	stickerRefs: React.MutableRefObject<Map<string, HTMLButtonElement>>;
+	stickerRefs: React.RefObject<Map<string, HTMLButtonElement>>;
 	shouldScrollOnSelection?: boolean;
 	handleStickerClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
 	handleContextMenu: (event: React.MouseEvent<HTMLButtonElement>) => void;
@@ -65,7 +62,9 @@ const StickerButton: React.FC<StickerButtonProps> = React.memo(
 		stickerRowIndex,
 		columnIndex,
 	}) => {
-		const {shouldAnimate, interactionHandlers} = useStickerAnimation({respectUserSettings: false});
+		const {shouldAnimate, interactionHandlers} = useStickerAnimation({
+			isAnimated: sticker.animated,
+		});
 		return (
 			<FocusRing offset={-2} data-flx="channel.sticker-picker.virtual-row.sticker-button.focus-ring">
 				<button
@@ -107,6 +106,7 @@ const StickerButton: React.FC<StickerButtonProps> = React.memo(
 						src={AvatarUtils.getStickerURL({
 							id: sticker.id,
 							animated: shouldAnimate,
+							isAnimatable: sticker.animated,
 							size: 320,
 						})}
 						alt={sticker.name}
@@ -127,6 +127,7 @@ const VirtualRowRendererBase: React.FC<VirtualRowRendererProps> = React.memo(
 		handleHover,
 		handleSelect,
 		gridColumns = 4,
+		cellTrackWidth,
 		selectedRow,
 		selectedColumn,
 		stickerRowIndex,
@@ -174,7 +175,7 @@ const VirtualRowRendererBase: React.FC<VirtualRowRendererProps> = React.memo(
 					type="button"
 					onClick={handleToggleCategory}
 					style={{
-						height: remFromPx(CATEGORY_HEADER_HEIGHT),
+						height: remFromPx(STICKER_CATEGORY_HEADER_HEIGHT),
 						display: 'flex',
 						alignItems: 'center',
 						paddingLeft: '0.75rem',
@@ -221,11 +222,14 @@ const VirtualRowRendererBase: React.FC<VirtualRowRendererProps> = React.memo(
 			);
 		}
 		if (row.type === 'sticker-row') {
+			const hasFixedTrack = cellTrackWidth != null && cellTrackWidth > 0;
 			return (
 				<div
-					className={styles.stickerGrid}
+					className={hasFixedTrack ? `${styles.stickerGrid} ${styles.stickerGridFixedTrack}` : styles.stickerGrid}
 					style={{
-						gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`,
+						gridTemplateColumns: hasFixedTrack
+							? `repeat(auto-fill, ${remFromPx(cellTrackWidth)})`
+							: `repeat(${gridColumns}, minmax(0, 1fr))`,
 					}}
 					data-flx="channel.sticker-picker.virtual-row.virtual-row-renderer-base.sticker-grid"
 				>
@@ -287,12 +291,12 @@ interface VirtualRowWrapperProps {
 	handleHover: (sticker: GuildSticker | null, row?: number, column?: number) => void;
 	handleSelect: (sticker: GuildSticker, shiftKey?: boolean) => void;
 	gridColumns?: number;
-	hoveredSticker: GuildSticker | null;
+	cellTrackWidth?: number;
 	selectedRow: number;
 	selectedColumn: number;
 	stickerRowIndex: number;
 	shouldScrollOnSelection?: boolean;
-	stickerRefs: React.MutableRefObject<Map<string, HTMLButtonElement>>;
+	stickerRefs: React.RefObject<Map<string, HTMLButtonElement>>;
 	channel?: Channel | null;
 }
 
@@ -302,7 +306,7 @@ export const VirtualRowWrapper: React.FC<VirtualRowWrapperProps> = observer(
 		handleHover,
 		handleSelect,
 		gridColumns,
-		hoveredSticker,
+		cellTrackWidth,
 		selectedRow,
 		selectedColumn,
 		stickerRowIndex,
@@ -310,63 +314,21 @@ export const VirtualRowWrapper: React.FC<VirtualRowWrapperProps> = observer(
 		stickerRefs,
 		channel,
 	}) => {
-		const [isVisible, setIsVisible] = useState(false);
-		const placeholderRef = useRef<HTMLDivElement>(null);
-		useEffect(() => {
-			const placeholder = placeholderRef.current;
-			if (!placeholder) return;
-			const observer = new IntersectionObserver(
-				(entries) => {
-					entries.forEach((entry) => {
-						if (entry.isIntersecting) {
-							setIsVisible(true);
-						} else {
-							const rect = entry.boundingClientRect;
-							const viewportHeight = window.innerHeight;
-							const overscanDistance = OVERSCAN_ROWS * STICKER_ROW_HEIGHT;
-							if (rect.bottom < -overscanDistance || rect.top > viewportHeight + overscanDistance) {
-								setIsVisible(false);
-							}
-						}
-					});
-				},
-				{
-					rootMargin: `${OVERSCAN_ROWS * STICKER_ROW_HEIGHT}px 0px`,
-					threshold: 0,
-				},
-			);
-			observer.observe(placeholder);
-			return () => {
-				observer.disconnect();
-			};
-		}, []);
-		const height = row.type === 'header' ? CATEGORY_HEADER_HEIGHT : STICKER_ROW_HEIGHT;
-		if (!isVisible) {
-			return (
-				<div
-					ref={placeholderRef}
-					style={{height: remFromPx(height)}}
-					data-flx="channel.sticker-picker.virtual-row.virtual-row-wrapper.div"
-				/>
-			);
-		}
 		return (
-			<div ref={placeholderRef} data-flx="channel.sticker-picker.virtual-row.virtual-row-wrapper.div--2">
-				<VirtualRowRenderer
-					row={row}
-					handleHover={handleHover}
-					handleSelect={handleSelect}
-					gridColumns={gridColumns}
-					hoveredSticker={hoveredSticker}
-					selectedRow={selectedRow}
-					selectedColumn={selectedColumn}
-					stickerRowIndex={stickerRowIndex}
-					shouldScrollOnSelection={shouldScrollOnSelection}
-					stickerRefs={stickerRefs}
-					channel={channel}
-					data-flx="channel.sticker-picker.virtual-row.virtual-row-wrapper.virtual-row-renderer"
-				/>
-			</div>
+			<VirtualRowRenderer
+				row={row}
+				handleHover={handleHover}
+				handleSelect={handleSelect}
+				gridColumns={gridColumns}
+				cellTrackWidth={cellTrackWidth}
+				selectedRow={selectedRow}
+				selectedColumn={selectedColumn}
+				stickerRowIndex={stickerRowIndex}
+				shouldScrollOnSelection={shouldScrollOnSelection}
+				stickerRefs={stickerRefs}
+				channel={channel}
+				data-flx="channel.sticker-picker.virtual-row.virtual-row-wrapper.virtual-row-renderer"
+			/>
 		);
 	},
 );

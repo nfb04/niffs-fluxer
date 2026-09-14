@@ -1,6 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import {mapGuildsToAdminResponse} from '@app/api/admin/models/GuildTypes';
+import type {GuildID} from '@app/api/BrandedTypes';
+import {createGuildID, createUserID} from '@app/api/BrandedTypes';
+import {Config} from '@app/api/Config';
+import type {IChannelRepository} from '@app/api/channel/IChannelRepository';
+import {mapGuildFeatures} from '@app/api/guild/GuildFeatureUtils';
+import type {IGuildRepositoryAggregate} from '@app/api/guild/repositories/IGuildRepositoryAggregate';
+import type {IGatewayService} from '@app/api/infrastructure/IGatewayService';
+import type {IUserRepository} from '@app/api/user/IUserRepository';
 import {MEDIA_PROXY_ICON_SIZE_DEFAULT} from '@fluxer/constants/src/MediaProxyAssetSizes';
+import type {MediaProxyImageSize} from '@fluxer/constants/src/MediaProxyImageSizes';
 import {UnknownUserError} from '@fluxer/errors/src/domains/user/UnknownUserError';
 import type {
 	ListGuildMembersRequest,
@@ -8,15 +18,8 @@ import type {
 	LookupGuildRequest,
 } from '@fluxer/schema/src/domains/admin/AdminGuildSchemas';
 import type {ListGuildEmojisResponse, ListGuildStickersResponse} from '@fluxer/schema/src/domains/admin/AdminSchemas';
-import type {GuildID} from '../../../BrandedTypes';
-import {createGuildID, createUserID} from '../../../BrandedTypes';
-import {Config} from '../../../Config';
-import type {IChannelRepository} from '../../../channel/IChannelRepository';
-import {mapGuildFeatures} from '../../../guild/GuildFeatureUtils';
-import type {IGuildRepositoryAggregate} from '../../../guild/repositories/IGuildRepositoryAggregate';
-import type {IGatewayService} from '../../../infrastructure/IGatewayService';
-import type {IUserRepository} from '../../../user/IUserRepository';
-import {mapGuildsToAdminResponse} from '../../models/GuildTypes';
+
+const ADMIN_STICKER_MEDIA_RUNG: MediaProxyImageSize = 320;
 
 interface AdminGuildLookupServiceDeps {
 	guildRepository: IGuildRepositoryAggregate;
@@ -201,6 +204,6 @@ export class AdminGuildLookupService {
 	}
 
 	private buildStickerMediaUrl(id: string, animated: boolean): string {
-		return `${Config.endpoints.media}/stickers/${id}.webp?size=${MEDIA_PROXY_ICON_SIZE_DEFAULT}${animated ? '&animated=true' : ''}`;
+		return `${Config.endpoints.media}/stickers/${id}.webp?size=${ADMIN_STICKER_MEDIA_RUNG}${animated ? '&animated=true' : ''}`;
 	}
 }

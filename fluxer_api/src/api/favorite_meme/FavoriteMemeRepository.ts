@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type {MemeID, UserID} from '../BrandedTypes';
-import {BatchBuilder, fetchMany, fetchOne, upsertOne} from '../database/CassandraQueryExecution';
-import type {FavoriteMemeRow} from '../database/types/UserTypes';
-import {FavoriteMeme} from '../models/FavoriteMeme';
-import {FavoriteMemes, FavoriteMemesByMemeId} from '../Tables';
-import {type CreateFavoriteMemeParams, IFavoriteMemeRepository} from './IFavoriteMemeRepository';
+import type {MemeID, UserID} from '@app/api/BrandedTypes';
+import {BatchBuilder, fetchMany, fetchOne, upsertOne} from '@app/api/database/CassandraQueryExecution';
+import {Db} from '@app/api/database/CassandraTypes';
+import type {FavoriteMemeRow} from '@app/api/database/types/UserTypes';
+import {type CreateFavoriteMemeParams, IFavoriteMemeRepository} from '@app/api/favorite_meme/IFavoriteMemeRepository';
+import {FavoriteMeme} from '@app/api/models/FavoriteMeme';
+import {FavoriteMemes, FavoriteMemesByMemeId} from '@app/api/Tables';
 
 const FETCH_FAVORITE_MEME_CQL = FavoriteMemes.selectCql({
 	where: [FavoriteMemes.where.eq('user_id'), FavoriteMemes.where.eq('meme_id')],
@@ -97,6 +98,10 @@ export class FavoriteMemeRepository extends IFavoriteMemeRepository {
 		};
 		await upsertOne(FavoriteMemes.upsertAll(memeRow));
 		return new FavoriteMeme(memeRow);
+	}
+
+	async updatePlaceholder(userId: UserID, memeId: MemeID, placeholder: string): Promise<void> {
+		await fetchOne(FavoriteMemes.patchByPk({user_id: userId, meme_id: memeId}, {placeholder: Db.set(placeholder)}));
 	}
 
 	async delete(userId: UserID, memeId: MemeID): Promise<void> {

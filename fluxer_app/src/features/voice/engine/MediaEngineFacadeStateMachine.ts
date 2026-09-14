@@ -2,7 +2,7 @@
 
 import type {GatewayErrorCode} from '@fluxer/constants/src/GatewayConstants';
 import {GatewayErrorCodes} from '@fluxer/constants/src/GatewayConstants';
-import {assign, getInitialSnapshot, type SnapshotFrom, setup, transition} from 'xstate';
+import {assign, initialTransition, type SnapshotFrom, setup, transition} from 'xstate';
 
 export interface MediaEngineFacadeConnectionTarget {
 	guildId: string | null;
@@ -84,18 +84,6 @@ export interface MediaEngineFacadeGatewayErrorInput {
 	channelId: string | null;
 }
 
-export const VOICE_CAMERA_USER_LIMIT_ERROR_CODE = 'VOICE_CAMERA_USER_LIMIT';
-
-export interface MediaEngineFacadeVoiceStateAckRejectionInput {
-	status?: string;
-	errorCode?: string;
-}
-
-export function shouldNotifyCameraUserLimitRejection(input: MediaEngineFacadeVoiceStateAckRejectionInput): boolean {
-	if (input.status !== 'rejected') return false;
-	return input.errorCode === VOICE_CAMERA_USER_LIMIT_ERROR_CODE;
-}
-
 export type MediaEngineFacadeGatewayErrorDecision =
 	| {type: 'ignore'}
 	| {
@@ -123,26 +111,6 @@ export interface MediaEngineFacadeServerVoiceStateRemovalInput {
 	currentChannelId: string | null;
 	connected: boolean;
 	connecting: boolean;
-}
-
-export const NATIVE_VOICE_READY_SOUND_CONNECTION_MEMORY_LIMIT = 16;
-
-export function hasPlayedNativeVoiceReadySounds(
-	playedConnectionIds: ReadonlySet<string>,
-	connectionId: string | null,
-): boolean {
-	if (!connectionId) return false;
-	return playedConnectionIds.has(connectionId);
-}
-
-export function rememberNativeVoiceReadySounds(playedConnectionIds: Set<string>, connectionId: string | null): void {
-	if (!connectionId) return;
-	playedConnectionIds.add(connectionId);
-	while (playedConnectionIds.size > NATIVE_VOICE_READY_SOUND_CONNECTION_MEMORY_LIMIT) {
-		const oldest = playedConnectionIds.values().next().value;
-		if (oldest === undefined) break;
-		playedConnectionIds.delete(oldest);
-	}
 }
 
 export function createInitialMediaEngineFacadeContext(): MediaEngineFacadeMachineContext {
@@ -372,7 +340,7 @@ export const mediaEngineFacadeStateMachine = setup({
 export type MediaEngineFacadeSnapshot = SnapshotFrom<typeof mediaEngineFacadeStateMachine>;
 
 export function createMediaEngineFacadeSnapshot(): MediaEngineFacadeSnapshot {
-	return getInitialSnapshot(mediaEngineFacadeStateMachine);
+	return initialTransition(mediaEngineFacadeStateMachine)[0];
 }
 
 export function transitionMediaEngineFacadeSnapshot(
@@ -547,7 +515,8 @@ export function shouldImmediatelyDisconnectMediaEngineForServerVoiceStateRemoval
 	input: MediaEngineFacadeServerVoiceStateRemovalInput,
 ): boolean {
 	if (!isCurrentServerVoiceStateRemoval(input)) return false;
-	return input.connected || input.connecting || input.currentChannelId != null;
+	if (input.connected) return false;
+	return input.connecting || input.currentChannelId != null;
 }
 
 export function shouldCancelMediaEngineReconnectForServerVoiceStateRemoval(

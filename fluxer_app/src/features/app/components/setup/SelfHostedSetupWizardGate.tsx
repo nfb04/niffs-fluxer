@@ -3,6 +3,7 @@
 import * as Modal from '@app/features/app/components/dialogs/Modal';
 import styles from '@app/features/app/components/setup/SelfHostedSetupWizardGate.module.css';
 import {
+	classifySetupUnauthorized,
 	fetchInstanceConfig,
 	type SetupBrandingAssetKind,
 	testSmtpConfig,
@@ -55,6 +56,7 @@ import {fileToBase64} from '@app/features/user/utils/AvatarUtils';
 import * as FormUtils from '@app/lib/forms';
 import {type ThemeType, ThemeTypes} from '@fluxer/constants/src/UserConstants';
 import type {InstanceConfigResponse} from '@fluxer/schema/src/domains/admin/AdminSchemas';
+import type {MessageDescriptor} from '@lingui/core';
 import {msg} from '@lingui/core/macro';
 import {useLingui} from '@lingui/react/macro';
 import {ArrowLeftIcon, ArrowRightIcon, CheckIcon, WrenchIcon} from '@phosphor-icons/react';
@@ -91,6 +93,11 @@ const LOADING_DESCRIPTOR = msg({
 const LOAD_ERROR_DESCRIPTOR = msg({
 	message: 'Could not load the instance configuration. Try reloading the page.',
 	comment: 'Error shown when the setup wizard fails to load the instance configuration.',
+});
+const ORIGIN_MISMATCH_DESCRIPTOR = msg({
+	message:
+		'The API is on a different origin than this page, so setup requests are sent without your session. Check the public origin and port this instance is configured with, then reload.',
+	comment: 'Error shown when the setup wizard cannot load because the API origin differs from the page origin.',
 });
 const ASSET_UPLOAD_ERROR_DESCRIPTOR = msg({
 	message: 'That image could not be used. Try a different file.',
@@ -425,12 +432,12 @@ export const SelfHostedSetupWizardGate = observer(() => {
 	const stepNavigationUnlockTimerRef = useRef<number | null>(null);
 
 	const [config, setConfig] = useState<InstanceConfigResponse | null>(null);
-	const [loadError, setLoadError] = useState(false);
+	const [loadError, setLoadError] = useState<MessageDescriptor | null>(null);
 	const [submitting, setSubmitting] = useState(false);
 	const [submitError, setSubmitError] = useState<string | null>(null);
 	const [stepNavigationLocked, setStepNavigationLocked] = useState(false);
 	const [wizardSnapshot, setWizardSnapshot] = useState(createSetupWizardSnapshot);
-	const [setupTheme, setSetupTheme] = useState<ThemeType>(ThemeTypes.SYSTEM);
+	const [setupTheme, setSetupTheme] = useState<ThemeType>(ThemeTypes.DARK);
 	const [forceUnauthenticatedSetup, setForceUnauthenticatedSetup] = useState(false);
 	const [integrationDraft, setIntegrationDraft] = useState<ServiceIntegrationDraft>(() => ({
 		...DEFAULT_INTEGRATION_DRAFT,
@@ -531,11 +538,11 @@ export const SelfHostedSetupWizardGate = observer(() => {
 	}, [authStoreAuthenticated, forceUnauthenticatedSetup]);
 
 	const resetStaleSetupSession = useCallback(async () => {
-		logger.warn('Instance config fetch returned 401 during setup; clearing stale local setup session');
+		logger.warn('The setup session token was rejected. Clearing the stale local setup session.');
 		setForceUnauthenticatedSetup(true);
 		registerFormDraftsRef.current.clear();
 		setConfig(null);
-		setLoadError(false);
+		setLoadError(null);
 		setSubmitError(null);
 		setSubmitting(false);
 		setWizardSnapshot(createSetupWizardSnapshot());
@@ -605,7 +612,7 @@ export const SelfHostedSetupWizardGate = observer(() => {
 	useEffect(() => {
 		if (!isAuthenticated || config) return;
 		let cancelled = false;
-		setLoadError(false);
+		setLoadError(null);
 		void (async () => {
 			try {
 				const next = await fetchInstanceConfig();
@@ -613,12 +620,15 @@ export const SelfHostedSetupWizardGate = observer(() => {
 				hydrateFromConfig(next);
 			} catch (error) {
 				if (cancelled) return;
-				if (error instanceof HttpError && error.status === 401) {
+				const cause =
+					error instanceof HttpError && error.status === 401 ? await classifySetupUnauthorized() : 'unknown';
+				if (cancelled) return;
+				if (cause === 'stale_session') {
 					await resetStaleSetupSession();
 					return;
 				}
 				logger.error('Failed to load instance configuration', error);
-				setLoadError(true);
+				setLoadError(cause === 'origin_mismatch' ? ORIGIN_MISMATCH_DESCRIPTOR : LOAD_ERROR_DESCRIPTOR);
 			}
 		})();
 		return () => {
@@ -731,7 +741,7 @@ export const SelfHostedSetupWizardGate = observer(() => {
 				password: integrationDraft.smtpPassword,
 				secure: integrationDraft.smtpSecure,
 			});
-			setSmtpTestResult(result.ok ? 'ok' : (result.error ?? 'SMTP validation failed.'));
+			setSmtpTestResult(result.ok ? 'ok' : (result.error ?? 'failed'));
 		} catch (error) {
 			logger.error('Failed to validate SMTP configuration', error);
 			setSmtpTestResult(FormUtils.extractErrorMessage(i18n, error));
@@ -868,7 +878,7 @@ export const SelfHostedSetupWizardGate = observer(() => {
 										role="alert"
 										data-flx="app.self-hosted-setup-wizard-gate.load-error"
 									>
-										{i18n._(LOAD_ERROR_DESCRIPTOR)}
+										{i18n._(loadError)}
 									</p>
 								</div>
 							) : (
@@ -885,12 +895,28 @@ export const SelfHostedSetupWizardGate = observer(() => {
 											productName={fallbackProductName}
 											isAuthenticated={isAuthenticated}
 											initialFocusRef={welcomeInitialFocusRef}
+											data-flx="app.setup.self-hosted-setup-wizard-gate.welcome-step"
 										/>
 									)}
-									{step === 'theme' && <ThemeStep theme={setupTheme} onThemeChange={setSetupTheme} />}
-									{step === 'admin_intro' && <AdminIntroStep />}
-									{step === 'admin_account' && <AdminAccountStep theme={setupTheme} />}
-									{step === 'loading' && <LoadingStep />}
+									{step === 'theme' && (
+										<ThemeStep
+											theme={setupTheme}
+											onThemeChange={setSetupTheme}
+											data-flx="app.setup.self-hosted-setup-wizard-gate.theme-step"
+										/>
+									)}
+									{step === 'admin_intro' && (
+										<AdminIntroStep data-flx="app.setup.self-hosted-setup-wizard-gate.admin-intro-step" />
+									)}
+									{step === 'admin_account' && (
+										<AdminAccountStep
+											theme={setupTheme}
+											data-flx="app.setup.self-hosted-setup-wizard-gate.admin-account-step"
+										/>
+									)}
+									{step === 'loading' && (
+										<LoadingStep data-flx="app.setup.self-hosted-setup-wizard-gate.loading-step" />
+									)}
 									{step === 'branding' && (
 										<BrandingStep
 											productName={productName}
@@ -902,10 +928,16 @@ export const SelfHostedSetupWizardGate = observer(() => {
 											onThemeColorChange={setThemeColor}
 											onUploadAsset={handleUploadAsset}
 											onClearAsset={handleClearAsset}
+											data-flx="app.setup.self-hosted-setup-wizard-gate.branding-step"
 										/>
 									)}
 									{step === 'registration' && (
-										<RegistrationStep mode={registrationMode} disabled={submitting} onChange={setRegistrationMode} />
+										<RegistrationStep
+											mode={registrationMode}
+											disabled={submitting}
+											onChange={setRegistrationMode}
+											data-flx="app.setup.self-hosted-setup-wizard-gate.registration-step.set-registration-mode"
+										/>
 									)}
 									{step === 'community' && (
 										<CommunityStep
@@ -917,6 +949,7 @@ export const SelfHostedSetupWizardGate = observer(() => {
 											onToggleSingleCommunity={setSingleCommunityEnabled}
 											onSingleCommunityNameChange={setSingleCommunityName}
 											onToggleDirectMessages={setDirectMessagesDisabled}
+											data-flx="app.setup.self-hosted-setup-wizard-gate.community-step"
 										/>
 									)}
 									{step === 'media_expiry' && (
@@ -924,6 +957,7 @@ export const SelfHostedSetupWizardGate = observer(() => {
 											draft={mediaExpiryDraft}
 											disabled={submitting}
 											onDraftChange={handleMediaExpiryDraftChange}
+											data-flx="app.setup.self-hosted-setup-wizard-gate.media-expiry-step"
 										/>
 									)}
 									{wizardStepToIntegrationKind(step) && (
@@ -935,6 +969,7 @@ export const SelfHostedSetupWizardGate = observer(() => {
 											smtpTestResult={smtpTestResult}
 											onDraftChange={handleIntegrationDraftChange}
 											onTestSmtp={handleTestSmtp}
+											data-flx="app.setup.self-hosted-setup-wizard-gate.integration-step"
 										/>
 									)}
 									{step === 'services' && (
@@ -943,10 +978,16 @@ export const SelfHostedSetupWizardGate = observer(() => {
 											selection={serviceSelection}
 											disabled={submitting}
 											onToggle={handleToggleService}
+											data-flx="app.setup.self-hosted-setup-wizard-gate.services-step"
 										/>
 									)}
 									{step === 'premium' && (
-										<PremiumStep mode={premiumMode} disabled={submitting} onChange={setPremiumMode} />
+										<PremiumStep
+											mode={premiumMode}
+											disabled={submitting}
+											onChange={setPremiumMode}
+											data-flx="app.setup.self-hosted-setup-wizard-gate.premium-step.set-premium-mode"
+										/>
 									)}
 									{step === 'finish' && (
 										<FinishStep
@@ -957,6 +998,7 @@ export const SelfHostedSetupWizardGate = observer(() => {
 											attachmentExpiryEnabled={mediaExpiryDraft.enabled}
 											premiumMode={premiumMode}
 											submitError={submitError}
+											data-flx="app.setup.self-hosted-setup-wizard-gate.finish-step"
 										/>
 									)}
 								</SteppedCarousel>
@@ -989,7 +1031,13 @@ export const SelfHostedSetupWizardGate = observer(() => {
 													<Button
 														variant="secondary"
 														disabled={stepNavigationLocked}
-														leftIcon={<ArrowLeftIcon size={18} weight="bold" />}
+														leftIcon={
+															<ArrowLeftIcon
+																size={18}
+																weight="bold"
+																data-flx="app.setup.self-hosted-setup-wizard-gate.arrow-left-icon"
+															/>
+														}
 														onClick={goBack}
 														data-flx="app.self-hosted-setup-wizard-gate.back-button"
 													>
@@ -1015,7 +1063,13 @@ export const SelfHostedSetupWizardGate = observer(() => {
 													>
 														<Button
 															submitting={submitting}
-															rightIcon={<CheckIcon size={18} weight="bold" />}
+															rightIcon={
+																<CheckIcon
+																	size={18}
+																	weight="bold"
+																	data-flx="app.setup.self-hosted-setup-wizard-gate.check-icon"
+																/>
+															}
 															onClick={submit}
 															data-flx="app.self-hosted-setup-wizard-gate.finish-button"
 														>
@@ -1035,7 +1089,13 @@ export const SelfHostedSetupWizardGate = observer(() => {
 														<Button
 															disabled={primaryButtonDisabled}
 															submitting={isLoading}
-															rightIcon={<ArrowRightIcon size={18} weight="bold" />}
+															rightIcon={
+																<ArrowRightIcon
+																	size={18}
+																	weight="bold"
+																	data-flx="app.setup.self-hosted-setup-wizard-gate.arrow-right-icon"
+																/>
+															}
 															onClick={handlePrimaryButton}
 															data-flx="app.self-hosted-setup-wizard-gate.next-button"
 														>

@@ -1,42 +1,240 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use crate::common::{CommandSpec, output_text, parse_version_instant, run_command};
-use crate::functions::{remove_dir_if_exists, write_json_pretty};
-use anyhow::{Context, Result, anyhow, ensure};
-use chrono::Utc;
-use clap::{ArgAction, Args, Subcommand};
-use flate2::Compression;
-use flate2::write::GzEncoder;
+use crate::functions::sha256_reader;
+use anyhow::{Context, Result, bail, ensure};
+use chrono::{DateTime, Utc};
+use clap::{Args, Subcommand};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
-use sha2::{Digest as _, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
-use std::env;
 use std::fs::{self, File};
-use std::io::{self, Read};
 use std::path::{Path, PathBuf};
-use tar::{Builder, Header};
-use tempfile::tempdir;
-use walkdir::WalkDir;
+use std::thread;
+use std::time::Duration;
 
-const RELEASE_SCHEMA_VERSION: u32 = 1;
-const RELEASE_MANIFEST_FILENAME: &str = "fluxer-release-manifest.json";
-const RELEASE_FRAGMENT_FILENAME_PREFIX: &str = "fluxer-release-fragment-";
-const DEFAULT_RELEASE_OUTPUT_DIR: &str = "release-out";
+pub(crate) const RELEASE_REPOSITORY: &str = "fluxerapp/fluxer";
+const RELEASE_COMPARE_URL: &str = "https://github.com/fluxerapp/fluxer/compare";
+pub(crate) const DESKTOP_RELEASE_DESCRIPTOR_SCHEMA_VERSION: u8 = 1;
+pub(crate) const DESKTOP_RELEASE_ROUTE_COUNT: usize = 28;
+pub(crate) const DESKTOP_RELEASE_ASSET_COUNT: usize = 24;
 
-const SELF_HOSTED_IMAGE_COMPONENTS: &[&str] = &[
-    "fluxer-admin",
-    "fluxer-api",
-    "fluxer-app-proxy-self-hosted",
-    "fluxer-gateway",
-    "fluxer-gifs",
-    "fluxer-media-proxy",
-    "fluxer-messages",
-    "fluxer-snowflakes",
-    "fluxer-static",
-    "fluxer-unfurl",
-    "fluxer-users",
-];
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub(crate) struct DesktopReleaseAsset {
+    pub(crate) storage_key: String,
+    pub(crate) release_asset: String,
+    pub(crate) sha256: String,
+    pub(crate) size: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub(crate) struct DesktopReleaseDescriptor {
+    pub(crate) schema_version: u8,
+    pub(crate) channel: String,
+    pub(crate) version: String,
+    pub(crate) release_tag: String,
+    pub(crate) source_sha: String,
+    pub(crate) assets: Vec<DesktopReleaseAsset>,
+}
+
+pub(crate) fn desktop_release_product(channel: &str) -> Result<&'static str> {
+    match channel {
+        "stable" => Ok("Fluxer"),
+        "canary" => Ok("Fluxer-Canary"),
+        other => bail!("Unsupported desktop release channel {other:?}"),
+    }
+}
+
+pub(crate) fn desktop_release_descriptor_filename(channel: &str, version: &str) -> Result<String> {
+    Ok(format!(
+        "{}-{version}-release-manifest.json",
+        desktop_release_product(channel)?
+    ))
+}
+
+pub(crate) fn desktop_release_asset_name(
+    channel: &str,
+    version: &str,
+    platform: &str,
+    arch: &str,
+    storage_filename: &str,
+) -> Result<String> {
+    let release_prefix = format!("{}-{version}-", desktop_release_product(channel)?);
+    let platform_token = match platform {
+        "win32" => "win",
+        "darwin" => "mac",
+        "linux" => "linux",
+        other => bail!("Unsupported desktop release platform {other:?}"),
+    };
+    ensure!(
+        matches!(arch, "x64" | "arm64"),
+        "Unsupported desktop release architecture {arch:?}"
+    );
+    if storage_filename.starts_with(&release_prefix) {
+        return Ok(storage_filename.to_string());
+    }
+    let release_filename =
+        if platform == "darwin" && storage_filename.eq_ignore_ascii_case("releases.json") {
+            "releases.json"
+        } else {
+            storage_filename
+        };
+    Ok(format!(
+        "{release_prefix}{platform_token}-{arch}-{release_filename}"
+    ))
+}
+
+pub(crate) fn validate_desktop_release_descriptor(
+    descriptor: &DesktopReleaseDescriptor,
+    channel: &str,
+    version: &str,
+    source_sha: &str,
+) -> Result<()> {
+    ensure!(
+        descriptor.schema_version == DESKTOP_RELEASE_DESCRIPTOR_SCHEMA_VERSION,
+        "Unsupported desktop release descriptor schema version {}",
+        descriptor.schema_version
+    );
+    ensure!(
+        descriptor.channel == channel,
+        "Desktop release descriptor channel {:?} does not match {channel:?}",
+        descriptor.channel
+    );
+    ensure!(
+        descriptor.version == version,
+        "Desktop release descriptor version {:?} does not match {version:?}",
+        descriptor.version
+    );
+    ensure!(
+        descriptor.release_tag == format!("fluxer-desktop-{channel}@{version}"),
+        "Desktop release descriptor tag {:?} is invalid",
+        descriptor.release_tag
+    );
+    ensure!(
+        descriptor.source_sha == source_sha,
+        "Desktop release descriptor source SHA {:?} does not match {source_sha:?}",
+        descriptor.source_sha
+    );
+    ensure!(
+        source_sha.len() == 40
+            && source_sha
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()),
+        "Invalid desktop release source SHA {source_sha:?}"
+    );
+    parse_version_instant(version)
+        .with_context(|| format!("Invalid desktop release descriptor version {version:?}"))?;
+    ensure!(
+        descriptor.assets.len() == DESKTOP_RELEASE_ROUTE_COUNT,
+        "Desktop release descriptor must contain {DESKTOP_RELEASE_ROUTE_COUNT} routes, found {}",
+        descriptor.assets.len()
+    );
+    let storage_prefix = format!("desktop/{channel}/");
+    let release_prefix = format!("{}-{version}-", desktop_release_product(channel)?);
+    let descriptor_name = desktop_release_descriptor_filename(channel, version)?;
+    let mut storage_keys = BTreeSet::new();
+    let mut route_counts = BTreeMap::<String, usize>::new();
+    let mut release_assets = BTreeMap::<&str, (&str, u64)>::new();
+    let mut release_asset_names = BTreeMap::from([(
+        descriptor_name.to_ascii_lowercase(),
+        descriptor_name.as_str(),
+    )]);
+    for asset in &descriptor.assets {
+        ensure!(
+            storage_keys.insert(asset.storage_key.as_str()),
+            "Desktop release descriptor contains duplicate storage key {:?}",
+            asset.storage_key
+        );
+        let key_segments = asset.storage_key.split('/').collect::<Vec<_>>();
+        ensure!(
+            key_segments.len() == 5
+                && key_segments[0] == "desktop"
+                && key_segments[1] == channel
+                && matches!(key_segments[2], "win32" | "darwin" | "linux")
+                && matches!(key_segments[3], "x64" | "arm64")
+                && !key_segments[4].is_empty()
+                && key_segments[4].bytes().all(|byte| {
+                    byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'-' | b'_')
+                })
+                && asset.storage_key.starts_with(&storage_prefix),
+            "Desktop release descriptor contains invalid storage key {:?}",
+            asset.storage_key
+        );
+        *route_counts
+            .entry(format!("{}/{}", key_segments[2], key_segments[3]))
+            .or_default() += 1;
+        let expected_release_asset = desktop_release_asset_name(
+            channel,
+            version,
+            key_segments[2],
+            key_segments[3],
+            key_segments[4],
+        )?;
+        ensure!(
+            asset.release_asset.starts_with(&release_prefix)
+                && asset.release_asset != descriptor_name
+                && asset.release_asset == expected_release_asset
+                && asset.release_asset.bytes().all(|byte| {
+                    byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'-' | b'_')
+                }),
+            "Desktop release descriptor contains invalid release asset {:?}",
+            asset.release_asset
+        );
+        if let Some(existing) = release_asset_names.insert(
+            asset.release_asset.to_ascii_lowercase(),
+            asset.release_asset.as_str(),
+        ) {
+            ensure!(
+                existing == asset.release_asset,
+                "Desktop release asset names differ only by case: {existing:?} and {:?}",
+                asset.release_asset
+            );
+        }
+        ensure!(
+            asset.sha256.len() == 64
+                && asset
+                    .sha256
+                    .bytes()
+                    .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()),
+            "Desktop release descriptor contains invalid SHA-256 for {:?}",
+            asset.release_asset
+        );
+        ensure!(
+            asset.size > 0,
+            "Desktop release descriptor contains an empty asset {:?}",
+            asset.release_asset
+        );
+        if let Some((sha256, size)) = release_assets.get(asset.release_asset.as_str()) {
+            ensure!(
+                *sha256 == asset.sha256 && *size == asset.size,
+                "Desktop release descriptor maps conflicting content to {:?}",
+                asset.release_asset
+            );
+        } else {
+            release_assets.insert(
+                asset.release_asset.as_str(),
+                (asset.sha256.as_str(), asset.size),
+            );
+        }
+    }
+    ensure!(
+        release_assets.len() == DESKTOP_RELEASE_ASSET_COUNT,
+        "Desktop release descriptor must contain {DESKTOP_RELEASE_ASSET_COUNT} unique release assets, found {}",
+        release_assets.len()
+    );
+    let expected_route_counts = BTreeMap::from([
+        ("darwin/arm64".to_string(), 4usize),
+        ("darwin/x64".to_string(), 4usize),
+        ("linux/arm64".to_string(), 4usize),
+        ("linux/x64".to_string(), 4usize),
+        ("win32/arm64".to_string(), 6usize),
+        ("win32/x64".to_string(), 6usize),
+    ]);
+    ensure!(
+        route_counts == expected_route_counts,
+        "Desktop release descriptor route inventory mismatch: expected {expected_route_counts:?}, found {route_counts:?}"
+    );
+    Ok(())
+}
 
 #[derive(Debug, Args, Clone)]
 pub struct ReleaseArgs {
@@ -47,1034 +245,838 @@ pub struct ReleaseArgs {
 #[derive(Debug, Subcommand, Clone)]
 #[clap(rename_all = "kebab_case")]
 enum ReleaseCommand {
-    PublishImage(PublishImageArgs),
-    PublishAppProxy(PublishAppProxyArgs),
-    PublishDesktop(PublishDesktopArgs),
-    PublishHelm(PublishHelmArgs),
-    PublishSelfHosting(PublishSelfHostingArgs),
-    Finalise(FinaliseArgs),
+    Publish(PublishArgs),
 }
 
 #[derive(Debug, Args, Clone)]
-pub struct PublishImageArgs {
+struct PublishArgs {
+    #[arg(long)]
+    component: String,
     #[arg(long)]
     build_version: String,
     #[arg(long)]
-    image: String,
+    source_sha: String,
     #[arg(long)]
-    image_ref: Option<String>,
+    previous_sha: Option<String>,
     #[arg(long)]
+    prerelease: bool,
+    #[arg(long)]
+    asset_dir: Option<PathBuf>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ReleaseSummary {
+    id: u64,
+    tag_name: String,
+    #[serde(rename = "draft")]
+    is_draft: bool,
+    published_at: Option<String>,
+}
+
+#[derive(Debug)]
+struct QualifiedRelease {
+    id: u64,
+    tag: String,
+    version_instant: DateTime<Utc>,
+    published_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ReleaseHandle<'a> {
+    id: u64,
+    tag: &'a str,
+}
+
+#[derive(Debug, Deserialize)]
+struct ReleaseDetail {
+    id: u64,
+    tag_name: String,
+    target_commitish: String,
+    name: Option<String>,
+    body: Option<String>,
+    draft: bool,
+    prerelease: bool,
+    assets: Vec<PublishedReleaseAsset>,
+}
+
+#[derive(Debug, Deserialize)]
+struct PublishedReleaseAsset {
+    name: String,
+    label: Option<String>,
+    size: u64,
     digest: Option<String>,
-    #[arg(long, default_value = "v1,latest")]
-    moving_tags: String,
-    #[arg(long)]
-    source_sha: Option<String>,
+    state: String,
 }
 
-#[derive(Debug, Args, Clone)]
-pub struct PublishAppProxyArgs {
-    #[command(flatten)]
-    image: PublishImageArgs,
-    #[arg(long)]
-    asset_manifest: Option<PathBuf>,
+#[derive(Debug)]
+struct LocalReleaseAsset {
+    path: PathBuf,
+    name: String,
+    size: u64,
+    digest: String,
 }
 
-#[derive(Debug, Args, Clone)]
-pub struct PublishDesktopArgs {
-    #[arg(long)]
-    build_version: String,
-    #[arg(long)]
-    channel: String,
-    #[arg(long, action = ArgAction::Set)]
-    test_build: bool,
-    #[arg(long)]
-    s3_prefix: String,
-    #[arg(long, default_value = "s3_payload")]
-    payload_root: PathBuf,
-    #[arg(long)]
-    source_sha: Option<String>,
+#[derive(Debug, Deserialize)]
+struct GitRef {
+    #[serde(rename = "ref")]
+    name: String,
 }
 
-#[derive(Debug, Args, Clone)]
-pub struct PublishHelmArgs {
-    #[arg(long)]
-    build_version: String,
-    #[arg(long, default_value = DEFAULT_RELEASE_OUTPUT_DIR)]
-    output_dir: PathBuf,
-    #[arg(long)]
-    source_sha: Option<String>,
-}
-
-#[derive(Debug, Args, Clone)]
-pub struct PublishSelfHostingArgs {
-    #[arg(long)]
-    build_version: String,
-    #[arg(long, default_value = DEFAULT_RELEASE_OUTPUT_DIR)]
-    output_dir: PathBuf,
-    #[arg(long)]
-    source_sha: Option<String>,
-}
-
-#[derive(Debug, Args, Clone)]
-pub struct FinaliseArgs {
-    #[arg(long)]
-    build_version: String,
-    #[arg(long, default_value = DEFAULT_RELEASE_OUTPUT_DIR)]
-    output_dir: PathBuf,
-    #[arg(long)]
-    source_sha: Option<String>,
-}
+const PUBLISH_ATTEMPTS: u64 = 3;
 
 pub async fn run(args: ReleaseArgs) -> Result<()> {
     match args.command {
-        ReleaseCommand::PublishImage(args) => publish_image(args).await,
-        ReleaseCommand::PublishAppProxy(args) => publish_app_proxy(args).await,
-        ReleaseCommand::PublishDesktop(args) => publish_desktop(args).await,
-        ReleaseCommand::PublishHelm(args) => publish_helm(args).await,
-        ReleaseCommand::PublishSelfHosting(args) => publish_self_hosting(args).await,
-        ReleaseCommand::Finalise(args) => finalise(args).await,
+        ReleaseCommand::Publish(args) => retry_publish(
+            PUBLISH_ATTEMPTS,
+            |attempt| thread::sleep(Duration::from_secs(attempt * 15)),
+            || publish(args.clone()),
+        ),
     }
 }
 
-async fn publish_image(args: PublishImageArgs) -> Result<()> {
-    let version = validate_build_version(&args.build_version)?;
-    let image_ref = args
-        .image_ref
-        .clone()
-        .unwrap_or_else(|| format!("{}:{version}", args.image));
-    let digest = match args
-        .digest
-        .as_deref()
-        .map(str::trim)
-        .filter(|v| !v.is_empty())
-    {
-        Some(digest) => digest.to_string(),
-        None => inspect_image_digest(&image_ref)?,
-    };
-    let source_sha = resolve_source_sha(args.source_sha.as_deref())?;
-    let moving_tags = parse_csv(&args.moving_tags);
-    let fragment = image_fragment(
-        &version,
-        &source_sha,
-        &args.image,
-        &image_ref,
-        &digest,
-        moving_tags,
-    );
-    let fragment_path = write_fragment(
-        &fragment_filename(&format!("image-{}", sanitize_asset_segment(&args.image))),
-        &fragment,
-    )?;
-    publish_fragment(&version, &source_sha, false, true, &[])?;
-    println!("Wrote release fragment: {}", fragment_path.display());
-    Ok(())
-}
-
-async fn publish_app_proxy(args: PublishAppProxyArgs) -> Result<()> {
-    let version = validate_build_version(&args.image.build_version)?;
-    let image_ref = args
-        .image
-        .image_ref
-        .clone()
-        .unwrap_or_else(|| format!("{}:{version}", args.image.image));
-    let digest = match args
-        .image
-        .digest
-        .as_deref()
-        .map(str::trim)
-        .filter(|v| !v.is_empty())
-    {
-        Some(digest) => digest.to_string(),
-        None => inspect_image_digest(&image_ref)?,
-    };
-    let source_sha = resolve_source_sha(args.image.source_sha.as_deref())?;
-    let moving_tags = parse_csv(&args.image.moving_tags);
-    let static_assets = match args.asset_manifest.as_deref() {
-        Some(path) => Some(static_asset_manifest(path)?),
-        None => None,
-    };
-    let fragment = json!({
-        "schemaVersion": RELEASE_SCHEMA_VERSION,
-        "kind": "app-proxy",
-        "version": version,
-        "sourceSha": source_sha,
-        "image": image_payload(&args.image.image, &image_ref, &digest, moving_tags),
-        "staticAssets": static_assets,
-        "workflow": workflow_payload(),
-    });
-    let fragment_path = write_fragment(&fragment_filename("app-proxy"), &fragment)?;
-    publish_fragment(&version, &source_sha, false, true, &[])?;
-    println!("Wrote release fragment: {}", fragment_path.display());
-    Ok(())
-}
-
-async fn publish_desktop(args: PublishDesktopArgs) -> Result<()> {
-    let version = validate_build_version(&args.build_version)?;
-    let source_sha = resolve_source_sha(args.source_sha.as_deref())?;
-    let payload_dir = args.payload_root.join(&args.s3_prefix);
-    ensure!(
-        payload_dir.is_dir(),
-        "Desktop payload directory does not exist: {}",
-        payload_dir.display()
-    );
-    let output_dir = release_output_dir().join("desktop");
-    fs::create_dir_all(&output_dir)
-        .with_context(|| format!("Failed to create {}", output_dir.display()))?;
-    let bundle_name = format!(
-        "fluxer-desktop-{}-{version}.tar.gz",
-        sanitize_asset_segment(&args.channel)
-    );
-    let bundle_path = output_dir.join(&bundle_name);
-    create_tar_gz(
-        &bundle_path,
-        &payload_dir,
-        &format!("fluxer-desktop-{version}"),
-    )?;
-    let manifests = collect_payload_manifests(&payload_dir)?;
-    let fragment = json!({
-        "schemaVersion": RELEASE_SCHEMA_VERSION,
-        "kind": "desktop",
-        "version": version,
-        "sourceSha": source_sha,
-        "channel": args.channel,
-        "testBuild": args.test_build,
-        "s3Prefix": args.s3_prefix,
-        "payloadRoot": path_to_slash_string(&payload_dir),
-        "bundle": file_payload(&bundle_path)?,
-        "manifests": manifests,
-        "workflow": workflow_payload(),
-    });
-    let fragment_path = write_fragment(
-        &fragment_filename(&format!(
-            "desktop-{}",
-            sanitize_asset_segment(&args.channel)
-        )),
-        &fragment,
-    )?;
-    publish_fragment(
-        &version,
-        &source_sha,
-        args.channel == "canary" || args.test_build,
-        true,
-        &[bundle_path],
-    )?;
-    println!("Wrote release fragment: {}", fragment_path.display());
-    Ok(())
-}
-
-async fn publish_helm(args: PublishHelmArgs) -> Result<()> {
-    let version = validate_build_version(&args.build_version)?;
-    let source_sha = resolve_source_sha(args.source_sha.as_deref())?;
-    let output_dir = args.output_dir.join("helm");
-    remove_dir_if_exists(&output_dir)?;
-    fs::create_dir_all(&output_dir)
-        .with_context(|| format!("Failed to create {}", output_dir.display()))?;
-
-    let chart_dirs = helm_chart_dirs(Path::new("deploy/helm"))?;
-    for chart_dir in &chart_dirs {
-        run_command(
-            CommandSpec::new("helm")
-                .args(["dependency", "update"])
-                .arg(chart_dir),
-        )?;
-        run_command(
-            CommandSpec::new("helm")
-                .arg("package")
-                .arg(chart_dir)
-                .args(["--version", &version])
-                .args(["--app-version", &version])
-                .arg("--destination")
-                .arg(&output_dir),
-        )?;
-    }
-
-    let mut charts = Vec::new();
-    let mut assets = Vec::new();
-    for path in sorted_files(&output_dir)? {
-        if path.extension().and_then(|ext| ext.to_str()) != Some("tgz") {
-            continue;
+fn retry_publish(
+    attempts: u64,
+    mut wait: impl FnMut(u64),
+    mut publish: impl FnMut() -> Result<()>,
+) -> Result<()> {
+    let mut attempt = 1;
+    loop {
+        match publish() {
+            Ok(()) => return Ok(()),
+            Err(error) if attempt < attempts => {
+                eprintln!("Release publish attempt {attempt} of {attempts} failed: {error:#}");
+                wait(attempt);
+                attempt += 1;
+            }
+            Err(error) => return Err(error),
         }
-        charts.push(file_payload(&path)?);
-        assets.push(path);
     }
-    ensure!(!charts.is_empty(), "No Helm chart packages were generated");
-
-    let fragment = json!({
-        "schemaVersion": RELEASE_SCHEMA_VERSION,
-        "kind": "helm",
-        "version": version,
-        "sourceSha": source_sha,
-        "charts": charts,
-        "workflow": workflow_payload(),
-    });
-    let fragment_path = write_fragment(&fragment_filename("helm"), &fragment)?;
-    publish_fragment(&version, &source_sha, false, true, &assets)?;
-    println!("Wrote release fragment: {}", fragment_path.display());
-    Ok(())
 }
 
-async fn publish_self_hosting(args: PublishSelfHostingArgs) -> Result<()> {
-    let version = validate_build_version(&args.build_version)?;
-    let source_sha = resolve_source_sha(args.source_sha.as_deref())?;
-    let output_dir = args.output_dir.join("self-hosting");
-    fs::create_dir_all(&output_dir)
-        .with_context(|| format!("Failed to create {}", output_dir.display()))?;
-    let bundle_path = output_dir.join(format!("fluxer-self-hosting-{version}.tar.gz"));
-    create_self_hosting_bundle(&bundle_path, &version)?;
-    let fragment = json!({
-        "schemaVersion": RELEASE_SCHEMA_VERSION,
-        "kind": "self-hosting",
-        "version": version,
-        "sourceSha": source_sha,
-        "bundle": file_payload(&bundle_path)?,
-        "images": self_hosting_images(&version),
-        "workflow": workflow_payload(),
-    });
-    let fragment_path = write_fragment(&fragment_filename("self-hosting"), &fragment)?;
-    publish_fragment(&version, &source_sha, true, true, &[bundle_path])?;
-    println!("Wrote release fragment: {}", fragment_path.display());
-    Ok(())
-}
-
-async fn finalise(args: FinaliseArgs) -> Result<()> {
-    let version = validate_build_version(&args.build_version)?;
-    let source_sha = resolve_source_sha(args.source_sha.as_deref())?;
-    ensure_release(&version, &source_sha, false, true)?;
-
-    let fragments_dir = args.output_dir.join("fragments");
-    let fragments = read_fragments(&fragments_dir)?;
+fn publish(args: PublishArgs) -> Result<()> {
+    validate_component(&args.component)?;
+    let version_instant = parse_version_instant(&args.build_version)?;
+    let source_sha = validate_full_sha("source SHA", &args.source_sha)?;
+    let resolved_source_sha = resolve_commit_sha(&source_sha).with_context(|| {
+        format!("Source SHA {source_sha} is not a resolvable repository commit")
+    })?;
     ensure!(
-        !fragments.is_empty(),
-        "No release fragments found in {} for {}",
-        fragments_dir.display(),
-        release_tag(&version)
+        resolved_source_sha == source_sha,
+        "Source SHA {source_sha} resolved to unexpected commit {resolved_source_sha}"
     );
-    let manifest = build_manifest(&version, &source_sha, fragments);
-    let manifest_path = args.output_dir.join(RELEASE_MANIFEST_FILENAME);
-    write_json_pretty(&manifest_path, &manifest)?;
-    let notes_path = args.output_dir.join("fluxer-release-notes.md");
-    fs::write(&notes_path, release_notes(&manifest))
-        .with_context(|| format!("Failed to write {}", notes_path.display()))?;
 
-    upload_release_assets(&version, &[manifest_path])?;
-    publish_release(&version, &notes_path)
+    let tag = release_tag(&args.component, &args.build_version);
+    let title = release_title(&args.component, &args.build_version);
+    let summaries = release_summaries()?;
+    let qualified = qualified_releases(&summaries, &args.component)?;
+    let existing_release = qualified.iter().find(|release| release.tag == tag);
+    let existing_summary = summaries.iter().find(|release| release.tag_name == tag);
+
+    if existing_release.is_none()
+        && let Some(newer) = qualified
+            .iter()
+            .filter(|release| release.version_instant > version_instant)
+            .max_by_key(|release| release.version_instant)
+    {
+        bail!(
+            "Refusing to publish {tag}: newer component release {} already exists",
+            newer.tag
+        );
+    }
+
+    let previous_sha = match qualified
+        .iter()
+        .filter(|release| release.tag != tag)
+        .filter(|release| {
+            existing_release.is_none_or(|existing| {
+                (release.published_at, release.id) < (existing.published_at, existing.id)
+            })
+        })
+        .max_by_key(|release| (release.published_at, release.id))
+    {
+        Some(previous) => {
+            let previous_sha = resolve_commit_sha(&previous.tag).with_context(|| {
+                format!(
+                    "Previous component release tag {} is not a resolvable repository commit",
+                    previous.tag
+                )
+            })?;
+            ensure!(
+                previous_sha != source_sha,
+                "Component {component} already has a prior qualified release at source SHA {source_sha}",
+                component = args.component
+            );
+            ensure_ancestor(&previous_sha, &source_sha, false)?;
+            previous_sha
+        }
+        None => {
+            let baseline = args
+                .previous_sha
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .context("--previous-sha is required for the first qualified component release")?;
+            let baseline = validate_full_sha("previous SHA", baseline)?;
+            let resolved_baseline = resolve_commit_sha(&baseline).with_context(|| {
+                format!("Previous SHA {baseline} is not a resolvable repository commit")
+            })?;
+            ensure!(
+                resolved_baseline == baseline,
+                "Previous SHA {baseline} resolved to unexpected commit {resolved_baseline}"
+            );
+            ensure_ancestor(&baseline, &source_sha, true)?;
+            baseline
+        }
+    };
+
+    let body = release_body(&previous_sha, &source_sha);
+    let assets = local_release_assets(
+        &args.component,
+        &args.build_version,
+        &source_sha,
+        args.asset_dir.as_deref(),
+    )?;
+    if let Some(existing) = existing_summary.filter(|release| !release.is_draft) {
+        ensure!(
+            existing.published_at.is_some(),
+            "Published release {tag} is missing its publication timestamp"
+        );
+        verify_release(
+            ReleaseHandle {
+                id: existing.id,
+                tag: &tag,
+            },
+            &title,
+            &body,
+            &source_sha,
+            args.prerelease,
+            false,
+            &assets,
+        )?;
+        println!("Release {tag} already exists with the expected state.");
+        return Ok(());
+    }
+
+    let release_id = if let Some(existing) = existing_summary {
+        ensure!(
+            existing.published_at.is_none(),
+            "Draft release {tag} unexpectedly has a publication timestamp"
+        );
+        existing.id
+    } else {
+        ensure!(
+            !tag_exists(&tag)?,
+            "Refusing to publish {tag}: the tag already exists without a matching GitHub Release"
+        );
+        create_draft_release(&tag, &title, &body, &source_sha, args.prerelease)?
+    };
+    let release = ReleaseHandle {
+        id: release_id,
+        tag: &tag,
+    };
+    upload_draft_release_assets(
+        release,
+        &title,
+        &body,
+        &source_sha,
+        args.prerelease,
+        &assets,
+    )?;
+    verify_release(
+        release,
+        &title,
+        &body,
+        &source_sha,
+        args.prerelease,
+        true,
+        &assets,
+    )?;
+    run_command(
+        CommandSpec::new("gh")
+            .args(["release", "edit", &tag])
+            .args(["--repo", RELEASE_REPOSITORY])
+            .arg("--draft=false")
+            .arg(format!("--prerelease={}", args.prerelease))
+            .arg("--latest=false"),
+    )?;
+    verify_release(
+        release,
+        &title,
+        &body,
+        &source_sha,
+        args.prerelease,
+        false,
+        &assets,
+    )
 }
 
-fn image_fragment(
+fn validate_component(component: &str) -> Result<()> {
+    ensure!(!component.is_empty(), "Release component must not be empty");
+    ensure!(
+        component.split('-').all(|segment| {
+            !segment.is_empty()
+                && segment
+                    .bytes()
+                    .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
+        }),
+        "Invalid release component {component:?}: expected lowercase letters, digits, and single hyphen separators"
+    );
+    Ok(())
+}
+
+pub(crate) fn validate_full_sha(label: &str, value: &str) -> Result<String> {
+    let value = value.trim();
+    ensure!(
+        value.len() == 40 && value.bytes().all(|byte| byte.is_ascii_hexdigit()),
+        "Invalid {label} {value:?}: expected a full 40-character commit SHA"
+    );
+    Ok(value.to_ascii_lowercase())
+}
+
+fn release_summaries() -> Result<Vec<ReleaseSummary>> {
+    let output = output_text(
+        CommandSpec::new("gh")
+            .args(["api", "--paginate", "--slurp"])
+            .arg(format!("repos/{RELEASE_REPOSITORY}/releases?per_page=100")),
+    )?;
+    let pages: Vec<Vec<ReleaseSummary>> =
+        serde_json::from_str(&output).context("Failed to parse GitHub Release history")?;
+    Ok(pages.into_iter().flatten().collect())
+}
+
+fn qualified_releases(
+    summaries: &[ReleaseSummary],
+    component: &str,
+) -> Result<Vec<QualifiedRelease>> {
+    let prefix = format!("{component}@");
+    let mut qualified = Vec::new();
+    for release in summaries.iter().filter(|release| !release.is_draft) {
+        let Some(version) = release.tag_name.strip_prefix(&prefix) else {
+            continue;
+        };
+        let Ok(version_instant) = parse_version_instant(version) else {
+            continue;
+        };
+        let published_at = release.published_at.as_deref().with_context(|| {
+            format!(
+                "Published component release {} is missing its publication timestamp",
+                release.tag_name
+            )
+        })?;
+        let published_at = DateTime::parse_from_rfc3339(published_at)
+            .with_context(|| {
+                format!(
+                    "Release {} has invalid published timestamp {published_at:?}",
+                    release.tag_name
+                )
+            })?
+            .with_timezone(&Utc);
+        qualified.push(QualifiedRelease {
+            id: release.id,
+            tag: release.tag_name.clone(),
+            version_instant,
+            published_at,
+        });
+    }
+    Ok(qualified)
+}
+
+pub(crate) fn resolve_commit_sha(reference: &str) -> Result<String> {
+    let sha = output_text(
+        CommandSpec::new("gh")
+            .arg("api")
+            .arg(format!("repos/{RELEASE_REPOSITORY}/commits/{reference}"))
+            .args(["--jq", ".sha"]),
+    )?;
+    validate_full_sha("resolved commit SHA", &sha)
+}
+
+fn ensure_ancestor(previous_sha: &str, source_sha: &str, allow_identical: bool) -> Result<()> {
+    let status = output_text(
+        CommandSpec::new("gh")
+            .arg("api")
+            .arg(format!(
+                "repos/{RELEASE_REPOSITORY}/compare/{previous_sha}...{source_sha}"
+            ))
+            .args(["--jq", ".status"]),
+    )?;
+    if status == "identical" {
+        ensure!(
+            allow_identical,
+            "Identical compare range {previous_sha}..{source_sha} is allowed only for a component's first qualified release"
+        );
+        return Ok(());
+    }
+    ensure!(
+        status == "ahead",
+        "Previous SHA {previous_sha} is not an ancestor of source SHA {source_sha}; GitHub compare status is {status:?}"
+    );
+    Ok(())
+}
+
+fn tag_exists(tag: &str) -> Result<bool> {
+    let output = output_text(
+        CommandSpec::new("gh")
+            .arg("api")
+            .arg(format!(
+                "repos/{RELEASE_REPOSITORY}/git/matching-refs/tags/{tag}"
+            ))
+            .args(["--jq", "map({ref: .ref})"]),
+    )?;
+    let refs: Vec<GitRef> =
+        serde_json::from_str(&output).context("Failed to parse matching Git tag references")?;
+    let expected = format!("refs/tags/{tag}");
+    Ok(refs.iter().any(|git_ref| git_ref.name == expected))
+}
+
+fn local_release_assets(
+    component: &str,
     version: &str,
     source_sha: &str,
-    image: &str,
-    image_ref: &str,
-    digest: &str,
-    moving_tags: Vec<String>,
-) -> Value {
-    json!({
-        "schemaVersion": RELEASE_SCHEMA_VERSION,
-        "kind": "image",
-        "version": version,
-        "sourceSha": source_sha,
-        "image": image_payload(image, image_ref, digest, moving_tags),
-        "workflow": workflow_payload(),
-    })
+    asset_dir: Option<&Path>,
+) -> Result<Vec<LocalReleaseAsset>> {
+    let Some(channel) = desktop_channel(component) else {
+        ensure!(
+            asset_dir.is_none(),
+            "Release assets are supported only for desktop components"
+        );
+        return Ok(Vec::new());
+    };
+    let asset_dir = asset_dir.context("Desktop releases require --asset-dir")?;
+    ensure!(
+        asset_dir.is_dir(),
+        "Desktop release asset directory does not exist: {}",
+        asset_dir.display()
+    );
+    let product = desktop_release_product(channel)?;
+    let prefix = format!("{product}-{version}-");
+    let descriptor_name = desktop_release_descriptor_filename(channel, version)?;
+    let descriptor_path = asset_dir.join(&descriptor_name);
+    let descriptor: DesktopReleaseDescriptor = serde_json::from_slice(
+        &fs::read(&descriptor_path)
+            .with_context(|| format!("Failed to read {}", descriptor_path.display()))?,
+    )
+    .with_context(|| format!("Failed to parse {}", descriptor_path.display()))?;
+    validate_desktop_release_descriptor(&descriptor, channel, version, source_sha)?;
+    let mut entries = fs::read_dir(asset_dir)
+        .with_context(|| {
+            format!(
+                "Failed to read desktop release assets in {}",
+                asset_dir.display()
+            )
+        })?
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    entries.sort_by_key(std::fs::DirEntry::file_name);
+    ensure!(
+        !entries.is_empty(),
+        "Desktop release asset directory is empty: {}",
+        asset_dir.display()
+    );
+
+    let mut assets = Vec::with_capacity(entries.len());
+    let mut case_folded_names = BTreeMap::<String, String>::new();
+    for entry in entries {
+        let path = entry.path();
+        let metadata = fs::symlink_metadata(&path)
+            .with_context(|| format!("Failed to inspect release asset {}", path.display()))?;
+        ensure!(
+            metadata.file_type().is_file(),
+            "Release asset must be a regular file: {}",
+            path.display()
+        );
+        ensure!(
+            metadata.len() > 0,
+            "Release asset is empty: {}",
+            path.display()
+        );
+        let name = entry
+            .file_name()
+            .into_string()
+            .map_err(|name| anyhow::anyhow!("Release asset name is not valid UTF-8: {name:?}"))?;
+        ensure!(
+            name.bytes()
+                .all(|byte| { byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'-' | b'_') }),
+            "Release asset name is not clean and URL-safe: {name:?}"
+        );
+        ensure!(
+            name.starts_with(&prefix),
+            "Release asset {name:?} must start with {prefix:?}"
+        );
+        if let Some(existing) = case_folded_names.insert(name.to_ascii_lowercase(), name.clone()) {
+            ensure!(
+                existing == name,
+                "Release asset names differ only by case: {existing:?} and {name:?}"
+            );
+        }
+        assets.push(LocalReleaseAsset {
+            digest: sha256_file(&path)?,
+            path,
+            name,
+            size: metadata.len(),
+        });
+    }
+    let expected_names = descriptor
+        .assets
+        .iter()
+        .map(|asset| asset.release_asset.clone())
+        .chain(std::iter::once(descriptor_name))
+        .collect::<BTreeSet<_>>();
+    let actual_names = assets
+        .iter()
+        .map(|asset| asset.name.clone())
+        .collect::<BTreeSet<_>>();
+    ensure!(
+        actual_names == expected_names,
+        "Desktop release asset inventory mismatch: expected {expected_names:?}, found {actual_names:?}"
+    );
+    let local_by_name = assets
+        .iter()
+        .map(|asset| (asset.name.as_str(), asset))
+        .collect::<BTreeMap<_, _>>();
+    for descriptor_asset in &descriptor.assets {
+        let local = local_by_name
+            .get(descriptor_asset.release_asset.as_str())
+            .with_context(|| {
+                format!(
+                    "Desktop release descriptor references missing asset {:?}",
+                    descriptor_asset.release_asset
+                )
+            })?;
+        ensure!(
+            local.digest == descriptor_asset.sha256 && local.size == descriptor_asset.size,
+            "Desktop release descriptor metadata does not match {:?}",
+            descriptor_asset.release_asset
+        );
+    }
+    Ok(assets)
 }
 
-fn image_payload(image: &str, image_ref: &str, digest: &str, moving_tags: Vec<String>) -> Value {
-    json!({
-        "name": image,
-        "ref": image_ref,
-        "digest": digest,
-        "digestRef": digest_ref(image_ref, digest),
-        "movingTags": moving_tags,
-    })
+fn sha256_file(path: &Path) -> Result<String> {
+    let file = File::open(path)
+        .with_context(|| format!("Failed to open release asset {}", path.display()))?;
+    sha256_reader(file).with_context(|| format!("Failed to read release asset {}", path.display()))
 }
 
-fn digest_ref(image_ref: &str, digest: &str) -> String {
-    let image = image_ref
-        .split_once(':')
-        .map(|(image, _)| image)
-        .unwrap_or(image_ref);
-    format!("{image}@{digest}")
-}
-
-fn static_asset_manifest(path: &Path) -> Result<Value> {
-    let text =
-        fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
-    let assets = text
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty())
-        .map(ToOwned::to_owned)
-        .collect::<Vec<_>>();
-    Ok(json!({
-        "filename": file_name(path)?,
-        "assetCount": assets.len(),
-        "sha256": sha256_file(path)?,
-    }))
-}
-
-fn inspect_image_digest(image_ref: &str) -> Result<String> {
-    let manifest = output_text(
-        CommandSpec::new("docker")
-            .args(["buildx", "imagetools", "inspect", image_ref])
-            .args(["--format", "{{json .Manifest}}"]),
-    )?;
-    let value: Value = serde_json::from_str(&manifest)
-        .with_context(|| format!("Failed to parse docker manifest for {image_ref}"))?;
-    value
-        .get("digest")
-        .and_then(Value::as_str)
-        .map(ToOwned::to_owned)
-        .ok_or_else(|| anyhow!("Docker manifest for {image_ref} did not include a digest"))
-}
-
-fn publish_fragment(
-    version: &str,
+fn create_draft_release(
+    tag: &str,
+    title: &str,
+    body: &str,
     source_sha: &str,
     prerelease: bool,
-    draft: bool,
-    assets: &[PathBuf],
+) -> Result<u64> {
+    let output = output_text(
+        CommandSpec::new("gh")
+            .args(["api", "--method", "POST"])
+            .arg(format!("repos/{RELEASE_REPOSITORY}/releases"))
+            .arg("-f")
+            .arg(format!("tag_name={tag}"))
+            .arg("-f")
+            .arg(format!("target_commitish={source_sha}"))
+            .arg("-f")
+            .arg(format!("name={title}"))
+            .arg("-f")
+            .arg(format!("body={body}"))
+            .arg("-F")
+            .arg("draft=true")
+            .arg("-F")
+            .arg(format!("prerelease={prerelease}"))
+            .arg("-f")
+            .arg("make_latest=false"),
+    )?;
+    let release: ReleaseDetail = serde_json::from_str(&output)
+        .with_context(|| format!("Failed to parse created draft release {tag}"))?;
+    ensure!(release.id > 0, "Draft release {tag} has an invalid ID");
+    Ok(release.id)
+}
+
+fn release_detail(release_id: u64) -> Result<ReleaseDetail> {
+    let output = output_text(
+        CommandSpec::new("gh")
+            .arg("api")
+            .arg(format!("repos/{RELEASE_REPOSITORY}/releases/{release_id}")),
+    )?;
+    serde_json::from_str(&output)
+        .with_context(|| format!("Failed to parse release ID {release_id}"))
+}
+
+fn upload_draft_release_assets(
+    release: ReleaseHandle<'_>,
+    title: &str,
+    body: &str,
+    source_sha: &str,
+    prerelease: bool,
+    expected_assets: &[LocalReleaseAsset],
 ) -> Result<()> {
-    ensure_release(version, source_sha, prerelease, draft)?;
-    upload_release_assets(version, assets)
-}
-
-fn ensure_release(version: &str, source_sha: &str, prerelease: bool, draft: bool) -> Result<()> {
-    let tag = release_tag(version);
-    if release_exists(&tag) {
-        return Ok(());
-    }
-
-    let notes = format!(
-        "Source: `{source_sha}`\n\nRelease manifest will be attached after finalisation.\n"
-    );
-    let notes_dir = tempdir()?;
-    let notes_file = notes_dir.path().join("notes.md");
-    fs::write(&notes_file, notes)
-        .with_context(|| format!("Failed to write {}", notes_file.display()))?;
-    let mut command = CommandSpec::new("gh")
-        .args(["release", "create", &tag])
-        .args(["--title", &release_title(version)])
-        .args(["--latest=false"])
-        .arg("--notes-file")
-        .arg(&notes_file)
-        .args(["--target", source_sha]);
-    if prerelease {
-        command = command.arg("--prerelease");
-    }
-    if draft {
-        command = command.arg("--draft");
-    }
-    match run_command(command) {
-        Ok(()) => Ok(()),
-        Err(error) if release_exists(&tag) => {
-            eprintln!(
-                "Release {tag} was created concurrently; continuing. Original error: {error:#}"
-            );
-            Ok(())
-        }
-        Err(error) => Err(error),
-    }
-}
-
-fn release_exists(tag: &str) -> bool {
-    crate::common::command_succeeds(CommandSpec::new("gh").args(["release", "view", tag]))
-}
-
-fn upload_release_assets(version: &str, assets: &[PathBuf]) -> Result<()> {
-    if assets.is_empty() {
-        return Ok(());
-    }
-    let mut command = CommandSpec::new("gh")
-        .args(["release", "upload", &release_tag(version)])
-        .args(["--clobber"]);
-    for asset in assets {
+    let detail = release_detail(release.id)?;
+    verify_release_metadata(
+        release.tag,
+        &detail,
+        title,
+        body,
+        source_sha,
+        prerelease,
+        true,
+    )?;
+    let expected_by_name = expected_assets
+        .iter()
+        .map(|asset| (asset.name.as_str(), asset))
+        .collect::<BTreeMap<_, _>>();
+    let mut published_by_name = BTreeMap::new();
+    for asset in &detail.assets {
         ensure!(
-            asset.is_file(),
-            "Release asset is missing: {}",
-            asset.display()
+            expected_by_name.contains_key(asset.name.as_str()),
+            "Draft release {} contains unexpected asset {:?}",
+            release.tag,
+            asset.name
         );
-        command = command.arg(asset);
+        ensure!(
+            published_by_name
+                .insert(asset.name.as_str(), asset)
+                .is_none(),
+            "Draft release {} contains duplicate asset name {:?}",
+            release.tag,
+            asset.name
+        );
+    }
+    let pending = expected_assets
+        .iter()
+        .filter(|expected| {
+            published_by_name
+                .get(expected.name.as_str())
+                .is_none_or(|published| !release_asset_matches(published, expected))
+        })
+        .collect::<Vec<_>>();
+    if pending.is_empty() {
+        return Ok(());
+    }
+    let mut command = CommandSpec::new("gh")
+        .args(["release", "upload", release.tag])
+        .args(["--repo", RELEASE_REPOSITORY])
+        .arg("--clobber");
+    for asset in pending {
+        command = command.arg(&asset.path);
     }
     run_command(command)
 }
 
-fn publish_release(version: &str, notes_path: &Path) -> Result<()> {
-    let tag = release_tag(version);
-    let release_id = release_database_id(&tag)?;
-    let payload_dir = tempdir()?;
-    let payload_path = payload_dir.path().join("release-update.json");
-    write_json_pretty(
-        &payload_path,
-        &json!({
-            "body": fs::read_to_string(notes_path)
-                .with_context(|| format!("Failed to read {}", notes_path.display()))?,
-            "draft": false,
-            "make_latest": "false",
-        }),
+fn verify_release(
+    release: ReleaseHandle<'_>,
+    title: &str,
+    body: &str,
+    source_sha: &str,
+    prerelease: bool,
+    draft: bool,
+    expected_assets: &[LocalReleaseAsset],
+) -> Result<()> {
+    let detail = release_detail(release.id)?;
+    verify_release_metadata(
+        release.tag,
+        &detail,
+        title,
+        body,
+        source_sha,
+        prerelease,
+        draft,
     )?;
-    run_command(
-        CommandSpec::new("gh")
-            .args(["api", "-X", "PATCH"])
-            .arg(format!("repos/{{owner}}/{{repo}}/releases/{release_id}"))
-            .arg("--input")
-            .arg(&payload_path),
+    verify_release_assets(release.tag, &detail.assets, expected_assets)?;
+    if draft {
+        return Ok(());
+    }
+    let tag_sha = resolve_commit_sha(release.tag)?;
+    ensure!(
+        tag_sha == source_sha,
+        "Release tag {} targets {tag_sha}, expected {source_sha}",
+        release.tag
+    );
+    Ok(())
+}
+
+fn verify_release_metadata(
+    tag: &str,
+    release: &ReleaseDetail,
+    title: &str,
+    body: &str,
+    source_sha: &str,
+    prerelease: bool,
+    draft: bool,
+) -> Result<()> {
+    ensure!(
+        release.tag_name == tag,
+        "Release {tag} has a mismatched tag"
+    );
+    ensure!(
+        release.name.as_deref().unwrap_or_default() == title,
+        "Release {tag} has a mismatched title"
+    );
+    ensure!(
+        release.body.as_deref().unwrap_or_default() == body,
+        "Release {tag} has a mismatched body"
+    );
+    ensure!(
+        release.draft == draft,
+        "Release {tag} has draft state {}, expected {draft}",
+        release.draft
+    );
+    ensure!(
+        release.prerelease == prerelease,
+        "Release {tag} has a mismatched prerelease state"
+    );
+    let target_sha = resolve_commit_sha(&release.target_commitish)?;
+    ensure!(
+        target_sha == source_sha,
+        "Release {tag} target resolves to {target_sha}, expected {source_sha}"
+    );
+    if draft && tag_exists(tag)? {
+        let tag_sha = resolve_commit_sha(tag)?;
+        ensure!(
+            tag_sha == source_sha,
+            "Draft release tag {tag} targets {tag_sha}, expected {source_sha}"
+        );
+    }
+    Ok(())
+}
+
+fn release_asset_matches(published: &PublishedReleaseAsset, expected: &LocalReleaseAsset) -> bool {
+    let expected_digest = format!("sha256:{}", expected.digest);
+    published.label.as_deref().unwrap_or_default().is_empty()
+        && published.state == "uploaded"
+        && published.size == expected.size
+        && published.digest.as_deref() == Some(expected_digest.as_str())
+}
+
+fn verify_release_assets(
+    tag: &str,
+    published_assets: &[PublishedReleaseAsset],
+    expected_assets: &[LocalReleaseAsset],
+) -> Result<()> {
+    let mut published_by_name = BTreeMap::new();
+    for asset in published_assets {
+        ensure!(
+            published_by_name
+                .insert(asset.name.as_str(), asset)
+                .is_none(),
+            "Release {tag} contains duplicate asset name {:?}",
+            asset.name
+        );
+    }
+    let expected_names = expected_assets
+        .iter()
+        .map(|asset| asset.name.as_str())
+        .collect::<Vec<_>>();
+    let published_names = published_by_name.keys().copied().collect::<Vec<_>>();
+    ensure!(
+        published_names == expected_names,
+        "Release {tag} asset inventory mismatch: expected {expected_names:?}, published {published_names:?}"
+    );
+    for expected in expected_assets {
+        let published = published_by_name
+            .get(expected.name.as_str())
+            .with_context(|| format!("Release {tag} is missing asset {:?}", expected.name))?;
+        ensure!(
+            published.label.as_deref().unwrap_or_default().is_empty(),
+            "Release {tag} asset {:?} has unexpected label {:?}",
+            expected.name,
+            published.label
+        );
+        ensure!(
+            published.state == "uploaded",
+            "Release {tag} asset {:?} is in unexpected state {:?}",
+            expected.name,
+            published.state
+        );
+        ensure!(
+            published.size == expected.size,
+            "Release {tag} asset {:?} has size {}, expected {}",
+            expected.name,
+            published.size,
+            expected.size
+        );
+        let expected_digest = format!("sha256:{}", expected.digest);
+        ensure!(
+            published.digest.as_deref() == Some(expected_digest.as_str()),
+            "Release {tag} asset {:?} has digest {:?}, expected {expected_digest}",
+            expected.name,
+            published.digest
+        );
+    }
+    Ok(())
+}
+
+pub(crate) fn release_tag(component: &str, version: &str) -> String {
+    format!("{component}@{version}")
+}
+
+fn release_title(component: &str, version: &str) -> String {
+    format!("{component} {version}")
+}
+
+fn release_body(previous_sha: &str, source_sha: &str) -> String {
+    format!(
+        "Changes: [`{}..{}`]({RELEASE_COMPARE_URL}/{previous_sha}..{source_sha})",
+        &previous_sha[..7],
+        &source_sha[..7]
     )
 }
 
-fn release_database_id(tag: &str) -> Result<String> {
-    let release_id = output_text(release_database_id_command(tag))?;
-    ensure!(
-        !release_id.trim().is_empty(),
-        "GitHub release {tag} did not include a database id"
-    );
-    Ok(release_id)
-}
-
-fn release_database_id_command(tag: &str) -> CommandSpec {
-    CommandSpec::new("gh")
-        .args(["release", "view", tag])
-        .args(["--json", "databaseId"])
-        .args(["--jq", ".databaseId"])
-}
-
-fn write_fragment(name: &str, value: &Value) -> Result<PathBuf> {
-    let dir = release_output_dir().join("fragments");
-    fs::create_dir_all(&dir).with_context(|| format!("Failed to create {}", dir.display()))?;
-    let path = dir.join(name);
-    write_json_pretty(&path, value)?;
-    Ok(path)
-}
-
-fn fragment_filename(name: &str) -> String {
-    format!("{RELEASE_FRAGMENT_FILENAME_PREFIX}{name}.json")
-}
-
-fn release_output_dir() -> PathBuf {
-    env::var("RELEASE_OUTPUT_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from(DEFAULT_RELEASE_OUTPUT_DIR))
-}
-
-fn validate_build_version(version: &str) -> Result<String> {
-    parse_version_instant(version)?;
-    Ok(version.to_string())
-}
-
-fn release_tag(version: &str) -> String {
-    version.to_string()
-}
-
-fn release_title(version: &str) -> String {
-    release_tag(version)
-}
-
-fn resolve_source_sha(value: Option<&str>) -> Result<String> {
-    value
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(ToOwned::to_owned)
-        .or_else(|| env::var("GITHUB_SHA").ok())
-        .or_else(|| output_text(CommandSpec::new("git").args(["rev-parse", "HEAD"])).ok())
-        .ok_or_else(|| anyhow!("Unable to resolve source SHA"))
-}
-
-fn workflow_payload() -> Value {
-    json!({
-        "repository": env::var("GITHUB_REPOSITORY").ok(),
-        "workflow": env::var("GITHUB_WORKFLOW").ok(),
-        "runId": env::var("GITHUB_RUN_ID").ok(),
-        "runAttempt": env::var("GITHUB_RUN_ATTEMPT").ok(),
-        "serverUrl": env::var("GITHUB_SERVER_URL").ok(),
-    })
-}
-
-fn parse_csv(value: &str) -> Vec<String> {
-    value
-        .split(',')
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(ToOwned::to_owned)
-        .collect()
-}
-
-fn file_payload(path: &Path) -> Result<Value> {
-    Ok(json!({
-        "filename": file_name(path)?,
-        "sha256": sha256_file(path)?,
-        "bytes": fs::metadata(path)
-            .with_context(|| format!("Failed to stat {}", path.display()))?
-            .len(),
-    }))
-}
-
-fn file_name(path: &Path) -> Result<String> {
-    path.file_name()
-        .and_then(|value| value.to_str())
-        .map(ToOwned::to_owned)
-        .ok_or_else(|| anyhow!("Invalid file name: {}", path.display()))
-}
-
-fn sha256_file(path: &Path) -> Result<String> {
-    let mut file =
-        File::open(path).with_context(|| format!("Failed to open {}", path.display()))?;
-    let mut hasher = Sha256::new();
-    let mut buffer = [0_u8; 64 * 1024];
-    loop {
-        let read = file
-            .read(&mut buffer)
-            .with_context(|| format!("Failed to read {}", path.display()))?;
-        if read == 0 {
-            break;
-        }
-        hasher.update(&buffer[..read]);
-    }
-    Ok(hex::encode(hasher.finalize()))
-}
-
-fn collect_payload_manifests(payload_dir: &Path) -> Result<Vec<Value>> {
-    let mut manifests = Vec::new();
-    for path in sorted_files(payload_dir)? {
-        if path.file_name().and_then(|value| value.to_str()) != Some("manifest.json") {
-            continue;
-        }
-        let relative = path
-            .strip_prefix(payload_dir)
-            .with_context(|| format!("Failed to relativize {}", path.display()))?;
-        manifests.push(json!({
-            "path": path_to_slash_string(relative),
-            "sha256": sha256_file(&path)?,
-        }));
-    }
-    Ok(manifests)
-}
-
-fn sorted_files(root: &Path) -> Result<Vec<PathBuf>> {
-    if !root.exists() {
-        return Ok(Vec::new());
-    }
-    let mut files = WalkDir::new(root)
-        .into_iter()
-        .collect::<std::result::Result<Vec<_>, _>>()
-        .with_context(|| format!("Failed to walk {}", root.display()))?
-        .into_iter()
-        .map(|entry| entry.path().to_path_buf())
-        .filter(|path| path.is_file())
-        .collect::<Vec<_>>();
-    files.sort();
-    Ok(files)
-}
-
-fn create_tar_gz(output: &Path, root: &Path, archive_root: &str) -> Result<()> {
-    if let Some(parent) = output.parent() {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("Failed to create {}", parent.display()))?;
-    }
-    let file =
-        File::create(output).with_context(|| format!("Failed to create {}", output.display()))?;
-    let encoder = GzEncoder::new(file, Compression::default());
-    let mut builder = Builder::new(encoder);
-    for path in sorted_files(root)? {
-        let relative = path
-            .strip_prefix(root)
-            .with_context(|| format!("Failed to relativize {}", path.display()))?;
-        builder
-            .append_path_with_name(&path, Path::new(archive_root).join(relative))
-            .with_context(|| format!("Failed to add {} to {}", path.display(), output.display()))?;
-    }
-    builder
-        .finish()
-        .with_context(|| format!("Failed to finish {}", output.display()))?;
-    Ok(())
-}
-
-fn create_self_hosting_bundle(output: &Path, version: &str) -> Result<()> {
-    let root = Path::new("deploy/self-hosting");
-    create_self_hosting_bundle_from(root, output, version)
-}
-
-fn create_self_hosting_bundle_from(root: &Path, output: &Path, version: &str) -> Result<()> {
-    ensure!(root.is_dir(), "{} does not exist", root.display());
-    if let Some(parent) = output.parent() {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("Failed to create {}", parent.display()))?;
-    }
-    let archive_root = format!("fluxer-self-hosting-{version}");
-    let file =
-        File::create(output).with_context(|| format!("Failed to create {}", output.display()))?;
-    let encoder = GzEncoder::new(file, Compression::default());
-    let mut builder = Builder::new(encoder);
-    for path in sorted_files(root)? {
-        let relative = path
-            .strip_prefix(root)
-            .with_context(|| format!("Failed to relativize {}", path.display()))?;
-        builder
-            .append_path_with_name(&path, Path::new(&archive_root).join(relative))
-            .with_context(|| format!("Failed to add {} to {}", path.display(), output.display()))?;
-    }
-    append_generated_tar_file(
-        &mut builder,
-        &Path::new(&archive_root).join("release.env"),
-        format!("FLUXER_IMAGE_TAG={version}\n").as_bytes(),
-    )?;
-    builder
-        .finish()
-        .with_context(|| format!("Failed to finish {}", output.display()))?;
-    Ok(())
-}
-
-fn append_generated_tar_file<W: io::Write>(
-    builder: &mut Builder<W>,
-    path: &Path,
-    contents: &[u8],
-) -> Result<()> {
-    let mut header = Header::new_gnu();
-    header.set_size(contents.len() as u64);
-    header.set_mode(0o644);
-    header.set_cksum();
-    builder
-        .append_data(&mut header, path, contents)
-        .with_context(|| format!("Failed to add generated {}", path.display()))
-}
-
-fn self_hosting_images(version: &str) -> Vec<Value> {
-    SELF_HOSTED_IMAGE_COMPONENTS
-        .iter()
-        .map(|image| {
-            json!({
-                "name": image,
-                "ref": format!("ghcr.io/fluxerapp/{image}:{version}"),
-            })
-        })
-        .collect()
-}
-
-fn helm_chart_dirs(root: &Path) -> Result<Vec<PathBuf>> {
-    let mut dirs = fs::read_dir(root)
-        .with_context(|| format!("Failed to read {}", root.display()))?
-        .map(|entry| entry.map(|entry| entry.path()))
-        .collect::<std::result::Result<Vec<_>, _>>()?;
-    dirs.retain(|path| path.join("Chart.yaml").is_file());
-    dirs.sort();
-    Ok(dirs)
-}
-
-fn read_fragments(dir: &Path) -> Result<Vec<ReleaseFragment>> {
-    let mut fragments = Vec::new();
-    for path in sorted_files(dir)? {
-        if !file_name(&path)?.starts_with(RELEASE_FRAGMENT_FILENAME_PREFIX) {
-            continue;
-        }
-        let value: Value = serde_json::from_str(
-            &fs::read_to_string(&path)
-                .with_context(|| format!("Failed to read {}", path.display()))?,
-        )
-        .with_context(|| format!("Failed to parse {}", path.display()))?;
-        fragments.push(ReleaseFragment {
-            filename: file_name(&path)?,
-            kind: value
-                .get("kind")
-                .and_then(Value::as_str)
-                .unwrap_or("unknown")
-                .to_string(),
-            value,
-        });
-    }
-    fragments.sort_by(|a, b| a.filename.cmp(&b.filename));
-    Ok(fragments)
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-struct ReleaseFragment {
-    filename: String,
-    kind: String,
-    value: Value,
-}
-
-fn build_manifest(version: &str, source_sha: &str, fragments: Vec<ReleaseFragment>) -> Value {
-    let mut images = BTreeMap::new();
-    let mut other = Vec::new();
-    for fragment in &fragments {
-        match fragment.kind.as_str() {
-            "image" | "app-proxy" => {
-                if let Some(image) = fragment.value.get("image")
-                    && let Some(name) = image.get("name").and_then(Value::as_str)
-                {
-                    images.insert(name.to_string(), image.clone());
-                }
-            }
-            _ => other.push(fragment.value.clone()),
-        }
-    }
-    json!({
-        "schemaVersion": RELEASE_SCHEMA_VERSION,
-        "version": version,
-        "tag": release_tag(version),
-        "sourceSha": source_sha,
-        "generatedAt": Utc::now().to_rfc3339(),
-        "repository": env::var("GITHUB_REPOSITORY").ok(),
-        "images": images,
-        "artifacts": other,
-        "fragments": fragments,
-    })
-}
-
-fn release_notes(manifest: &Value) -> String {
-    let source_sha = manifest
-        .get("sourceSha")
-        .and_then(Value::as_str)
-        .unwrap_or("unknown");
-    let images = manifest
-        .get("images")
-        .and_then(Value::as_object)
-        .map(|images| images.keys().cloned().collect::<BTreeSet<_>>())
-        .unwrap_or_default();
-    let artifacts = manifest
-        .get("artifacts")
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default();
-
-    let mut notes =
-        format!("Source: `{source_sha}`\n\nRelease manifest: `{RELEASE_MANIFEST_FILENAME}`\n");
-    if !images.is_empty() {
-        notes.push_str("\n## Images\n\n");
-        for image in images {
-            notes.push_str(&format!("- `{image}`\n"));
-        }
-    }
-    if !artifacts.is_empty() {
-        notes.push_str("\n## Artifacts\n\n");
-        for artifact in artifacts {
-            let kind = artifact
-                .get("kind")
-                .and_then(Value::as_str)
-                .unwrap_or("artifact");
-            notes.push_str(&format!("- `{kind}`\n"));
-        }
-    }
-    notes
-}
-
-fn path_to_slash_string(path: &Path) -> String {
-    path.components()
-        .map(|component| component.as_os_str().to_string_lossy())
-        .collect::<Vec<_>>()
-        .join("/")
-}
-
-fn sanitize_asset_segment(value: &str) -> String {
-    value
-        .chars()
-        .map(|ch| {
-            if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
-                ch
-            } else {
-                '-'
-            }
-        })
-        .collect()
+fn desktop_channel(component: &str) -> Option<&str> {
+    component.strip_prefix("fluxer-desktop-")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn write_file(path: &Path, contents: &str) {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).unwrap();
-        }
-        fs::write(path, contents).unwrap();
-    }
+    use anyhow::anyhow;
 
     #[test]
-    fn release_tag_uses_build_version_without_namespace() {
-        assert_eq!(release_tag("2026.520.1"), "2026.520.1");
-    }
-
-    #[test]
-    fn validate_build_version_rejects_invalid_calver() {
-        assert!(validate_build_version("v1").is_err());
-    }
-
-    #[test]
-    fn image_fragment_contains_digest_ref() {
-        let fragment = image_fragment(
-            "2026.520.1",
-            "abc",
-            "ghcr.io/fluxerapp/fluxer-api",
-            "ghcr.io/fluxerapp/fluxer-api:2026.520.1",
-            "sha256:123",
-            vec!["latest".to_string()],
-        );
-        assert_eq!(fragment["kind"], "image");
-        assert_eq!(
-            fragment["image"]["digestRef"],
-            "ghcr.io/fluxerapp/fluxer-api@sha256:123"
-        );
-    }
-
-    #[test]
-    fn static_asset_manifest_counts_non_empty_lines_and_hashes_file() {
-        let temp = tempdir().unwrap();
-        let path = temp.path().join("assets-manifest.txt");
-        fs::write(&path, "assets/a.js\n\nassets/b.css\n").unwrap();
-
-        let manifest = static_asset_manifest(&path).unwrap();
-
-        assert_eq!(manifest["assetCount"], 2);
-        assert_eq!(manifest["filename"], "assets-manifest.txt");
-        assert_eq!(manifest["sha256"].as_str().unwrap().len(), 64);
-    }
-
-    #[test]
-    fn collect_payload_manifests_records_relative_paths() {
-        let temp = tempdir().unwrap();
-        write_file(
-            &temp.path().join("desktop/canary/linux/x64/manifest.json"),
-            "{}",
-        );
-        write_file(
-            &temp.path().join("desktop/canary/linux/x64/file.txt"),
-            "ignored",
-        );
-
-        let manifests = collect_payload_manifests(&temp.path().join("desktop")).unwrap();
-
-        assert_eq!(manifests.len(), 1);
-        assert_eq!(manifests[0]["path"], "canary/linux/x64/manifest.json");
-    }
-
-    #[test]
-    fn self_hosting_bundle_includes_release_env() {
-        let temp = tempdir().unwrap();
-        let root = temp.path().join("self-hosting");
-        fs::create_dir_all(&root).unwrap();
-        fs::write(root.join("docker-compose.yml"), "name: fluxer\n").unwrap();
-        let output = temp.path().join("bundle.tar.gz");
-
-        create_self_hosting_bundle_from(&root, &output, "2026.520.1").unwrap();
-
-        assert!(output.is_file());
-        assert_eq!(sha256_file(&output).unwrap().len(), 64);
-    }
-
-    #[test]
-    fn build_manifest_promotes_image_fragments() {
-        let fragments = vec![
-            ReleaseFragment {
-                filename: "fluxer-release-fragment-image-fluxer-api.json".to_string(),
-                kind: "image".to_string(),
-                value: image_fragment(
-                    "2026.520.1",
-                    "abc",
-                    "fluxer-api",
-                    "ghcr.io/fluxerapp/fluxer-api:2026.520.1",
-                    "sha256:123",
-                    Vec::new(),
-                ),
+    fn retry_publish_retries_until_a_publish_succeeds() {
+        let mut calls = 0;
+        let mut waits = Vec::new();
+        let result = retry_publish(
+            3,
+            |attempt| waits.push(attempt),
+            || {
+                calls += 1;
+                if calls < 3 {
+                    Err(anyhow!("unexpected end of JSON input"))
+                } else {
+                    Ok(())
+                }
             },
-            ReleaseFragment {
-                filename: "fluxer-release-fragment-helm.json".to_string(),
-                kind: "helm".to_string(),
-                value: json!({"kind": "helm"}),
+        );
+        assert!(result.is_ok());
+        assert_eq!(calls, 3);
+        assert_eq!(waits, vec![1, 2]);
+    }
+
+    #[test]
+    fn retry_publish_returns_the_last_error_without_waiting_after_it() {
+        let mut calls = 0;
+        let mut waits = Vec::new();
+        let result = retry_publish(
+            3,
+            |attempt| waits.push(attempt),
+            || {
+                calls += 1;
+                Err(anyhow!("attempt {calls} failed"))
             },
-        ];
-
-        let manifest = build_manifest("2026.520.1", "abc", fragments);
-
-        assert_eq!(manifest["images"]["fluxer-api"]["digest"], "sha256:123");
-        assert_eq!(manifest["artifacts"][0]["kind"], "helm");
+        );
+        assert_eq!(result.unwrap_err().to_string(), "attempt 3 failed");
+        assert_eq!(calls, 3);
+        assert_eq!(waits, vec![1, 2]);
     }
 
     #[test]
-    fn release_notes_include_images_and_artifact_kinds() {
-        let manifest = json!({
-            "version": "2026.520.1",
-            "sourceSha": "abc",
-            "images": {
-                "fluxer-api": {"digest": "sha256:123"},
-                "fluxer-users": {"digest": "sha256:456"},
+    fn retry_publish_does_not_retry_a_successful_publish() {
+        let mut calls = 0;
+        let result = retry_publish(
+            3,
+            |_| panic!("a successful publish must not wait"),
+            || {
+                calls += 1;
+                Ok(())
             },
-            "artifacts": [
-                {"kind": "helm"},
-                {"kind": "self-hosting"},
-            ],
-        });
-
-        let notes = release_notes(&manifest);
-
-        assert!(notes.contains("Source: `abc`"));
-        assert!(notes.contains("Release manifest: `fluxer-release-manifest.json`"));
-        assert!(notes.contains("- `fluxer-api`"));
-        assert!(notes.contains("- `fluxer-users`"));
-        assert!(notes.contains("- `helm`"));
-        assert!(notes.contains("- `self-hosting`"));
-    }
-
-    #[test]
-    fn release_database_id_command_uses_gh_release_view_for_drafts() {
-        assert_eq!(
-            release_database_id_command("2026.520.1"),
-            CommandSpec::new("gh")
-                .args(["release", "view", "2026.520.1"])
-                .args(["--json", "databaseId"])
-                .args(["--jq", ".databaseId"])
         );
-    }
-
-    #[test]
-    fn self_hosting_images_match_compose_release_surface() {
-        let images = self_hosting_images("2026.520.1")
-            .into_iter()
-            .map(|image| image["name"].as_str().unwrap().to_string())
-            .collect::<Vec<_>>();
-
-        assert_eq!(
-            images,
-            vec![
-                "fluxer-admin",
-                "fluxer-api",
-                "fluxer-app-proxy-self-hosted",
-                "fluxer-gateway",
-                "fluxer-gifs",
-                "fluxer-media-proxy",
-                "fluxer-messages",
-                "fluxer-snowflakes",
-                "fluxer-static",
-                "fluxer-unfurl",
-                "fluxer-users",
-            ]
-        );
-    }
-
-    #[test]
-    fn helm_chart_dirs_are_sorted_and_require_chart_yaml() {
-        let temp = tempdir().unwrap();
-        fs::create_dir_all(temp.path().join("b")).unwrap();
-        fs::create_dir_all(temp.path().join("a")).unwrap();
-        fs::create_dir_all(temp.path().join("ignored")).unwrap();
-        fs::write(temp.path().join("b/Chart.yaml"), "name: b\n").unwrap();
-        fs::write(temp.path().join("a/Chart.yaml"), "name: a\n").unwrap();
-
-        let dirs = helm_chart_dirs(temp.path())
-            .unwrap()
-            .into_iter()
-            .map(|path| file_name(&path).unwrap())
-            .collect::<Vec<_>>();
-
-        assert_eq!(dirs, vec!["a", "b"]);
-    }
-
-    #[test]
-    fn digest_ref_replaces_tag_with_digest() {
-        assert_eq!(
-            digest_ref("ghcr.io/fluxerapp/fluxer-api:2026.520.1", "sha256:abc"),
-            "ghcr.io/fluxerapp/fluxer-api@sha256:abc"
-        );
-    }
-
-    #[test]
-    fn parse_csv_trims_empty_entries() {
-        assert_eq!(parse_csv("v1, latest,,"), vec!["v1", "latest"]);
+        assert!(result.is_ok());
+        assert_eq!(calls, 1);
     }
 }

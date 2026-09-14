@@ -7,6 +7,7 @@ import {
 	type UserAreaMuteReason,
 } from '@app/features/app/components/layout/UserAreaState';
 import {CustomStatusDisplay} from '@app/features/app/components/shared/custom_status_display/CustomStatusDisplay';
+import {reportSkeletonVoicePresence} from '@app/features/app/components/skeleton/SkeletonLayoutMemory';
 import {getStatusTypeLabel} from '@app/features/app/constants/AppConstants';
 import {useContextMenuHoverState} from '@app/features/app/hooks/useContextMenuHoverState';
 import * as VoiceStateCommands from '@app/features/devtools/commands/VoiceStateCommands';
@@ -160,11 +161,13 @@ const UserAreaInner = observer(
 			};
 			if (!hasVoiceConnection) {
 				clearHeight();
+				reportSkeletonVoicePresence(false, 0);
 				return;
 			}
 			const element = voiceConnectionRef.current;
 			if (!element || typeof ResizeObserver === 'undefined') {
 				clearHeight();
+				reportSkeletonVoicePresence(false, 0);
 				return;
 			}
 			let pendingHeight: number | null = null;
@@ -174,6 +177,7 @@ const UserAreaInner = observer(
 					if (voiceConnectionHeightRef.current !== roundedHeight) {
 						voiceConnectionHeightRef.current = roundedHeight;
 						root.style.setProperty(VOICE_CONNECTION_HEIGHT_VARIABLE, `${roundedHeight}px`);
+						reportSkeletonVoicePresence(true, roundedHeight);
 					}
 				} else {
 					clearHeight();
@@ -205,12 +209,9 @@ const UserAreaInner = observer(
 				clearHeight();
 			};
 		}, [hasVoiceConnection]);
-		const wrapperClassName = clsx(
-			styles.userAreaInnerWrapper,
-			hasVoiceConnection && styles.userAreaInnerWrapperHasVoiceConnection,
-		);
+		const wrapperClassName = styles.userAreaInnerWrapper;
 		const pushToTalkCombo = Keybind.getByAction('voice_push_to_talk').combo;
-		const pushToTalkHint = formatKeyCombo(pushToTalkCombo);
+		const pushToTalkHint = formatKeyCombo(i18n, pushToTalkCombo);
 		const isPushToTalkEffective = Keybind.isPushToTalkEffective();
 		const microphoneState = selectUserAreaMicrophoneState({
 			effectiveAudioMuted: isMuted,
@@ -247,7 +248,7 @@ const UserAreaInner = observer(
 			if (isDeafened) return i18n._(VOICE_UNDEAFEN_SELF_DESCRIPTOR);
 			return i18n._(VOICE_DEAFEN_SELF_DESCRIPTOR);
 		})();
-		const displayName = NicknameUtils.getNickname(user);
+		const displayName = NicknameUtils.getNickname(user, null);
 		return (
 			<section
 				className={wrapperClassName}
@@ -256,18 +257,13 @@ const UserAreaInner = observer(
 			>
 				{hasVoiceConnection && (
 					<div ref={voiceConnectionRef} data-flx="app.user-area.user-area-inner.div">
-						<div className={styles.separator} aria-hidden data-flx="app.user-area.user-area-inner.separator" />
 						<div
 							className={styles.voiceConnectionWrapper}
 							data-flx="app.user-area.user-area-inner.voice-connection-wrapper"
 						>
 							<VoiceConnectionStatus data-flx="app.user-area.user-area-inner.voice-connection-status" />
 						</div>
-						<div className={styles.separator} aria-hidden data-flx="app.user-area.user-area-inner.separator--2" />
 					</div>
-				)}
-				{!hasVoiceConnection && (
-					<div className={styles.separator} aria-hidden data-flx="app.user-area.user-area-inner.separator--3" />
 				)}
 				<div className={styles.userAreaContainer} data-flx="app.user-area.user-area-inner.user-area-container">
 					<Popout
@@ -288,7 +284,7 @@ const UserAreaInner = observer(
 								tabIndex={0}
 								data-flx="app.user-area.user-area-inner.user-info"
 							>
-								<StatusAwareAvatar user={user} size={36} data-flx="app.user-area.user-area-inner.status-aware-avatar" />
+								<StatusAwareAvatar user={user} size={32} data-flx="app.user-area.user-area-inner.status-aware-avatar" />
 								<div className={styles.userInfoText} data-flx="app.user-area.user-area-inner.user-info-text">
 									<div className={styles.userName} data-flx="app.user-area.user-area-inner.user-name">
 										{displayName}

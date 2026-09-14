@@ -23,31 +23,6 @@ export function getFormattedDateTime(timestamp: DateInput, locale: string = DEFA
 	}).format(date);
 }
 
-export function getFormattedDateTimeInZone(
-	isoString: string,
-	timezone: string,
-	locale: string = DEFAULT_LOCALE,
-	hour12?: boolean,
-): string {
-	try {
-		const date = new Date(isoString);
-		if (Number.isNaN(date.getTime())) {
-			return isoString;
-		}
-		return getDateFormatter(locale, {
-			month: 'short',
-			day: 'numeric',
-			year: 'numeric',
-			hour: 'numeric',
-			minute: '2-digit',
-			hour12: resolveHour12(locale, hour12),
-			timeZone: timezone,
-		}).format(date);
-	} catch {
-		return isoString;
-	}
-}
-
 export function getFormattedShortDate(timestamp: DateInput, locale: string = DEFAULT_LOCALE): string {
 	return getDateFormatter(locale, {month: 'short', day: 'numeric', year: 'numeric'}).format(parseDate(timestamp));
 }
@@ -70,7 +45,7 @@ export function getFormattedCompactDateTime(
 	hour12?: boolean,
 ): string {
 	const date = parseDate(timestamp);
-	const datePart = getDateFormatter('en-US', {month: 'numeric', day: 'numeric', year: '2-digit'}).format(date);
+	const datePart = getDateFormatter(locale, {month: 'numeric', day: 'numeric', year: '2-digit'}).format(date);
 	const timePart = getDateFormatter(locale, {
 		hour: 'numeric',
 		minute: '2-digit',
@@ -148,12 +123,4 @@ export function formatLastActive(date: DateInput, locale: string = DEFAULT_LOCAL
 		return String(date);
 	}
 	return getDateFormatter(locale, {dateStyle: 'medium', timeStyle: 'short'}).format(dateObj);
-}
-
-export function formatScheduledMessage(date: DateInput, locale: string = DEFAULT_LOCALE, timeZone?: string): string {
-	const dateObj = parseDate(date);
-	if (Number.isNaN(dateObj.getTime())) {
-		return String(date);
-	}
-	return getDateFormatter(locale, {dateStyle: 'medium', timeStyle: 'short', timeZone}).format(dateObj);
 }

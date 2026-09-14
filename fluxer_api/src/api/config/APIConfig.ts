@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type {WorkerTaskName} from '../worker/WorkerLaneConfig';
+import type {WorkerTaskName} from '@app/api/worker/WorkerLaneConfig';
+import type {CachePurgeAdapterName} from '@fluxer/config/src/MasterConfig';
+import type {ResolvedDownloadsProvider} from '@fluxer/config/src/S3DownloadsProvider';
 
 export type APIWorkerMode = 'all_lanes' | 'single_lane' | 'single_task';
 export type APIWorkerLaneName = 'realtime' | 'unfurl' | 'lifecycle' | 'batch';
@@ -11,6 +13,15 @@ export interface PushProviderAppConfig {
 	topic?: string;
 	environment?: PushProviderEnvironment;
 	projectId?: string;
+}
+
+export interface APICachePurgeConfig {
+	adapter: CachePurgeAdapterName;
+	http: {
+		endpoint: string;
+		token: string;
+		timeoutMs: number;
+	};
 }
 
 interface APIGeoipFilesystemConfig {
@@ -33,7 +44,11 @@ export type APIGeoipConfig = APIGeoipFilesystemConfig | APIGeoipS3Config;
 export interface APIConfig {
 	nodeEnv: 'development' | 'production';
 	port: number;
+	headersTimeoutMs: number;
+	requestTimeoutMs: number;
+	maxInflightRequests: number;
 	ipBanExemptIps: Array<string>;
+	desktopGitHubRedirectCountries: ReadonlySet<string>;
 	cassandra: {
 		hosts: string;
 		port: number;
@@ -53,6 +68,7 @@ export interface APIConfig {
 		sslCa: string;
 		maxConnections: number;
 		kvTable: string;
+		preparedStatements: boolean;
 	};
 	database: {
 		backend: 'cassandra' | 'postgres';
@@ -147,15 +163,16 @@ export interface APIConfig {
 			reports: string;
 			harvests: string;
 			downloads: string;
-			static: string;
 		};
 	};
+	s3Downloads: ResolvedDownloadsProvider;
 	email: {
 		enabled: boolean;
 		provider: 'smtp' | 'none';
 		webhookSecret?: string;
 		fromEmail: string;
 		fromName: string;
+		appBaseUrl: string;
 		smtp?: {
 			host: string;
 			port: number;
@@ -178,6 +195,9 @@ export interface APIConfig {
 		ipinfoApiKey?: string;
 		accountPolicyDsl?: unknown;
 	};
+	blocklistFeeds: {
+		enabled: boolean;
+	};
 	captcha: {
 		enabled: boolean;
 		provider: 'hcaptcha' | 'turnstile' | 'none';
@@ -199,6 +219,7 @@ export interface APIConfig {
 		apiSecret?: string;
 		webhookUrl?: string;
 		url?: string;
+		internalUrl?: string;
 		defaultRegion?: {
 			id: string;
 			name: string;
@@ -215,17 +236,29 @@ export interface APIConfig {
 			monthlyUsd?: string;
 			monthlyEur?: string;
 			monthlyBrl?: string;
+			monthlyDkk?: string;
 			monthlyInr?: string;
+			monthlyNok?: string;
 			monthlyPln?: string;
+			monthlySek?: string;
 			monthlyTry?: string;
 			yearlyUsd?: string;
 			yearlyEur?: string;
 			yearlyBrl?: string;
+			yearlyDkk?: string;
 			yearlyInr?: string;
+			yearlyNok?: string;
 			yearlyPln?: string;
+			yearlySek?: string;
 			yearlyTry?: string;
 			gift1MonthUsd?: string;
 			gift1MonthEur?: string;
+			gift1MonthSek?: string;
+			gift1YearSek?: string;
+			gift1MonthDkk?: string;
+			gift1YearDkk?: string;
+			gift1MonthNok?: string;
+			gift1YearNok?: string;
 			gift1MonthBrl?: string;
 			gift1MonthInr?: string;
 			gift1MonthPln?: string;
@@ -237,12 +270,9 @@ export interface APIConfig {
 			gift1YearPln?: string;
 			gift1YearTry?: string;
 		};
+		legacyPrices?: Record<string, Array<string> | undefined>;
 	};
-	bunny: {
-		purgeEnabled: boolean;
-		apiKey?: string;
-		pullZoneId?: number;
-	};
+	cachePurge: APICachePurgeConfig;
 	clamav: {
 		enabled: boolean;
 		host: string;
@@ -256,6 +286,7 @@ export interface APIConfig {
 	auth: {
 		sudoModeSecret: string;
 		connectionInitiationSecret: string;
+		ssoAllowPrivateAddresses: boolean;
 		passkeys: {
 			rpName: string;
 			rpId: string;
@@ -267,10 +298,6 @@ export interface APIConfig {
 			email?: string;
 		};
 		bluesky: BlueskyOAuthConfig;
-	};
-	cookie: {
-		domain: string;
-		secure: boolean;
 	};
 	klipy: {
 		apiKey?: string;
@@ -321,8 +348,11 @@ export interface APIConfig {
 		disableRateLimits: boolean;
 		testModeEnabled: boolean;
 		testHarnessToken?: string;
+		validateResponses: boolean;
 	};
 	presignedAttachmentUploadsEnabled: boolean;
+	presignedDownloadsEnabled: boolean;
+	presignedHarvestDownloadsEnabled: boolean;
 	attachmentDecayEnabled: boolean;
 	deletionGracePeriodHours: number;
 	inactivityDeletionThresholdDays?: number;
@@ -353,7 +383,6 @@ export interface APIConfig {
 		laneName?: APIWorkerLaneName;
 		taskName?: WorkerTaskName;
 		enableCronScheduler?: boolean;
-		enableVoiceReconciliation: boolean;
 		laneConcurrencyOverrides: {
 			realtime?: number;
 			unfurl?: number;

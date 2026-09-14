@@ -3,6 +3,7 @@
 import VoiceDevicePermissionState from '@app/features/voice/engine/VoiceDevicePermissionState';
 import type VoiceSettings from '@app/features/voice/state/VoiceSettings';
 import {resolveEffectiveDeviceId} from '@app/features/voice/utils/VoiceDeviceManager';
+import type {VoiceNoiseSuppressionBackend} from '@fluxer/schema/src/domains/admin/VoiceNoiseSuppressionSchemas';
 
 export type VoiceProcessingMode = 'voice' | 'studio' | 'custom';
 
@@ -23,12 +24,22 @@ export interface ResolvedVoiceProcessing {
 	deepFilter: boolean;
 	deepFilterNoiseReductionLevel: number;
 	contentHint: '' | 'speech' | 'music';
+	noiseSuppressionBackend: VoiceNoiseSuppressionBackend;
+	stereoCapture: boolean;
+}
+
+export function legacyNoiseSuppressionBackend(
+	deepFilter: boolean,
+	browserNoiseSuppression: boolean,
+): VoiceNoiseSuppressionBackend {
+	if (deepFilter) return 'deep_filter';
+	if (browserNoiseSuppression) return 'standard';
+	return 'none';
 }
 
 export const DEFAULT_VOICE_PROCESSING_MODE: VoiceProcessingMode = 'voice';
 export const DEEP_FILTER_NOISE_REDUCTION_LEVEL_MIN = 0;
 export const DEEP_FILTER_NOISE_REDUCTION_LEVEL_MAX = 100;
-export const FOCUSED_VOICE_DEEP_FILTER_NOISE_REDUCTION_LEVEL = 72;
 
 export function clampDeepFilterNoiseReductionLevel(level: number): number {
 	if (!Number.isFinite(level)) {
@@ -48,31 +59,36 @@ export function resolveVoiceProcessing(settings: VoiceProcessingSettingsLike): R
 				deepFilter: false,
 				deepFilterNoiseReductionLevel: DEEP_FILTER_NOISE_REDUCTION_LEVEL_MIN,
 				contentHint: 'music',
+				noiseSuppressionBackend: 'none',
+				stereoCapture: false,
 			};
 		case 'custom': {
-			const autoGain = settings.deepFilterNoiseSuppression ? false : settings.autoGainControl;
 			const browserNs = settings.noiseSuppression && !settings.deepFilterNoiseSuppression;
 			return {
 				mode: 'custom',
 				echoCancellation: settings.echoCancellation,
 				browserNoiseSuppression: browserNs,
-				autoGainControl: autoGain,
+				autoGainControl: settings.autoGainControl,
 				deepFilter: settings.deepFilterNoiseSuppression,
 				deepFilterNoiseReductionLevel: settings.deepFilterNoiseSuppression
 					? clampDeepFilterNoiseReductionLevel(settings.deepFilterNoiseSuppressionLevel)
 					: DEEP_FILTER_NOISE_REDUCTION_LEVEL_MIN,
 				contentHint: '',
+				noiseSuppressionBackend: legacyNoiseSuppressionBackend(settings.deepFilterNoiseSuppression, browserNs),
+				stereoCapture: false,
 			};
 		}
 		default:
 			return {
 				mode: 'voice',
 				echoCancellation: true,
-				browserNoiseSuppression: false,
-				autoGainControl: false,
-				deepFilter: true,
-				deepFilterNoiseReductionLevel: FOCUSED_VOICE_DEEP_FILTER_NOISE_REDUCTION_LEVEL,
+				browserNoiseSuppression: true,
+				autoGainControl: settings.autoGainControl,
+				deepFilter: false,
+				deepFilterNoiseReductionLevel: DEEP_FILTER_NOISE_REDUCTION_LEVEL_MIN,
 				contentHint: 'speech',
+				noiseSuppressionBackend: 'standard',
+				stereoCapture: false,
 			};
 	}
 }

@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import {resolveChannelUnreadState} from './ChannelUnreadStateMachine';
+import {resolveChannelUnreadState} from '@app/features/app/components/layout/utils/ChannelUnreadStateMachine';
 
 export interface ChannelUnreadStateInput {
+	hasUnread: boolean;
 	unreadCount: number;
 	mentionCount: number;
 	isMuted: boolean;
@@ -20,6 +21,7 @@ export interface ChannelUnreadState {
 }
 
 export function getChannelUnreadState({
+	hasUnread,
 	unreadCount,
 	mentionCount,
 	isMuted,
@@ -27,6 +29,7 @@ export function getChannelUnreadState({
 	unreadBadgesLevel,
 }: ChannelUnreadStateInput): ChannelUnreadState {
 	return resolveChannelUnreadState({
+		hasUnread,
 		unreadCount,
 		mentionCount,
 		isMuted,

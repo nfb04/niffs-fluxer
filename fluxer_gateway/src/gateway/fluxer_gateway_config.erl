@@ -29,6 +29,7 @@ env_config() ->
     #{
         <<"env">> => env_binary("FLUXER_ENV", <<"development">>),
         <<"internal">> => env_internal_config(),
+        <<"public">> => env_public_config(),
         <<"proxy">> => env_proxy_config(),
         <<"services">> => env_services_config(),
         <<"auth">> => env_auth_config(),
@@ -42,12 +43,21 @@ env_internal_config() ->
         <<"api">> => env_binary("FLUXER_INTERNAL_API_ENDPOINT", <<"http://127.0.0.1:8080">>)
     }.
 
+-spec env_public_config() -> map().
+env_public_config() ->
+    #{
+        <<"base_domain">> => env_optional_binary("FLUXER_BASE_DOMAIN"),
+        <<"scheme">> => env_optional_binary("FLUXER_PUBLIC_SCHEME"),
+        <<"port">> => env_optional_binary("FLUXER_PUBLIC_PORT")
+    }.
+
 -spec env_proxy_config() -> map().
 env_proxy_config() ->
     #{
         <<"client_ip_header">> => env_binary(
             "FLUXER_CLIENT_IP_HEADER_NAME", <<"x-forwarded-for">>
-        )
+        ),
+        <<"trust_client_ip_header">> => env_bool("FLUXER_TRUST_CLIENT_IP_HEADER", false)
     }.
 
 -spec env_services_config() -> map().
@@ -59,7 +69,7 @@ env_services_config() ->
 
 -spec env_gateway_config() -> map().
 env_gateway_config() ->
-    maps:merge(env_gateway_base_config(), env_gateway_hotpatch_config()).
+    env_gateway_base_config().
 
 -spec env_gateway_base_config() -> map().
 env_gateway_base_config() ->
@@ -67,7 +77,7 @@ env_gateway_base_config() ->
         <<"port">> => env_int("FLUXER_GATEWAY_PORT", 8771),
         <<"gateway_role">> => env_optional_binary("FLUXER_GATEWAY_ROLE"),
         <<"rpc_auth_token">> => env_binary("FLUXER_GATEWAY_RPC_AUTH_TOKEN", <<>>),
-        <<"push_enabled">> => env_bool("FLUXER_GATEWAY_PUSH_ENABLED", false),
+        <<"push_enabled">> => env_bool("FLUXER_GATEWAY_PUSH_ENABLED", true),
         <<"logger_level">> => env_binary("FLUXER_GATEWAY_LOGGER_LEVEL", <<"info">>),
         <<"api_rpc_endpoint">> => env_optional_binary("FLUXER_GATEWAY_API_RPC_ENDPOINT"),
         <<"cluster_enabled">> => env_bool("FLUXER_GATEWAY_CLUSTER_ENABLED", false),
@@ -99,41 +109,14 @@ env_gateway_base_config() ->
         <<"gateway_http_rpc_max_concurrency">> => env_int(
             "FLUXER_GATEWAY_HTTP_RPC_MAX_CONCURRENCY", 512
         ),
+        <<"gateway_nats_rpc_max_handlers">> => env_int(
+            "FLUXER_GATEWAY_NATS_RPC_MAX_HANDLERS", 512
+        ),
         <<"gateway_http_failure_threshold">> => env_int(
             "FLUXER_GATEWAY_HTTP_FAILURE_THRESHOLD", 6
         ),
         <<"gateway_http_recovery_timeout_ms">> => env_int(
             "FLUXER_GATEWAY_HTTP_RECOVERY_TIMEOUT_MS", 15000
-        )
-    }.
-
--spec env_gateway_hotpatch_config() -> map().
-env_gateway_hotpatch_config() ->
-    #{
-        <<"hotpatch_enabled">> => env_bool("FLUXER_GATEWAY_HOTPATCH_ENABLED", false),
-        <<"hotpatch_cassandra_hosts">> => env_optional_binary(
-            "FLUXER_GATEWAY_HOTPATCH_CASSANDRA_HOSTS"
-        ),
-        <<"hotpatch_cassandra_port">> => env_int(
-            "FLUXER_GATEWAY_HOTPATCH_CASSANDRA_PORT", 9042
-        ),
-        <<"hotpatch_cassandra_keyspace">> => env_binary(
-            "FLUXER_GATEWAY_HOTPATCH_CASSANDRA_KEYSPACE", <<"fluxer">>
-        ),
-        <<"hotpatch_cassandra_username">> => env_optional_binary(
-            "FLUXER_GATEWAY_HOTPATCH_CASSANDRA_USERNAME"
-        ),
-        <<"hotpatch_cassandra_password">> => env_optional_binary(
-            "FLUXER_GATEWAY_HOTPATCH_CASSANDRA_PASSWORD"
-        ),
-        <<"hotpatch_public_keys">> => env_optional_binary(
-            "FLUXER_GATEWAY_HOTPATCH_PUBLIC_KEYS"
-        ),
-        <<"hotpatch_poll_interval_ms">> => env_int(
-            "FLUXER_GATEWAY_HOTPATCH_POLL_INTERVAL_MS", 5000
-        ),
-        <<"hotpatch_startup_sync_timeout_ms">> => env_int(
-            "FLUXER_GATEWAY_HOTPATCH_STARTUP_SYNC_TIMEOUT_MS", 30000
         )
     }.
 
@@ -212,12 +195,13 @@ build_config(RawConfig) ->
     Apns = get_map(Push, [<<"apns">>]),
     Fcm = get_map(Push, [<<"fcm">>]),
     Proxy = get_map(RawConfig, [<<"proxy">>]),
+    Public = get_map(RawConfig, [<<"public">>]),
     lists:foldl(fun maps:merge/2, #{}, [
         build_core_config(Service, Internal, Nats, Proxy),
-        build_push_config(Service),
+        build_push_config(Service, Public),
         build_sharding_config(Service),
         build_http_config(Service),
-        build_cluster_config(Service),
+        build_cluster_config(Service, Public),
         build_vapid_config(Vapid),
         build_apns_config(Apns),
         build_fcm_config(Fcm),
@@ -230,18 +214,21 @@ build_core_config(Service, Internal, Nats, Proxy) ->
         port => get_int(Service, <<"port">>, 8080),
         gateway_role => normalize_gateway_role(get_value(Service, <<"gateway_role">>)),
         client_ip_header => get_binary(Proxy, <<"client_ip_header">>, <<"x-forwarded-for">>),
+        trust_client_ip_header => get_bool(Proxy, <<"trust_client_ip_header">>, false),
         api_internal_url => get_binary(Internal, <<"api">>, <<"http://127.0.0.1:8088">>),
         api_rpc_endpoint => get_optional_binary(Service, <<"api_rpc_endpoint">>),
         nats_core_url => get_string(Nats, <<"core_url">>, "nats://127.0.0.1:4222"),
         nats_auth_token => get_string(Nats, <<"auth_token">>, ""),
         rpc_auth_token => get_string(Service, <<"rpc_auth_token">>, ""),
+        gateway_nats_rpc_max_handlers =>
+            get_int(Service, <<"gateway_nats_rpc_max_handlers">>, 512),
         identify_rate_limit_enabled => get_bool(
             Service, <<"identify_rate_limit_enabled">>, false
         )
     }.
 
--spec build_push_config(map()) -> config().
-build_push_config(Service) ->
+-spec build_push_config(map(), map()) -> config().
+build_push_config(Service, Public) ->
     #{
         push_enabled => get_bool(Service, <<"push_enabled">>, true),
         push_user_guild_settings_cache_mb =>
@@ -253,8 +240,8 @@ build_push_config(Service) ->
         push_badge_counts_cache_mb => get_int(Service, <<"push_badge_counts_cache_mb">>, 256),
         push_badge_counts_cache_ttl_seconds =>
             get_int(Service, <<"push_badge_counts_cache_ttl_seconds">>, 60),
-        static_cdn_endpoint => get_binary(
-            Service, <<"static_cdn_endpoint">>, <<"http://localhost:8088">>
+        static_cdn_endpoint => public_endpoint(
+            get_binary(Service, <<"static_cdn_endpoint">>, <<"http://localhost:8088">>), Public
         ),
         push_dispatcher_max_inflight => get_int(
             Service, <<"push_dispatcher_max_inflight">>, 16
@@ -295,28 +282,14 @@ build_http_config(Service) ->
         ),
         gateway_http_recovery_timeout_ms =>
             get_int(Service, <<"gateway_http_recovery_timeout_ms">>, 15000),
-        hotpatch_enabled => get_bool(Service, <<"hotpatch_enabled">>, false),
-        hotpatch_cassandra_hosts =>
-            optional_string(get_optional_binary(Service, <<"hotpatch_cassandra_hosts">>)),
-        hotpatch_cassandra_port => get_int(Service, <<"hotpatch_cassandra_port">>, 9042),
-        hotpatch_cassandra_keyspace =>
-            get_binary(Service, <<"hotpatch_cassandra_keyspace">>, <<"fluxer">>),
-        hotpatch_cassandra_username =>
-            get_optional_binary(Service, <<"hotpatch_cassandra_username">>),
-        hotpatch_cassandra_password =>
-            get_optional_binary(Service, <<"hotpatch_cassandra_password">>),
-        hotpatch_public_keys => get_optional_binary(Service, <<"hotpatch_public_keys">>),
-        hotpatch_poll_interval_ms => get_int(Service, <<"hotpatch_poll_interval_ms">>, 5000),
-        hotpatch_startup_sync_timeout_ms =>
-            get_int(Service, <<"hotpatch_startup_sync_timeout_ms">>, 30000),
         gateway_http_cleanup_interval_ms =>
             get_int(Service, <<"gateway_http_cleanup_interval_ms">>, 30000),
         gateway_http_cleanup_max_age_ms =>
             get_int(Service, <<"gateway_http_cleanup_max_age_ms">>, 300000)
     }.
 
--spec build_cluster_config(map()) -> config().
-build_cluster_config(Service) ->
+-spec build_cluster_config(map(), map()) -> config().
+build_cluster_config(Service, Public) ->
     #{
         cluster_enabled => get_bool(Service, <<"cluster_enabled">>, false),
         cluster_discovery_dns_name =>
@@ -329,7 +302,9 @@ build_cluster_config(Service) ->
             get_int(Service, <<"cluster_discovery_poll_interval_ms">>, 5000),
         cluster_static_peers =>
             parse_node_list(get_optional_binary(Service, <<"cluster_static_peers">>)),
-        media_proxy_endpoint => get_optional_binary(Service, <<"media_proxy_endpoint">>)
+        media_proxy_endpoint => public_endpoint(
+            get_optional_binary(Service, <<"media_proxy_endpoint">>), Public
+        )
     }.
 
 -spec build_vapid_config(map()) -> config().
@@ -423,22 +398,27 @@ characters_to_binary_or_default(Value, Default) ->
 
 -spec env_int(string(), integer()) -> integer().
 env_int(Name, Default) ->
-    parse_env_int(os:getenv(Name), Default).
+    parse_env_int(Name, os:getenv(Name), Default).
 
--spec parse_env_int(false | string(), integer()) -> integer().
-parse_env_int(false, Default) ->
+-spec parse_env_int(string(), false | string(), integer()) -> integer().
+parse_env_int(_Name, false, Default) ->
     Default;
-parse_env_int("", Default) ->
+parse_env_int(_Name, "", Default) ->
     Default;
-parse_env_int(Value, Default) ->
-    parse_int(Value, Default).
+parse_env_int(Name, Value, Default) ->
+    parse_int(Name, Value, Default).
 
--spec parse_int(string(), integer()) -> integer().
-parse_int(Value, Default) ->
-    try list_to_integer(Value) of
-        Parsed -> Parsed
-    catch
-        error:badarg -> Default
+-spec parse_int(string(), string(), integer()) -> integer().
+parse_int(Name, Value, Default) ->
+    case string:trim(Value) of
+        "" ->
+            Default;
+        Trimmed ->
+            try list_to_integer(Trimmed) of
+                Parsed -> Parsed
+            catch
+                error:badarg -> erlang:error({invalid_integer_env, Name, Value})
+            end
     end.
 
 -spec env_bool(string(), boolean()) -> boolean().
@@ -598,7 +578,7 @@ parse_node_list([], _Remaining, Acc) ->
 parse_node_list([Peer | Rest], Remaining, Acc) ->
     case gateway_node_name:from_string(Peer) of
         {ok, Node} -> parse_node_list(Rest, Remaining - 1, [Node | Acc]);
-        error -> parse_node_list(Rest, Remaining, Acc)
+        error -> erlang:error({invalid_cluster_static_peer, Peer})
     end.
 
 -spec normalize_log_level(term()) -> log_level() | undefined.
@@ -639,6 +619,17 @@ normalize_gateway_role(Value) when is_list(Value) ->
     normalize_gateway_role(unicode:characters_to_binary(config_char_list(Value)));
 normalize_gateway_role(_) ->
     all.
+
+-spec public_endpoint(binary() | undefined, map()) -> binary() | undefined.
+public_endpoint(undefined, _Public) ->
+    undefined;
+public_endpoint(Url, Public) ->
+    gateway_public_endpoint:normalize(
+        Url,
+        get_optional_binary(Public, <<"base_domain">>),
+        get_optional_binary(Public, <<"scheme">>),
+        get_optional_int(Public, <<"port">>)
+    ).
 
 -spec optional_string(binary() | undefined) -> string() | undefined.
 optional_string(undefined) -> undefined;

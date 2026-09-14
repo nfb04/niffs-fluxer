@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import {BrowserWindow, desktopCapturer, ipcMain, screen} from 'electron';
-import log from 'electron-log';
 import {
 	isListOnlyDesktopSourcesOption,
 	isValidDesktopSourceId,
 	isValidDisplayMediaRequestId,
 	normalizeDesktopSourceTypes,
 	shouldHonorSelectedAudio,
-} from './DisplayMediaValidation';
-import {startWindowsScreenCaptureGuardForSource} from './WindowsScreenCaptureGuard';
+} from '@electron/main/DisplayMediaValidation';
+import {startWindowsScreenCaptureGuardForSource} from '@electron/main/WindowsScreenCaptureGuard';
+import {BrowserWindow, desktopCapturer, ipcMain, screen} from 'electron';
+import log from 'electron-log';
 
 type DisplayMediaPortalSurfacePreference = 'window' | 'monitor';
 
@@ -128,7 +128,7 @@ function consumeWaylandPortalSurfacePreference(): DisplayMediaPortalSurfacePrefe
 	return preference;
 }
 
-export const DISPLAY_MEDIA_PORTAL_EMPTY_CHANNEL = 'display-media-portal-empty';
+const DISPLAY_MEDIA_PORTAL_EMPTY_CHANNEL = 'display-media-portal-empty';
 
 type WaylandPortalUnavailableReason = 'empty' | 'error';
 
@@ -152,7 +152,7 @@ async function defaultWaylandPortalSourceProvider(
 	return desktopCapturer.getSources({types});
 }
 
-export async function resolveWaylandPortalDisplayMedia(
+async function resolveWaylandPortalDisplayMedia(
 	context: WaylandPortalResolutionContext,
 ): Promise<Electron.Streams | null> {
 	const {requestId, preference, getSources, notifyUnavailable} = context;

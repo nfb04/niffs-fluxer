@@ -7,8 +7,9 @@ use reqwest::Url;
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::{BTreeMap, HashSet};
+use std::sync::LazyLock;
 use std::time::Duration;
-use tokio::time::sleep;
+use tokio::time::{sleep, timeout};
 
 const KLIPY_BASE_URL: &str = "https://api.klipy.com/v2";
 const KLIPY_DIRECT_BASE_URL: &str = "https://api.klipy.com/api/v1";
@@ -17,13 +18,18 @@ const CLIENT_KEY: &str = "fluxer";
 const MAX_RETRIES: usize = 3;
 const BACKOFF_BASE_DELAY: Duration = Duration::from_secs(1);
 const KLIPY_RESPONSE_LIMIT_BYTES: usize = 512 * 1024;
+const MAX_FEATURED_CATEGORIES: usize = 50;
+const FEATURED_CATEGORIES_FETCH_TIMEOUT: Duration = Duration::from_secs(30);
 const FLUXER_USER_AGENT: &str = "Fluxerbot/1.0 (+https://fluxer.app)";
 const KLIPY_PROVIDER_NAME: &str = "klipy";
 const KLIPY_FEATURED_CATEGORY_REFRESH_COUNTRY: &str = "US";
+const UNRESOLVABLE_CACHE_KEY: &str = "unresolvable";
 
-const SIZE_PREFERENCE: [&str; 4] = ["hd", "md", "sm", "xs"];
-const FILE_FORMAT_PREFERENCE: [&str; 4] = ["webm", "mp4", "webp", "gif"];
-const MEDIA_FORMAT_PREFERENCE: [&str; 11] = [
+const SIZE_KEY_PREFIXES: [(&str, &str); 4] =
+    [("hd", ""), ("md", "medium"), ("sm", "tiny"), ("xs", "nano")];
+const FILE_FORMATS: [&str; 4] = ["webm", "mp4", "webp", "gif"];
+const UNSIZED_MEDIA_FORMAT_KEYS: [&str; 1] = ["loopedmp4"];
+const MEDIA_FORMAT_PREFERENCE: [&str; 17] = [
     "webm",
     "mp4",
     "webp",
@@ -35,9 +41,14 @@ const MEDIA_FORMAT_PREFERENCE: [&str; 11] = [
     "nanowebm",
     "nanomp4",
     "nanogif",
+    "loopedmp4",
+    "mediummp4",
+    "mediumwebm",
+    "mediumwebp",
+    "nanowebp",
+    "tinywebp",
 ];
-const MEDIA_FILTER: &str =
-    "webm,mp4,webp,gif,mediumgif,tinywebm,tinymp4,tinygif,nanowebm,nanomp4,nanogif";
+static MEDIA_FILTER: LazyLock<String> = LazyLock::new(|| MEDIA_FORMAT_PREFERENCE.join(","));
 
 #[derive(Clone)]
 pub struct KlipyClient {
@@ -65,9 +76,26 @@ struct KlipyGif {
     #[serde(default)]
     itemurl: Option<String>,
     #[serde(default)]
-    file: Option<BTreeMap<String, BTreeMap<String, KlipyMediaEntry>>>,
+    file: Option<BTreeMap<String, KlipyFileGroup>>,
+    #[serde(default)]
+    file_meta: Option<BTreeMap<String, KlipyFileMeta>>,
     #[serde(default)]
     media_formats: Option<BTreeMap<String, KlipyMediaEntry>>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum KlipyFileGroup {
+    Sized(BTreeMap<String, KlipyMediaEntry>),
+    Flat(KlipyMediaEntry),
+}
+
+#[derive(Debug, Deserialize)]
+struct KlipyFileMeta {
+    #[serde(default)]
+    width: Option<i32>,
+    #[serde(default)]
+    height: Option<i32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -94,7 +122,13 @@ struct KlipyCategoryTag {
 #[derive(Debug, Deserialize)]
 struct DirectGifResponse {
     #[serde(default)]
-    data: Option<KlipyGif>,
+    data: Option<DirectGifItems>,
+}
+
+#[derive(Debug, Deserialize)]
+struct DirectGifItems {
+    #[serde(default)]
+    data: Vec<KlipyGif>,
 }
 
 enum KlipyJsonFetch<T> {
@@ -145,7 +179,7 @@ impl KlipyClient {
                 ("country", country),
                 ("locale", &locale),
                 ("limit", &limit),
-                ("media_filter", MEDIA_FILTER),
+                ("media_filter", MEDIA_FILTER.as_str()),
             ],
         )
         .await
@@ -165,7 +199,7 @@ impl KlipyClient {
                 ("country", country),
                 ("locale", &locale),
                 ("limit", "1"),
-                ("media_filter", MEDIA_FILTER),
+                ("media_filter", MEDIA_FILTER.as_str()),
             ],
         )
         .await
@@ -185,7 +219,7 @@ impl KlipyClient {
                 ("country", country),
                 ("locale", &locale),
                 ("limit", "50"),
-                ("media_filter", MEDIA_FILTER),
+                ("media_filter", MEDIA_FILTER.as_str()),
             ],
         )
         .await
@@ -230,7 +264,13 @@ impl KlipyClient {
                 ("q", q),
             ],
         )?;
-        let response = self.http_client.get(url).send().await?;
+        let response = self
+            .http_client
+            .get(url)
+            .send()
+            .await
+            .map_err(reqwest::Error::without_url)
+            .context("KLIPY registershare request failed")?;
         if !response.status().is_success() {
             anyhow::bail!(
                 "KLIPY registershare failed with status {}",
@@ -258,6 +298,19 @@ impl KlipyClient {
         api_key: &str,
         locale: &str,
     ) -> anyhow::Result<Vec<GifCategoryTag>> {
+        timeout(
+            FEATURED_CATEGORIES_FETCH_TIMEOUT,
+            self.fetch_featured_categories(api_key, locale),
+        )
+        .await
+        .context("KLIPY featured categories request timed out")?
+    }
+
+    async fn fetch_featured_categories(
+        &self,
+        api_key: &str,
+        locale: &str,
+    ) -> anyhow::Result<Vec<GifCategoryTag>> {
         let normalized_locale = normalize_locale(locale);
         let response: TagsResponse = self
             .fetch_json(
@@ -279,6 +332,7 @@ impl KlipyClient {
             .map(|tag| tag.searchterm.trim().to_owned())
             .filter(|term| !term.is_empty())
             .filter(|term| seen.insert(term.clone()))
+            .take(MAX_FEATURED_CATEGORIES)
             .collect::<Vec<_>>();
 
         let mut categories = Vec::with_capacity(search_terms.len());
@@ -349,10 +403,14 @@ impl KlipyClient {
         url: Url,
         path: &KlipyPath,
     ) -> anyhow::Result<Option<GifItem>> {
-        match self.fetch_json_response::<DirectGifResponse>(url).await? {
+        match self
+            .fetch_json_response::<DirectGifResponse>(url, klipy_resource(path.path_type))
+            .await?
+        {
             KlipyJsonFetch::NotFound => Ok(None),
             KlipyJsonFetch::Found(response) => Ok(response
                 .data
+                .and_then(|items| items.data.into_iter().next())
                 .and_then(|gif| self.transform_gif_with_path(gif, Some(path)))),
         }
     }
@@ -364,7 +422,7 @@ impl KlipyClient {
         let url = self.create_url(endpoint, params)?;
         let mut last_error = None;
         for attempt in 0..MAX_RETRIES {
-            match self.fetch_json_once(url.clone()).await {
+            match self.fetch_json_once(url.clone(), endpoint).await {
                 Ok(value) => return Ok(value),
                 Err(error) if attempt + 1 < MAX_RETRIES => {
                     last_error = Some(error);
@@ -376,26 +434,41 @@ impl KlipyClient {
         Err(last_error.unwrap_or_else(|| anyhow::anyhow!("exceeded KLIPY retry limit")))
     }
 
-    async fn fetch_json_once<T>(&self, url: Url) -> anyhow::Result<T>
+    async fn fetch_json_once<T>(&self, url: Url, label: &str) -> anyhow::Result<T>
     where
         T: serde::de::DeserializeOwned,
     {
-        match self.fetch_json_response(url).await? {
+        match self.fetch_json_response(url, label).await? {
             KlipyJsonFetch::Found(value) => Ok(value),
-            KlipyJsonFetch::NotFound => anyhow::bail!("KLIPY request returned not found"),
+            KlipyJsonFetch::NotFound => {
+                anyhow::bail!("KLIPY {label} request returned not found")
+            }
         }
     }
 
-    async fn fetch_json_response<T>(&self, url: Url) -> anyhow::Result<KlipyJsonFetch<T>>
+    async fn fetch_json_response<T>(
+        &self,
+        url: Url,
+        label: &str,
+    ) -> anyhow::Result<KlipyJsonFetch<T>>
     where
         T: serde::de::DeserializeOwned,
     {
-        let response = self.http_client.get(url.clone()).send().await?;
+        let mut response = self
+            .http_client
+            .get(url)
+            .send()
+            .await
+            .map_err(reqwest::Error::without_url)
+            .with_context(|| format!("KLIPY {label} request failed"))?;
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Ok(KlipyJsonFetch::NotFound);
         }
         if !response.status().is_success() {
-            anyhow::bail!("KLIPY request failed with status {}", response.status());
+            anyhow::bail!(
+                "KLIPY {label} request failed with status {}",
+                response.status()
+            );
         }
         if response
             .content_length()
@@ -403,12 +476,24 @@ impl KlipyClient {
         {
             anyhow::bail!("KLIPY response declared more than {KLIPY_RESPONSE_LIMIT_BYTES} bytes");
         }
-        let bytes = response.bytes().await?;
-        if bytes.len() > KLIPY_RESPONSE_LIMIT_BYTES {
-            anyhow::bail!("KLIPY response exceeded {KLIPY_RESPONSE_LIMIT_BYTES} bytes");
+        let initial_capacity = response
+            .content_length()
+            .and_then(|length| usize::try_from(length).ok())
+            .unwrap_or_default();
+        let mut bytes = Vec::with_capacity(initial_capacity);
+        while let Some(chunk) = response
+            .chunk()
+            .await
+            .map_err(reqwest::Error::without_url)
+            .with_context(|| format!("KLIPY {label} response body failed"))?
+        {
+            if bytes.len().saturating_add(chunk.len()) > KLIPY_RESPONSE_LIMIT_BYTES {
+                anyhow::bail!("KLIPY {label} response exceeded {KLIPY_RESPONSE_LIMIT_BYTES} bytes");
+            }
+            bytes.extend_from_slice(&chunk);
         }
         serde_json::from_slice(&bytes)
-            .with_context(|| format!("failed to parse KLIPY response from {url}"))
+            .with_context(|| format!("failed to parse KLIPY {label} response"))
             .map(KlipyJsonFetch::Found)
     }
 
@@ -426,7 +511,7 @@ impl KlipyClient {
     }
 
     fn create_direct_url(&self, api_key: &str, path: &KlipyPath) -> anyhow::Result<Url> {
-        let mut url = Url::parse(&format!("{KLIPY_DIRECT_BASE_URL}/"))?;
+        let mut url = Url::parse(KLIPY_DIRECT_BASE_URL)?;
         {
             let mut segments = url
                 .path_segments_mut()
@@ -434,8 +519,9 @@ impl KlipyClient {
             segments
                 .push(api_key)
                 .push(klipy_resource(path.path_type))
-                .push(&path.slug);
+                .push("items");
         }
+        url.query_pairs_mut().append_pair("slugs", &path.slug);
         Ok(url)
     }
 
@@ -494,30 +580,39 @@ impl KlipyClient {
     ) -> (BTreeMap<String, GifMediaFormat>, Option<GifMediaFormat>) {
         let mut media = BTreeMap::new();
         let mut preferred = None;
-        for size in SIZE_PREFERENCE {
-            let Some(bucket) = input.file.as_ref().and_then(|files| files.get(size)) else {
-                continue;
-            };
-            for format in FILE_FORMAT_PREFERENCE {
-                let Some(entry) = bucket.get(format) else {
+        if let Some(files) = input.file.as_ref() {
+            report_unmapped_file_keys(files);
+            for (size, _) in SIZE_KEY_PREFIXES {
+                let Some(KlipyFileGroup::Sized(bucket)) = files.get(size) else {
                     continue;
                 };
-                let Some(media_format) = self.to_media_format(entry) else {
-                    continue;
-                };
-                let public_key = public_format_key(size, format);
-                media.insert(public_key, media_format.clone());
-                if preferred.is_none() {
-                    preferred = Some(media_format);
+                for format in FILE_FORMATS {
+                    let Some(entry) = bucket.get(format) else {
+                        continue;
+                    };
+                    let Some(media_format) = self.to_media_format(entry, None) else {
+                        continue;
+                    };
+                    let Some(public_key) = public_format_key(size, format) else {
+                        continue;
+                    };
+                    media
+                        .entry(public_key)
+                        .or_insert_with(|| media_format.clone());
+                    if preferred.is_none() {
+                        preferred = Some(media_format);
+                    }
                 }
             }
-        }
-        if let Some(formats) = input.media_formats.as_ref() {
-            for format in MEDIA_FORMAT_PREFERENCE {
-                let Some(entry) = formats.get(format) else {
+            for format in FILE_FORMATS {
+                let Some(KlipyFileGroup::Flat(entry)) = files.get(format) else {
                     continue;
                 };
-                let Some(media_format) = self.to_media_format(entry) else {
+                let meta = input
+                    .file_meta
+                    .as_ref()
+                    .and_then(|file_meta| file_meta.get(format));
+                let Some(media_format) = self.to_media_format(entry, meta) else {
                     continue;
                 };
                 media
@@ -527,18 +622,18 @@ impl KlipyClient {
                     preferred = Some(media_format);
                 }
             }
-
-            for (format, entry) in formats {
-                if MEDIA_FORMAT_PREFERENCE.contains(&format.as_str())
-                    || !is_supported_media_format_key(format)
-                {
+        }
+        if let Some(formats) = input.media_formats.as_ref() {
+            report_unmapped_media_format_keys(formats);
+            for format in MEDIA_FORMAT_PREFERENCE {
+                let Some(entry) = formats.get(format) else {
                     continue;
-                }
-                let Some(media_format) = self.to_media_format(entry) else {
+                };
+                let Some(media_format) = self.to_media_format(entry, None) else {
                     continue;
                 };
                 media
-                    .entry(format.clone())
+                    .entry(format.to_owned())
                     .or_insert_with(|| media_format.clone());
                 if preferred.is_none() {
                     preferred = Some(media_format);
@@ -548,8 +643,12 @@ impl KlipyClient {
         (media, preferred)
     }
 
-    fn to_media_format(&self, entry: &KlipyMediaEntry) -> Option<GifMediaFormat> {
-        let (src, width, height) = entry.media_parts()?;
+    fn to_media_format(
+        &self,
+        entry: &KlipyMediaEntry,
+        meta: Option<&KlipyFileMeta>,
+    ) -> Option<GifMediaFormat> {
+        let (src, width, height) = entry.media_parts(meta)?;
         let proxy_src = self.media_proxy.external_proxy_url(src)?;
         Some(GifMediaFormat {
             src: src.to_owned(),
@@ -561,11 +660,16 @@ impl KlipyClient {
 }
 
 impl KlipyMediaEntry {
-    fn media_parts(&self) -> Option<(&str, i32, i32)> {
+    fn media_parts(&self, meta: Option<&KlipyFileMeta>) -> Option<(&str, i32, i32)> {
         match self {
             KlipyMediaEntry::Url(url) => {
-                let _ = url;
-                None
+                let src = url.trim();
+                if src.is_empty() {
+                    return None;
+                }
+                let meta = meta?;
+                let (width, height) = valid_dimensions(meta.width?, meta.height?)?;
+                Some((src, width, height))
             }
             KlipyMediaEntry::Object {
                 url,
@@ -607,6 +711,13 @@ pub fn build_share_url(slug: &str) -> String {
 
 pub fn extract_slug_from_url(url: &str) -> Option<String> {
     parse_klipy_path(url).map(|path| path.slug)
+}
+
+pub fn resolve_cache_key(url: &str) -> String {
+    match parse_klipy_path(url) {
+        Some(path) => format!("{}:{}", klipy_resource(path.path_type), path.slug),
+        None => UNRESOLVABLE_CACHE_KEY.to_owned(),
+    }
 }
 
 fn klipy_id_as_string(value: &Value) -> Option<String> {
@@ -656,27 +767,49 @@ fn klipy_resource(path_type: KlipyPathType) -> &'static str {
     }
 }
 
-fn public_format_key(size: &str, format: &str) -> String {
-    match (size, format) {
-        ("hd", "webm") => "webm",
-        ("hd", "mp4") => "mp4",
-        ("hd", "webp") => "webp",
-        ("hd", "gif") => "gif",
-        ("md", "webm") => "mediumwebm",
-        ("md", "mp4") => "mediummp4",
-        ("md", "webp") => "mediumwebp",
-        ("md", "gif") => "mediumgif",
-        ("sm", "webm") => "tinywebm",
-        ("sm", "mp4") => "tinymp4",
-        ("sm", "webp") => "tinywebp",
-        ("sm", "gif") => "tinygif",
-        ("xs", "webm") => "nanowebm",
-        ("xs", "mp4") => "nanomp4",
-        ("xs", "webp") => "nanowebp",
-        ("xs", "gif") => "nanogif",
-        _ => format,
+fn size_key_prefix(size: &str) -> Option<&'static str> {
+    SIZE_KEY_PREFIXES
+        .iter()
+        .find(|(known, _)| *known == size)
+        .map(|(_, prefix)| *prefix)
+}
+
+fn public_format_key(size: &str, format: &str) -> Option<String> {
+    if !FILE_FORMATS.contains(&format) {
+        return None;
     }
-    .to_owned()
+    Some(format!("{}{format}", size_key_prefix(size)?))
+}
+
+fn report_unmapped_file_keys(files: &BTreeMap<String, KlipyFileGroup>) {
+    for (key, group) in files {
+        match group {
+            KlipyFileGroup::Sized(bucket) => {
+                if size_key_prefix(key).is_none() {
+                    tracing::warn!(size = %key, "skipping gif file bucket with an unmapped size");
+                    continue;
+                }
+                for format in bucket.keys() {
+                    if !FILE_FORMATS.contains(&format.as_str()) {
+                        tracing::warn!(size = %key, format = %format, "skipping gif file entry with an unmapped format");
+                    }
+                }
+            }
+            KlipyFileGroup::Flat(_) => {
+                if !FILE_FORMATS.contains(&key.as_str()) {
+                    tracing::warn!(format = %key, "skipping flat gif file entry with an unmapped format");
+                }
+            }
+        }
+    }
+}
+
+fn report_unmapped_media_format_keys(formats: &BTreeMap<String, KlipyMediaEntry>) {
+    for key in formats.keys() {
+        if !is_supported_media_format_key(key) {
+            tracing::debug!(format = %key, "skipping unsupported gif media format");
+        }
+    }
 }
 
 fn valid_dimensions(width: i32, height: i32) -> Option<(i32, i32)> {
@@ -684,21 +817,12 @@ fn valid_dimensions(width: i32, height: i32) -> Option<(i32, i32)> {
 }
 
 fn is_supported_media_format_key(format: &str) -> bool {
-    matches!(
-        format,
-        "webm"
-            | "tinywebm"
-            | "nanowebm"
-            | "mp4"
-            | "loopedmp4"
-            | "tinymp4"
-            | "nanomp4"
-            | "webp"
-            | "gif"
-            | "mediumgif"
-            | "tinygif"
-            | "nanogif"
-    )
+    UNSIZED_MEDIA_FORMAT_KEYS.contains(&format)
+        || SIZE_KEY_PREFIXES.iter().any(|(_, prefix)| {
+            format
+                .strip_prefix(prefix)
+                .is_some_and(|codec| FILE_FORMATS.contains(&codec))
+        })
 }
 
 fn category_response(name: String, gif: Option<GifItem>) -> GifCategoryTag {
@@ -745,6 +869,174 @@ mod tests {
     }
 
     #[test]
+    fn direct_url_targets_the_items_endpoint() {
+        let client = KlipyClient::new(MediaProxyUrlBuilder::for_test(
+            "https://media.example.test",
+            "secret",
+        ))
+        .expect("client");
+        let url = client
+            .create_direct_url(
+                "secret/key",
+                &KlipyPath {
+                    path_type: KlipyPathType::Gif,
+                    slug: "walter blame government-1".to_owned(),
+                },
+            )
+            .expect("direct URL");
+        assert_eq!(
+            url.as_str(),
+            "https://api.klipy.com/api/v1/secret%2Fkey/gifs/items?slugs=walter+blame+government-1"
+        );
+        let clip_url = client
+            .create_direct_url(
+                "key",
+                &KlipyPath {
+                    path_type: KlipyPathType::Clip,
+                    slug: "kittens".to_owned(),
+                },
+            )
+            .expect("direct URL");
+        assert_eq!(
+            clip_url.as_str(),
+            "https://api.klipy.com/api/v1/key/clips/items?slugs=kittens"
+        );
+    }
+
+    #[test]
+    fn transforms_direct_gif_item_sizes() {
+        let client = KlipyClient::new(MediaProxyUrlBuilder::for_test(
+            "https://media.example.test",
+            "secret",
+        ))
+        .expect("client");
+        let input = serde_json::from_value::<KlipyGif>(serde_json::json!({
+            "id": 5441109273429299_i64,
+            "slug": "walter-blame-government-1",
+            "title": "Walter blame government",
+            "type": "gif",
+            "file": {
+                "hd": {
+                    "gif": {"url": "https://static.klipy.com/hd.gif", "width": 498, "height": 420, "size": 1},
+                    "webp": {"url": "https://static.klipy.com/hd.webp", "width": 498, "height": 420, "size": 1},
+                    "webm": {"url": "https://static.klipy.com/hd.webm", "width": 498, "height": 420, "size": 1}
+                },
+                "sm": {
+                    "webp": {"url": "https://static.klipy.com/sm.webp", "width": 165, "height": 139, "size": 1}
+                }
+            }
+        }))
+        .expect("fixture");
+
+        let gif = client
+            .transform_gif_with_path(
+                input,
+                Some(&KlipyPath {
+                    path_type: KlipyPathType::Gif,
+                    slug: "walter-blame-government-1".to_owned(),
+                }),
+            )
+            .expect("transformed gif");
+
+        assert_eq!(gif.id, "walter-blame-government-1");
+        assert_eq!(gif.url, "https://klipy.com/gifs/walter-blame-government-1");
+        assert_eq!(gif.src, "https://static.klipy.com/hd.webm");
+        assert_eq!((gif.width, gif.height), (498, 420));
+        assert_eq!(
+            gif.media.get("webp").map(|format| format.src.as_str()),
+            Some("https://static.klipy.com/hd.webp")
+        );
+        assert_eq!(
+            gif.media
+                .get("tinywebp")
+                .map(|format| (format.width, format.height)),
+            Some((165, 139))
+        );
+    }
+
+    #[test]
+    fn transforms_direct_clip_item_using_file_meta_dimensions() {
+        let client = KlipyClient::new(MediaProxyUrlBuilder::for_test(
+            "https://media.example.test",
+            "secret",
+        ))
+        .expect("client");
+        let input = serde_json::from_value::<KlipyGif>(serde_json::json!({
+            "id": 6641306069493365_i64,
+            "url": "https://klipy.com/clips/kittens",
+            "slug": "kittens",
+            "title": "Kittens",
+            "type": "clip",
+            "file": {
+                "mp4": "https://static.klipy.com/clip.mp4",
+                "gif": "https://static.klipy.com/clip.gif",
+                "webp": "https://static.klipy.com/clip.webp"
+            },
+            "file_meta": {
+                "mp4": {"width": 854, "height": 480, "size": 924555},
+                "gif": {"width": 320, "height": 180, "size": 4117532},
+                "webp": {"width": 320, "height": 180, "size": 625686}
+            }
+        }))
+        .expect("fixture");
+
+        let clip = client
+            .transform_gif_with_path(
+                input,
+                Some(&KlipyPath {
+                    path_type: KlipyPathType::Clip,
+                    slug: "kittens".to_owned(),
+                }),
+            )
+            .expect("transformed clip");
+
+        assert_eq!(clip.id, "kittens");
+        assert_eq!(clip.url, "https://klipy.com/clips/kittens");
+        assert_eq!(clip.src, "https://static.klipy.com/clip.mp4");
+        assert_eq!((clip.width, clip.height), (854, 480));
+        assert_eq!(
+            clip.media
+                .get("webp")
+                .map(|format| (format.src.as_str(), format.width, format.height)),
+            Some(("https://static.klipy.com/clip.webp", 320, 180))
+        );
+        assert!(
+            clip.media
+                .get("mp4")
+                .expect("mp4 format")
+                .proxy_src
+                .starts_with("https://media.example.test/external/")
+        );
+    }
+
+    #[test]
+    fn direct_response_unwraps_the_items_array() {
+        let response = serde_json::from_value::<DirectGifResponse>(serde_json::json!({
+            "result": true,
+            "data": {
+                "data": [{
+                    "id": 1_i64,
+                    "slug": "kittens",
+                    "title": "Kittens",
+                    "file": {"mp4": "https://static.klipy.com/clip.mp4"}
+                }],
+                "meta": {}
+            }
+        }))
+        .expect("fixture");
+        let items = response.data.expect("data");
+        assert_eq!(items.data.len(), 1);
+        assert_eq!(items.data[0].slug.as_deref(), Some("kittens"));
+
+        let empty = serde_json::from_value::<DirectGifResponse>(serde_json::json!({
+            "result": true,
+            "data": {"data": [], "meta": {}}
+        }))
+        .expect("fixture");
+        assert!(empty.data.expect("data").data.is_empty());
+    }
+
+    #[test]
     fn build_share_url_uses_gifs_path() {
         assert_eq!(build_share_url("hello"), "https://klipy.com/gifs/hello");
         assert_eq!(build_share_url("  "), "https://klipy.com/gifs");
@@ -768,10 +1060,212 @@ mod tests {
     }
 
     #[test]
-    fn maps_provider_format_keys() {
-        assert_eq!(public_format_key("hd", "webm"), "webm");
-        assert_eq!(public_format_key("sm", "gif"), "tinygif");
-        assert_eq!(public_format_key("xs", "webp"), "nanowebp");
+    fn resolve_cache_key_ignores_everything_but_the_klipy_path() {
+        assert_eq!(
+            resolve_cache_key("https://klipy.com/gifs/funny-123"),
+            "gifs:funny-123"
+        );
+        assert_eq!(
+            resolve_cache_key("https://www.klipy.com/gif/funny-123?utm_source=x"),
+            "gifs:funny-123"
+        );
+        assert_eq!(
+            resolve_cache_key("https://klipy.com/clips/kittens"),
+            "clips:kittens"
+        );
+        assert_ne!(
+            resolve_cache_key("https://klipy.com/gifs/kittens"),
+            resolve_cache_key("https://klipy.com/clips/kittens")
+        );
+        assert_eq!(
+            resolve_cache_key("https://notklipy.com/gifs/funny"),
+            "unresolvable"
+        );
+    }
+
+    const FROZEN_PUBLIC_FORMAT_KEYS: [(&str, &str, &str); 16] = [
+        ("hd", "webm", "webm"),
+        ("hd", "mp4", "mp4"),
+        ("hd", "webp", "webp"),
+        ("hd", "gif", "gif"),
+        ("md", "webm", "mediumwebm"),
+        ("md", "mp4", "mediummp4"),
+        ("md", "webp", "mediumwebp"),
+        ("md", "gif", "mediumgif"),
+        ("sm", "webm", "tinywebm"),
+        ("sm", "mp4", "tinymp4"),
+        ("sm", "webp", "tinywebp"),
+        ("sm", "gif", "tinygif"),
+        ("xs", "webm", "nanowebm"),
+        ("xs", "mp4", "nanomp4"),
+        ("xs", "webp", "nanowebp"),
+        ("xs", "gif", "nanogif"),
+    ];
+
+    #[test]
+    fn every_size_and_format_pair_maps_to_its_frozen_key() {
+        assert_eq!(
+            FROZEN_PUBLIC_FORMAT_KEYS.len(),
+            SIZE_KEY_PREFIXES.len() * FILE_FORMATS.len()
+        );
+        for (size, format, expected) in FROZEN_PUBLIC_FORMAT_KEYS {
+            assert_eq!(public_format_key(size, format).as_deref(), Some(expected));
+        }
+    }
+
+    #[test]
+    fn unmapped_sizes_and_formats_produce_no_key() {
+        assert_eq!(public_format_key("xxl", "webm"), None);
+        assert_eq!(public_format_key("orig", "gif"), None);
+        assert_eq!(public_format_key("hd", "avif"), None);
+        assert_eq!(public_format_key("", "webm"), None);
+    }
+
+    #[test]
+    fn the_accepted_vocabulary_is_frozen() {
+        let mut expected: Vec<&str> = FROZEN_PUBLIC_FORMAT_KEYS
+            .iter()
+            .map(|(_, _, key)| *key)
+            .collect();
+        expected.extend(UNSIZED_MEDIA_FORMAT_KEYS);
+        expected.sort_unstable();
+        let mut ordered = MEDIA_FORMAT_PREFERENCE.to_vec();
+        ordered.sort_unstable();
+        assert_eq!(
+            ordered, expected,
+            "preference order must cover exactly the accepted keys"
+        );
+        for key in expected {
+            assert!(is_supported_media_format_key(key), "dropped {key}");
+        }
+        for key in [
+            "preview", "avif", "medium", "hdwebm", "webmm", "tinyavif", "",
+        ] {
+            assert!(!is_supported_media_format_key(key), "admitted {key}");
+        }
+    }
+
+    #[test]
+    fn media_filter_requests_every_accepted_key() {
+        assert_eq!(
+            MEDIA_FILTER.as_str(),
+            "webm,mp4,webp,gif,mediumgif,tinywebm,tinymp4,tinygif,nanowebm,nanomp4,nanogif,loopedmp4,mediummp4,mediumwebm,mediumwebp,nanowebp,tinywebp"
+        );
+    }
+
+    #[test]
+    fn sized_payloads_emit_exactly_the_frozen_key_set() {
+        let client = KlipyClient::new(MediaProxyUrlBuilder::for_test(
+            "https://media.example.test",
+            "secret",
+        ))
+        .expect("client");
+        let input = serde_json::from_value::<KlipyGif>(serde_json::json!({
+            "id": "frozen-keys",
+            "title": "Frozen Keys",
+            "itemurl": "https://klipy.com/gifs/frozen-keys",
+            "file": {
+                "hd": {
+                    "webm": {"url": "https://static.klipy.com/hd.webm", "width": 640, "height": 420},
+                    "mp4": {"url": "https://static.klipy.com/hd.mp4", "width": 640, "height": 420},
+                    "webp": {"url": "https://static.klipy.com/hd.webp", "width": 640, "height": 420},
+                    "gif": {"url": "https://static.klipy.com/hd.gif", "width": 640, "height": 420},
+                    "avif": {"url": "https://static.klipy.com/hd.avif", "width": 640, "height": 420}
+                },
+                "md": {
+                    "webm": {"url": "https://static.klipy.com/md.webm", "width": 498, "height": 327},
+                    "mp4": {"url": "https://static.klipy.com/md.mp4", "width": 498, "height": 327},
+                    "webp": {"url": "https://static.klipy.com/md.webp", "width": 498, "height": 327},
+                    "gif": {"url": "https://static.klipy.com/md.gif", "width": 498, "height": 327}
+                },
+                "sm": {
+                    "webm": {"url": "https://static.klipy.com/sm.webm", "width": 220, "height": 144},
+                    "mp4": {"url": "https://static.klipy.com/sm.mp4", "width": 220, "height": 144},
+                    "webp": {"url": "https://static.klipy.com/sm.webp", "width": 220, "height": 144},
+                    "gif": {"url": "https://static.klipy.com/sm.gif", "width": 220, "height": 144}
+                },
+                "xs": {
+                    "webm": {"url": "https://static.klipy.com/xs.webm", "width": 137, "height": 90},
+                    "mp4": {"url": "https://static.klipy.com/xs.mp4", "width": 137, "height": 90},
+                    "webp": {"url": "https://static.klipy.com/xs.webp", "width": 137, "height": 90},
+                    "gif": {"url": "https://static.klipy.com/xs.gif", "width": 137, "height": 90}
+                },
+                "xxl": {
+                    "webm": {"url": "https://static.klipy.com/xxl.webm", "width": 1280, "height": 840}
+                }
+            }
+        }))
+        .expect("fixture");
+
+        let gif = client.transform_gif(input).expect("transformed gif");
+
+        let keys: Vec<&str> = gif.media.keys().map(String::as_str).collect();
+        assert_eq!(
+            keys,
+            [
+                "gif",
+                "mediumgif",
+                "mediummp4",
+                "mediumwebm",
+                "mediumwebp",
+                "mp4",
+                "nanogif",
+                "nanomp4",
+                "nanowebm",
+                "nanowebp",
+                "tinygif",
+                "tinymp4",
+                "tinywebm",
+                "tinywebp",
+                "webm",
+                "webp"
+            ]
+        );
+        assert_eq!(gif.media["webm"].src, "https://static.klipy.com/hd.webm");
+        assert_eq!(gif.src, gif.media["webm"].src);
+    }
+
+    #[test]
+    fn keeps_medium_variants_from_the_v2_media_formats_payload() {
+        let client = KlipyClient::new(MediaProxyUrlBuilder::for_test(
+            "https://media.example.test",
+            "secret",
+        ))
+        .expect("client");
+        let input = serde_json::from_value::<KlipyGif>(serde_json::json!({
+            "id": "medium-variants",
+            "title": "Medium Variants",
+            "itemurl": "https://klipy.com/gifs/medium-variants",
+            "media_formats": {
+                "webp": {"url": "https://static.klipy.com/m.webp", "dims": [498, 327]},
+                "mediumwebm": {"url": "https://static.klipy.com/m-medium.webm", "dims": [640, 420]},
+                "mediummp4": {"url": "https://static.klipy.com/m-medium.mp4", "dims": [640, 420]},
+                "mediumwebp": {"url": "https://static.klipy.com/m-medium.webp", "dims": [640, 420]},
+                "tinywebp": {"url": "https://static.klipy.com/m-tiny.webp", "dims": [220, 144]},
+                "nanowebp": {"url": "https://static.klipy.com/m-nano.webp", "dims": [137, 90]}
+            }
+        }))
+        .expect("fixture");
+
+        let gif = client.transform_gif(input).expect("transformed gif");
+
+        for format in [
+            "mediumwebm",
+            "mediummp4",
+            "mediumwebp",
+            "tinywebp",
+            "nanowebp",
+        ] {
+            assert!(gif.media.contains_key(format), "missing {format}");
+        }
+        assert_eq!(
+            gif.media.get("mediumwebm").map(|format| (
+                format.src.as_str(),
+                format.width,
+                format.height
+            )),
+            Some(("https://static.klipy.com/m-medium.webm", 640, 420))
+        );
     }
 
     #[test]

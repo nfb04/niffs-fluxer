@@ -1,67 +1,46 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type {IKVProvider, IKVSubscription} from '@pkgs/kv_client/src/IKVProvider';
-import {AdminRepository} from '../admin/AdminRepository';
-import {BANNED_PHRASES_REFRESH_CHANNEL} from '../constants/ContentModeration';
-import {Logger} from '../Logger';
-import {buildPhraseMatchForms, canonicalizeStoredPhrase} from '../utils/PhraseBlocklistNormalization';
+import {AdminRepository} from '@app/api/admin/AdminRepository';
+import {BANNED_PHRASES_REFRESH_CHANNEL} from '@app/api/constants/ContentModeration';
+import {Logger} from '@app/api/Logger';
+import {buildPhraseMatchForms, canonicalizeStoredPhrase} from '@app/api/utils/PhraseBlocklistNormalization';
+import {RefreshSubscription} from '@app/api/utils/RefreshSubscription';
+import {SubstringMatcher} from '@app/api/utils/SubstringMatcher';
+import type {IKVProvider} from '@pkgs/kv_client/src/IKVProvider';
 
 export class PhraseBlocklistCache {
 	private rawPhrases: Array<string> = [];
 	private rawPhraseSet = new Set<string>();
-	private wordPhrases: Array<string> = [];
-	private compactPhrases: Array<string> = [];
-	private asciiWordPhrases: Array<string> = [];
-	private asciiCompactPhrases: Array<string> = [];
-	private isInitialized = false;
+	private rawMatcher: SubstringMatcher | null = null;
+	private wordMatcher: SubstringMatcher | null = null;
+	private compactMatcher: SubstringMatcher | null = null;
+	private asciiWordMatcher: SubstringMatcher | null = null;
+	private asciiCompactMatcher: SubstringMatcher | null = null;
 	private adminRepository = new AdminRepository();
 	private kvClient: IKVProvider | null = null;
-	private kvSubscription: IKVSubscription | null = null;
-	private subscriberInitialized = false;
-	private messageHandler: ((channel: string) => void) | null = null;
 	private consecutiveFailures = 0;
 	private readonly maxConsecutiveFailures = 5;
+	private readonly refreshSubscription = new RefreshSubscription({
+		name: 'phrase blocklist cache',
+		channels: [BANNED_PHRASES_REFRESH_CHANNEL],
+		refresh: () => this.refresh(),
+		onRefreshError: (err) => {
+			this.consecutiveFailures++;
+			const message = err instanceof Error ? err.message : String(err);
+			if (this.consecutiveFailures >= this.maxConsecutiveFailures) {
+				Logger.error({error: message}, 'Failed to refresh phrase blocklist cache after notification');
+			} else {
+				Logger.warn({error: message}, 'Failed to refresh phrase blocklist cache after notification');
+			}
+		},
+	});
 
 	setRefreshSubscriber(kvClient: IKVProvider | null): void {
 		this.kvClient = kvClient;
 	}
 
-	async initialize(): Promise<void> {
-		if (this.isInitialized) return;
-		await this.refresh();
-		this.isInitialized = true;
-		this.setupSubscriber();
-	}
-
-	private setupSubscriber(): void {
-		if (this.subscriberInitialized || !this.kvClient) return;
-		const subscription = this.kvClient.duplicate();
-		this.kvSubscription = subscription;
-		this.messageHandler = (channel: string) => {
-			if (channel === BANNED_PHRASES_REFRESH_CHANNEL) {
-				this.refresh().catch((err) => {
-					this.consecutiveFailures++;
-					const message = err instanceof Error ? err.message : String(err);
-					if (this.consecutiveFailures >= this.maxConsecutiveFailures) {
-						Logger.error({error: message}, 'Failed to refresh phrase blocklist cache after notification');
-					} else {
-						Logger.warn({error: message}, 'Failed to refresh phrase blocklist cache after notification');
-					}
-				});
-			}
-		};
-		subscription
-			.connect()
-			.then(() => subscription.subscribe(BANNED_PHRASES_REFRESH_CHANNEL))
-			.then(() => {
-				if (this.messageHandler) {
-					subscription.on('message', this.messageHandler);
-				}
-			})
-			.catch((error) => {
-				Logger.error({error}, 'Failed to subscribe to phrase blocklist refresh channel');
-			});
-		this.subscriberInitialized = true;
+	initialize(): Promise<void> {
+		return this.refreshSubscription.start(this.kvClient);
 	}
 
 	async refresh(): Promise<void> {
@@ -81,20 +60,12 @@ export class PhraseBlocklistCache {
 		if (this.rawPhrases.length === 0) return false;
 		const forms = buildPhraseMatchForms(text);
 		return (
-			this.matchAny(forms.raw, this.rawPhrases) ||
-			this.matchAny(forms.words, this.wordPhrases) ||
-			this.matchAny(forms.compact, this.compactPhrases) ||
-			this.matchAny(forms.asciiWords, this.asciiWordPhrases) ||
-			this.matchAny(forms.asciiCompact, this.asciiCompactPhrases)
+			this.rawMatcher?.test(forms.raw) === true ||
+			this.wordMatcher?.test(forms.words) === true ||
+			this.compactMatcher?.test(forms.compact) === true ||
+			this.asciiWordMatcher?.test(forms.asciiWords) === true ||
+			this.asciiCompactMatcher?.test(forms.asciiCompact) === true
 		);
-	}
-
-	private matchAny(text: string, phrases: Array<string>): boolean {
-		if (!text || phrases.length === 0) return false;
-		for (const phrase of phrases) {
-			if (text.includes(phrase)) return true;
-		}
-		return false;
 	}
 
 	private rebuildMatchers(): void {
@@ -115,10 +86,11 @@ export class PhraseBlocklistCache {
 		}
 		this.rawPhraseSet = rawPhraseSet;
 		this.rawPhrases = Array.from(rawPhraseSet);
-		this.wordPhrases = Array.from(wordPhraseSet);
-		this.compactPhrases = Array.from(compactPhraseSet);
-		this.asciiWordPhrases = Array.from(asciiWordPhraseSet);
-		this.asciiCompactPhrases = Array.from(asciiCompactPhraseSet);
+		this.rawMatcher = SubstringMatcher.fromPatterns(rawPhraseSet);
+		this.wordMatcher = SubstringMatcher.fromPatterns(wordPhraseSet);
+		this.compactMatcher = SubstringMatcher.fromPatterns(compactPhraseSet);
+		this.asciiWordMatcher = SubstringMatcher.fromPatterns(asciiWordPhraseSet);
+		this.asciiCompactMatcher = SubstringMatcher.fromPatterns(asciiCompactPhraseSet);
 	}
 
 	isPhraseBanned(phrase: string): boolean {
@@ -144,15 +116,19 @@ export class PhraseBlocklistCache {
 		return this.rawPhraseSet.size;
 	}
 
-	shutdown(): void {
-		if (this.kvSubscription && this.messageHandler) {
-			this.kvSubscription.off('message', this.messageHandler);
-		}
-		if (this.kvSubscription) {
-			this.kvSubscription.disconnect();
-			this.kvSubscription = null;
-		}
-		this.messageHandler = null;
+	resetForTesting(): void {
+		void this.shutdown().catch((error) => {
+			Logger.error({error}, 'Failed to shut down phrase blocklist cache');
+		});
+		this.rawPhrases = [];
+		this.rawPhraseSet = new Set();
+		this.rebuildMatchers();
+		this.kvClient = null;
+		this.consecutiveFailures = 0;
+	}
+
+	shutdown(): Promise<void> {
+		return this.refreshSubscription.stop();
 	}
 }
 

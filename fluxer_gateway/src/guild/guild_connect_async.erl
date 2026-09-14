@@ -363,26 +363,10 @@ queued_session_pid(_) ->
 -spec start_worker(map(), map()) -> map().
 start_worker(Item, State) ->
     Self = self(),
-    Snapshot = build_connect_snapshot(State),
+    Snapshot = guild_data:build_connect_snapshot(Item, State),
     {_Pid, Ref} = spawn_monitor(fun() -> compute_and_send_done(Item, Self, Snapshot) end),
     WorkerRefs = maps:get(session_connect_worker_refs, State, #{}),
     State#{session_connect_worker_refs => WorkerRefs#{Ref => true}}.
-
--spec build_connect_snapshot(map()) -> map().
-build_connect_snapshot(State) ->
-    maps:with(
-        [
-            id,
-            data,
-            sessions,
-            member_count,
-            voice_server_pid,
-            voice_states,
-            member_list_engine,
-            virtual_channel_access
-        ],
-        State
-    ).
 
 -spec compute_and_send_done(map(), pid(), map()) -> ok.
 compute_and_send_done(Item, GuildPid, Snapshot) ->
@@ -660,3 +644,61 @@ send_result(GuildId, Attempt, Result0, SessionPid) ->
         end,
     SessionPid ! {guild_connect_result, GuildId, Attempt, Reply},
     ok.
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+pending_connect_state(Sessions) ->
+    #{
+        id => 42,
+        sessions => Sessions,
+        session_connect_pending => #{},
+        session_connect_queue => queue:new(),
+        session_connect_inflight => ?SESSION_CONNECT_MAX_WORKERS,
+        session_connect_max_queue => ?SESSION_CONNECT_DEFAULT_MAX_QUEUE
+    }.
+
+pending_connect_request(SessionId, UserId) ->
+    #{
+        session_id => SessionId,
+        user_id => UserId,
+        session_pid => self(),
+        bot => false,
+        is_staff => false,
+        active_guilds => sets:new()
+    }.
+
+enqueued_session_entry(SessionId, UserId, State0) ->
+    State1 = enqueue_session_connect_async(
+        42, 1, pending_connect_request(SessionId, UserId), #{}, State0
+    ),
+    maps:get(SessionId, maps:get(sessions, State1)).
+
+enqueue_marks_existing_session_pending_connect_test() ->
+    SessionId = <<"s-existing">>,
+    UserId = 21,
+    MRef = make_ref(),
+    Existing = #{
+        session_id => SessionId,
+        user_id => UserId,
+        pid => self(),
+        mref => MRef,
+        pending_connect => false,
+        active_guilds => sets:new()
+    },
+    Entry = enqueued_session_entry(
+        SessionId, UserId, pending_connect_state(#{SessionId => Existing})
+    ),
+    ?assertEqual(true, maps:get(pending_connect, Entry)),
+    ?assertEqual(MRef, maps:get(mref, Entry)),
+    ?assertEqual(UserId, maps:get(user_id, Entry)).
+
+enqueue_creates_pending_session_entry_test() ->
+    SessionId = <<"s-fresh">>,
+    UserId = 22,
+    Entry = enqueued_session_entry(SessionId, UserId, pending_connect_state(#{})),
+    demonitor(maps:get(mref, Entry), [flush]),
+    ?assertEqual(true, maps:get(pending_connect, Entry)),
+    ?assertEqual(UserId, maps:get(user_id, Entry)).
+
+-endif.

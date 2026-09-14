@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import {fromTimestamp} from '@fluxer/snowflake/src/SnowflakeUtils';
-import {describe, expect, it} from 'vitest';
 import {
 	createReadStateEntryStatusSnapshot,
 	type ReadStateEntryStatusInput,
@@ -9,19 +7,24 @@ import {
 	resolveReadStateEntryStatus,
 	selectReadStateEntryStatusModel,
 	transitionReadStateEntryStatusSnapshot,
-} from './ReadStateEntryStatusMachine';
+} from '@app/features/read_state/state/read_states/ReadStateEntryStatusMachine';
+import {fromTimestamp} from '@fluxer/snowflake/src/SnowflakeUtils';
+import {describe, expect, it} from 'vitest';
 
 const BASE_TIMESTAMP = Date.UTC(2024, 0, 1);
 const ACK_ID = fromTimestamp(BASE_TIMESTAMP + 1000);
 const LAST_ID = fromTimestamp(BASE_TIMESTAMP + 2000);
+const ACK_TS = BASE_TIMESTAMP + 1000;
+const LAST_TS = BASE_TIMESTAMP + 2000;
 
 function input(overrides: Partial<ReadStateEntryStatusInput> = {}): ReadStateEntryStatusInput {
 	return {
-		canTrackUnreads: true,
+		supportsUnreadTracking: true,
 		hasBlockedDirectMessageRecipient: false,
-		readStateKnown: true,
 		lastMessageId: LAST_ID,
 		ackMessageId: LAST_ID,
+		ackTimestamp: LAST_TS,
+		lastMessageTimestamp: LAST_TS,
 		mentionCount: 0,
 		...overrides,
 	};
@@ -33,10 +36,11 @@ function expectResolvedState(overrides: Partial<ReadStateEntryStatusInput>, expe
 
 describe('readStateEntryStatusMachine', () => {
 	it('routes the read-state status by priority', () => {
-		expectResolvedState({canTrackUnreads: false, mentionCount: 1, ackMessageId: ACK_ID}, 'untracked');
+		expectResolvedState({supportsUnreadTracking: false, mentionCount: 1, ackMessageId: ACK_ID}, 'untracked');
 		expectResolvedState({hasBlockedDirectMessageRecipient: true, mentionCount: 1, ackMessageId: ACK_ID}, 'blocked');
-		expectResolvedState({readStateKnown: false, ackMessageId: ACK_ID}, 'unknown');
-		expectResolvedState({lastMessageId: null, ackMessageId: ACK_ID}, 'unknown');
+		expectResolvedState({lastMessageId: null, ackMessageId: ACK_ID}, 'read');
+		expectResolvedState({ackMessageId: null, ackTimestamp: ACK_TS}, 'unread');
+		expectResolvedState({ackMessageId: null, ackTimestamp: LAST_TS}, 'read');
 		expectResolvedState({ackMessageId: ACK_ID}, 'unread');
 		expectResolvedState({ackMessageId: LAST_ID}, 'read');
 	});
@@ -45,28 +49,28 @@ describe('readStateEntryStatusMachine', () => {
 		expect(resolveReadStateEntryStatus(input({ackMessageId: ACK_ID, mentionCount: 2}))).toMatchObject({
 			state: 'unread',
 			canBeUnread: true,
-			canHaveMentions: true,
+			supportsMentions: true,
 			hasUnread: true,
 			hasMentions: true,
-			hasUnreadOrMentions: true,
+			isUnreadOrMentioned: true,
 		});
 		expect(resolveReadStateEntryStatus(input({hasBlockedDirectMessageRecipient: true, mentionCount: 2}))).toMatchObject(
 			{
 				state: 'blocked',
 				canBeUnread: true,
-				canHaveMentions: false,
+				supportsMentions: false,
 				hasUnread: false,
 				hasMentions: true,
-				hasUnreadOrMentions: false,
+				isUnreadOrMentioned: false,
 			},
 		);
-		expect(resolveReadStateEntryStatus(input({canTrackUnreads: false, mentionCount: 2}))).toMatchObject({
+		expect(resolveReadStateEntryStatus(input({supportsUnreadTracking: false, mentionCount: 2}))).toMatchObject({
 			state: 'untracked',
 			canBeUnread: false,
-			canHaveMentions: false,
+			supportsMentions: false,
 			hasUnread: false,
 			hasMentions: true,
-			hasUnreadOrMentions: false,
+			isUnreadOrMentioned: false,
 		});
 	});
 
@@ -81,7 +85,7 @@ describe('readStateEntryStatusMachine', () => {
 
 		expect(selectReadStateEntryStatusModel(unreadSnapshot)).toMatchObject({
 			state: 'unread',
-			hasUnreadOrMentions: true,
+			isUnreadOrMentioned: true,
 		});
 	});
 });

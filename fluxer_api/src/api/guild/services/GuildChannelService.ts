@@ -1,22 +1,24 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import type {ChannelID, GuildID, UserID} from '@app/api/BrandedTypes';
+import {mapChannelToResponse} from '@app/api/channel/ChannelMappers';
+import type {IChannelRepository} from '@app/api/channel/IChannelRepository';
+import type {GuildAuditLogService} from '@app/api/guild/GuildAuditLogService';
+import type {IGuildRepositoryAggregate} from '@app/api/guild/repositories/IGuildRepositoryAggregate';
+import {ChannelOperationsService} from '@app/api/guild/services/channel/ChannelOperationsService';
+import {createGuildMfaEnforcer} from '@app/api/guild/services/GuildMfaEnforcement';
+import type {IGatewayService} from '@app/api/infrastructure/IGatewayService';
+import type {ISnowflakeService} from '@app/api/infrastructure/ISnowflakeService';
+import type {UserCacheService} from '@app/api/infrastructure/UserCacheService';
+import type {LimitConfigService} from '@app/api/limits/LimitConfigService';
+import type {RequestCache} from '@app/api/middleware/RequestCacheMiddleware';
+import type {IUserRepository} from '@app/api/user/IUserRepository';
 import {Permissions} from '@fluxer/constants/src/ChannelConstants';
 import {MissingPermissionsError} from '@fluxer/errors/src/domains/core/MissingPermissionsError';
 import {UnknownGuildError} from '@fluxer/errors/src/domains/guild/UnknownGuildError';
 import type {ChannelCreateRequest} from '@fluxer/schema/src/domains/channel/ChannelRequestSchemas';
 import type {ChannelResponse} from '@fluxer/schema/src/domains/channel/ChannelSchemas';
 import type {ICacheService} from '@pkgs/cache/src/ICacheService';
-import type {ChannelID, GuildID, UserID} from '../../BrandedTypes';
-import {mapChannelToResponse} from '../../channel/ChannelMappers';
-import type {IChannelRepository} from '../../channel/IChannelRepository';
-import type {IGatewayService} from '../../infrastructure/IGatewayService';
-import type {ISnowflakeService} from '../../infrastructure/ISnowflakeService';
-import type {UserCacheService} from '../../infrastructure/UserCacheService';
-import type {LimitConfigService} from '../../limits/LimitConfigService';
-import type {RequestCache} from '../../middleware/RequestCacheMiddleware';
-import type {GuildAuditLogService} from '../GuildAuditLogService';
-import type {IGuildRepositoryAggregate} from '../repositories/IGuildRepositoryAggregate';
-import {ChannelOperationsService} from './channel/ChannelOperationsService';
 
 export class GuildChannelService {
 	private readonly channelOps: ChannelOperationsService;
@@ -30,6 +32,7 @@ export class GuildChannelService {
 		snowflakeService: ISnowflakeService,
 		guildAuditLogService: GuildAuditLogService,
 		limitConfigService: LimitConfigService,
+		private readonly userRepository: IUserRepository,
 	) {
 		this.channelOps = new ChannelOperationsService(
 			channelRepository,
@@ -131,5 +134,12 @@ export class GuildChannelService {
 			permission: params.permission,
 		});
 		if (!hasPermission) throw new MissingPermissionsError();
+		const guildData = await this.gatewayService.getGuildData({guildId: params.guildId, userId: params.userId});
+		const enforceGuildMfa = await createGuildMfaEnforcer({
+			userRepository: this.userRepository,
+			guildData,
+			userId: params.userId,
+		});
+		enforceGuildMfa(params.permission);
 	}
 }

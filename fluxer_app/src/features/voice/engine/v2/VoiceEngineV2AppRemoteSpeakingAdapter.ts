@@ -17,6 +17,11 @@ import {
 import {getSharedVoiceAudioContext} from '@app/features/voice/engine/VoiceSharedAudioContext';
 import {getRemoteSpeakingThresholdRms} from '@app/features/voice/engine/VoiceSpeakingThreshold';
 import {VoiceTrackKind, VoiceTrackSource} from '@app/features/voice/engine/VoiceTrackSource';
+import {
+	assertNonEmptyString,
+	assertNonNegativeFinite,
+	assertObjectLike,
+} from '@app/features/voice/engine/v2/VoiceEngineV2AppAdapterAssertions';
 import ParticipantVolume from '@app/features/voice/state/ParticipantVolume';
 import {
 	clearRemoteVoicePlaybackBoost,
@@ -24,18 +29,27 @@ import {
 } from '@app/features/voice/state/RemoteVoicePlaybackBoost';
 import VoiceSettings from '@app/features/voice/state/VoiceSettings';
 import type {Participant, RemoteAudioTrack, RemoteTrack, RemoteTrackPublication, Room} from 'livekit-client';
-import {assertNonEmptyString, assertNonNegativeFinite, assertObjectLike} from './VoiceEngineV2AppAdapterAssertions';
 
 const logger = new Logger('VoiceEngineV2AppRemoteSpeakingAdapter');
 export const REMOTE_SPEAKING_ANALYSER_INTERVAL_MS = 50;
 export const REMOTE_SPEAKING_ANALYSER_HANDLES_CAP = 256;
+
+export function computeTimeDomainRms(samples: Float32Array): number {
+	if (samples.length === 0) return 0;
+	let sumSquares = 0;
+	for (let i = 0; i < samples.length; i++) {
+		const sample = samples[i]!;
+		sumSquares += sample * sample;
+	}
+	return Math.sqrt(sumSquares / samples.length);
+}
 
 interface AnalyserHandle {
 	identity: string;
 	track: MediaStreamTrack;
 	source: MediaStreamAudioSourceNode;
 	analyser: AnalyserNode;
-	samples: Uint8Array<ArrayBuffer>;
+	samples: Float32Array<ArrayBuffer>;
 	nextTickAtMs: number;
 }
 
@@ -73,9 +87,7 @@ export class VoiceEngineV2AppRemoteSpeakingAdapter {
 					break;
 				case 'setPlaybackBoost':
 					setRemoteVoicePlaybackBoost(command.identity, command.boost);
-					if (command.boost !== 1) {
-						this.reapplyParticipantVolume(command.identity);
-					}
+					this.reapplyParticipantVolume(command.identity);
 					break;
 				case 'clearPlaybackBoost':
 					clearRemoteVoicePlaybackBoost(command.identity);
@@ -193,7 +205,7 @@ export class VoiceEngineV2AppRemoteSpeakingAdapter {
 				track: mediaStreamTrack,
 				source,
 				analyser,
-				samples: new Uint8Array(new ArrayBuffer(analyser.fftSize)),
+				samples: new Float32Array(new ArrayBuffer(analyser.fftSize * Float32Array.BYTES_PER_ELEMENT)),
 				nextTickAtMs: this.nowMs() + REMOTE_SPEAKING_ANALYSER_INTERVAL_MS,
 			};
 			this.analysers.set(identity, handle);
@@ -315,13 +327,8 @@ export class VoiceEngineV2AppRemoteSpeakingAdapter {
 			}
 			return;
 		}
-		handle.analyser.getByteTimeDomainData(handle.samples);
-		let sumSquares = 0;
-		for (let i = 0; i < handle.samples.length; i++) {
-			const normalized = (handle.samples[i]! - 128) / 128;
-			sumSquares += normalized * normalized;
-		}
-		const rms = Math.sqrt(sumSquares / handle.samples.length);
+		handle.analyser.getFloatTimeDomainData(handle.samples);
+		const rms = computeTimeDomainRms(handle.samples);
 		const threshold = getRemoteSpeakingThresholdRms(VoiceSettings.getVadThreshold());
 		this.applyCommands(this.transition({type: 'remote.tick', identity: handle.identity, rms, threshold, nowMs}));
 		handle.nextTickAtMs = nowMs + REMOTE_SPEAKING_ANALYSER_INTERVAL_MS;

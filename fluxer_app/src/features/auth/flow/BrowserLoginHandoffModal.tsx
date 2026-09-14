@@ -71,6 +71,7 @@ const BrowserLoginHandoffModal = observer(
 		const [isGenerating, setIsGenerating] = useState(false);
 		const [error, setError] = useState<string | null>(null);
 		const pollingRef = useRef(false);
+		const handoffPollSecretRef = useRef<string | null>(null);
 		const completedRef = useRef(false);
 		const instanceUrlHelper = useMemo(
 			() =>
@@ -86,6 +87,7 @@ const BrowserLoginHandoffModal = observer(
 			setHandoffExpiresAt(null);
 			try {
 				const result = await AuthenticationCommands.initiateDesktopHandoff();
+				handoffPollSecretRef.current = result.poll_secret ?? null;
 				setHandoffCode(result.code);
 				setHandoffExpiresAt(result.expires_at);
 			} catch (e) {
@@ -103,7 +105,7 @@ const BrowserLoginHandoffModal = observer(
 			const timer = setInterval(async () => {
 				if (!pollingRef.current) return;
 				try {
-					const result = await AuthenticationCommands.pollDesktopHandoffStatus(handoffCode);
+					const result = await AuthenticationCommands.pollDesktopHandoffStatus(handoffCode, handoffPollSecretRef.current);
 					if (result.status === 'completed' && result.token && result.user_id) {
 						pollingRef.current = false;
 						completedRef.current = true;

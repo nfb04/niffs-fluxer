@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import {SnowflakeService} from '@app/api/infrastructure/SnowflakeService';
 import type {INatsConnectionManager} from '@pkgs/nats/src/INatsConnectionManager';
 import {type NatsConnection, StringCodec} from 'nats';
 import {afterEach, describe, expect, it} from 'vitest';
-import {SnowflakeService} from './SnowflakeService';
 
 interface FakeRequest {
 	subject: string;
@@ -116,7 +116,7 @@ describe('SnowflakeService', () => {
 				count: 1,
 				routing_key: 'channel:1510189013330296832',
 			},
-			timeout: 5000,
+			timeout: 6000,
 		});
 		expect(await service.generate()).toBe(201n);
 		expect(manager.requests).toHaveLength(2);

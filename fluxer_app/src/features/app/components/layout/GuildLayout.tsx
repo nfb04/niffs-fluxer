@@ -5,9 +5,9 @@ import {ConfirmModal} from '@app/features/app/components/dialogs/ConfirmModal';
 import {TopNagbarContext} from '@app/features/app/components/layout/app_layout/TopNagbarContext';
 import styles from '@app/features/app/components/layout/GuildLayout.module.css';
 import {GuildNavbar} from '@app/features/app/components/layout/GuildNavbar';
-import {GuildNavbarSkeleton} from '@app/features/app/components/layout/GuildNavbarSkeleton';
 import {Nagbar} from '@app/features/app/components/layout/Nagbar';
 import {NagbarButton} from '@app/features/app/components/layout/NagbarButton';
+import {GuildSidebarSkeleton} from '@app/features/app/components/skeleton/GuildSidebarSkeleton';
 import {PRODUCT_NAME} from '@app/features/app/config/I18nDisplayConstants';
 import {MatureContentChannelGate} from '@app/features/channel/components/MatureContentChannelGate';
 import Channels from '@app/features/channel/state/Channels';
@@ -27,7 +27,7 @@ import SelectedChannel from '@app/features/navigation/state/SelectedChannel';
 import Permission from '@app/features/permissions/state/Permission';
 import * as PermissionUtils from '@app/features/permissions/utils/PermissionUtils';
 import {useParams} from '@app/features/platform/components/router/RouterReact';
-import {ComponentDispatch} from '@app/features/platform/utils/ComponentBus';
+import {ComponentBus} from '@app/features/platform/utils/ComponentBus';
 import * as ModalCommands from '@app/features/ui/commands/ModalCommands';
 import {modal} from '@app/features/ui/commands/ModalCommands';
 import * as NagbarCommands from '@app/features/ui/commands/NagbarCommands';
@@ -76,7 +76,7 @@ const ENABLE_INVITES_AGAIN_DESCRIPTOR = msg({
 });
 const GUILD_MFA_REQUIREMENT_MESSAGE_DESCRIPTOR = msg({
 	message:
-		'Moderation actions in {communityName} require two-factor authentication. Enable 2FA to kick, ban, timeout, or delete messages here.',
+		'Moderation actions in {communityName} require two-factor authentication. Enable 2FA to kick, ban, time out, or delete messages here.',
 	comment:
 		'Guild nagbar body shown when moderation actions in a community require two-factor authentication. {communityName} is the community name.',
 });
@@ -433,7 +433,7 @@ export const GuildLayout = observer(({children}: {children: React.ReactNode}) =>
 	useEffect(() => {
 		if (prevNagbarCount.current !== nagbarCount) {
 			prevNagbarCount.current = nagbarCount;
-			ComponentDispatch.dispatch('LAYOUT_RESIZED');
+			ComponentBus.dispatch('LAYOUT_RESIZED');
 		}
 	}, [nagbarCount]);
 	useEffect(() => {
@@ -497,7 +497,7 @@ export const GuildLayout = observer(({children}: {children: React.ReactNode}) =>
 			return (
 				<TopNagbarContext.Provider value={nagbarContextValue}>
 					<div className={styles.guildLayoutContent} data-flx="app.guild-layout.guild-layout-content">
-						<GuildNavbarSkeleton data-flx="app.guild-layout.guild-navbar-skeleton" />
+						<GuildSidebarSkeleton guildId={guildId} data-flx="app.guild-layout.guild-sidebar-skeleton" />
 						<div className={styles.guildMainContent} data-flx="app.guild-layout.guild-main-content">
 							{guildUnavailable ? (
 								<GuildUnavailable
@@ -572,7 +572,7 @@ export const GuildLayout = observer(({children}: {children: React.ReactNode}) =>
 				>
 					{guildNagbars}
 					<div className={styles.guildLayoutContent} data-flx="app.guild-layout.guild-layout-content--2">
-						<GuildNavbarSkeleton data-flx="app.guild-layout.guild-navbar-skeleton--2" />
+						<GuildSidebarSkeleton guildId={guildId} data-flx="app.guild-layout.guild-sidebar-skeleton--2" />
 						<div className={styles.guildMainContent} data-flx="app.guild-layout.guild-main-content--4">
 							<GuildUnavailable
 								icon={NetworkSlashIcon}
@@ -595,7 +595,7 @@ export const GuildLayout = observer(({children}: {children: React.ReactNode}) =>
 				>
 					{guildNagbars}
 					<div className={styles.guildLayoutContent} data-flx="app.guild-layout.guild-layout-content--3">
-						<GuildNavbarSkeleton data-flx="app.guild-layout.guild-navbar-skeleton--3" />
+						<GuildSidebarSkeleton guildId={guildId} data-flx="app.guild-layout.guild-sidebar-skeleton--3" />
 						<div className={styles.guildMainContent} data-flx="app.guild-layout.guild-main-content--5">
 							<GuildUnavailable
 								icon={SmileySadIcon}
@@ -641,7 +641,7 @@ export const GuildLayout = observer(({children}: {children: React.ReactNode}) =>
 				>
 					{guildNagbars}
 					<div className={styles.guildLayoutContent} data-flx="app.guild-layout.guild-layout-content--5">
-						<GuildNavbarSkeleton data-flx="app.guild-layout.guild-navbar-skeleton--4" />
+						<GuildSidebarSkeleton guildId={guildId} data-flx="app.guild-layout.guild-sidebar-skeleton--4" />
 						<div className={styles.guildMainContent} data-flx="app.guild-layout.guild-main-content--7">
 							<MatureContentChannelGate
 								guildId={guild.id}

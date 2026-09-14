@@ -1,10 +1,24 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import {requireSudoMode} from '@app/api/auth/services/SudoVerificationService';
+import {Config} from '@app/api/Config';
+import {DefaultUserOnly, LoginRequired, LoginRequiredAllowSuspicious} from '@app/api/middleware/AuthMiddleware';
+import {RateLimitMiddleware} from '@app/api/middleware/RateLimitMiddleware';
+import {OpenAPI} from '@app/api/middleware/ResponseTypeMiddleware';
+import {SudoModeMiddleware} from '@app/api/middleware/SudoModeMiddleware';
+import {RateLimitConfigs} from '@app/api/RateLimitConfig';
+import type {HonoApp} from '@app/api/types/HonoEnv';
+import {Validator} from '@app/api/Validator';
 import {requireClientIp} from '@fluxer/ip_utils/src/ClientIp';
 import {
 	DisableTotpRequest,
 	EnableMfaTotpRequest,
 	InboundSmsChallengeStartResponse,
+	MfaBackupCodesChallengeRegenerateRequest,
+	MfaBackupCodesChallengeResendRequest,
+	MfaBackupCodesChallengeStartResponse,
+	MfaBackupCodesChallengeVerifyRequest,
+	MfaBackupCodesChallengeVerifyResponse,
 	MfaBackupCodesRequest,
 	MfaBackupCodesResponse,
 	PhoneSendVerificationRequest,
@@ -19,15 +33,7 @@ import {
 	WebAuthnRegisterRequest,
 } from '@fluxer/schema/src/domains/auth/AuthSchemas';
 import {CredentialIdParam} from '@fluxer/schema/src/domains/common/CommonParamSchemas';
-import {requireSudoMode} from '../../auth/services/SudoVerificationService';
-import {Config} from '../../Config';
-import {DefaultUserOnly, LoginRequired, LoginRequiredAllowSuspicious} from '../../middleware/AuthMiddleware';
-import {RateLimitMiddleware} from '../../middleware/RateLimitMiddleware';
-import {OpenAPI} from '../../middleware/ResponseTypeMiddleware';
-import {SudoModeMiddleware} from '../../middleware/SudoModeMiddleware';
-import {RateLimitConfigs} from '../../RateLimitConfig';
-import type {HonoApp} from '../../types/HonoEnv';
-import {Validator} from '../../Validator';
+import {EmptyBodyRequest} from '@fluxer/schema/src/domains/user/UserRequestSchemas';
 
 export function UserAuthController(app: HonoApp) {
 	app.post(
@@ -108,6 +114,96 @@ export function UserAuthController(app: HonoApp) {
 			const sudoResult = await requireSudoMode(ctx, user, body);
 			return ctx.json(
 				await ctx.get('userAuthRequestService').getBackupCodes({user, data: body, sudoContext: sudoResult}),
+			);
+		},
+	);
+	app.post(
+		'/users/@me/mfa/backup-codes/challenge',
+		RateLimitMiddleware(RateLimitConfigs.USER_MFA_BACKUP_CODES_CHALLENGE_START),
+		LoginRequired,
+		DefaultUserOnly,
+		Validator('json', EmptyBodyRequest),
+		OpenAPI({
+			operationId: 'start_backup_codes_challenge',
+			summary: 'Start backup codes challenge',
+			responseSchema: MfaBackupCodesChallengeStartResponse,
+			statusCode: 200,
+			security: ['bearerToken', 'sessionToken'],
+			tags: ['Users'],
+			description:
+				"Initiates the challenge required to view existing backup codes. Sends a verification code to the user's email address. Returns a ticket for use in the remaining challenge steps.",
+		}),
+		async (ctx) => {
+			const user = ctx.get('user');
+			return ctx.json(await ctx.get('mfaBackupCodesChallengeService').start(user));
+		},
+	);
+	app.post(
+		'/users/@me/mfa/backup-codes/challenge/resend',
+		RateLimitMiddleware(RateLimitConfigs.USER_MFA_BACKUP_CODES_CHALLENGE_RESEND),
+		LoginRequired,
+		DefaultUserOnly,
+		Validator('json', MfaBackupCodesChallengeResendRequest),
+		OpenAPI({
+			operationId: 'resend_backup_codes_challenge',
+			summary: 'Resend backup codes challenge code',
+			responseSchema: null,
+			statusCode: 204,
+			security: ['bearerToken', 'sessionToken'],
+			tags: ['Users'],
+			description:
+				'Resends the verification code for a backup codes challenge. Use if the original code was not received. Requires a valid backup codes challenge ticket.',
+		}),
+		async (ctx) => {
+			const user = ctx.get('user');
+			const body = ctx.req.valid('json');
+			await ctx.get('mfaBackupCodesChallengeService').resend(user, body.ticket);
+			return ctx.body(null, 204);
+		},
+	);
+	app.post(
+		'/users/@me/mfa/backup-codes/challenge/verify',
+		RateLimitMiddleware(RateLimitConfigs.USER_MFA_BACKUP_CODES_CHALLENGE_VERIFY),
+		LoginRequired,
+		DefaultUserOnly,
+		Validator('json', MfaBackupCodesChallengeVerifyRequest),
+		OpenAPI({
+			operationId: 'verify_backup_codes_challenge',
+			summary: 'Verify backup codes challenge code',
+			responseSchema: MfaBackupCodesChallengeVerifyResponse,
+			statusCode: 200,
+			security: ['bearerToken', 'sessionToken'],
+			tags: ['Users'],
+			description:
+				'Verifies the email code sent during a backup codes challenge and returns the existing backup codes along with a proof token. The code is consumed on success and the proof token authorizes regeneration on the same ticket.',
+		}),
+		async (ctx) => {
+			const user = ctx.get('user');
+			const body = ctx.req.valid('json');
+			return ctx.json(await ctx.get('mfaBackupCodesChallengeService').verify(user, body.ticket, body.code));
+		},
+	);
+	app.post(
+		'/users/@me/mfa/backup-codes/challenge/regenerate',
+		RateLimitMiddleware(RateLimitConfigs.USER_MFA_BACKUP_CODES_CHALLENGE_REGENERATE),
+		LoginRequired,
+		DefaultUserOnly,
+		Validator('json', MfaBackupCodesChallengeRegenerateRequest),
+		OpenAPI({
+			operationId: 'regenerate_backup_codes_challenge',
+			summary: 'Regenerate backup codes with a verified challenge',
+			responseSchema: MfaBackupCodesResponse,
+			statusCode: 200,
+			security: ['bearerToken', 'sessionToken'],
+			tags: ['Users'],
+			description:
+				'Replaces the account backup codes using the proof token from a verified backup codes challenge. Old codes are invalidated.',
+		}),
+		async (ctx) => {
+			const user = ctx.get('user');
+			const body = ctx.req.valid('json');
+			return ctx.json(
+				await ctx.get('mfaBackupCodesChallengeService').regenerate(user, body.ticket, body.verification_proof),
 			);
 		},
 	);

@@ -13,6 +13,7 @@ import styles from '@app/features/expressions/components/modals/GiftSendToFriend
 import {SEARCH_FRIENDS_DESCRIPTOR, SENT_DESCRIPTOR} from '@app/features/i18n/utils/CommonMessageDescriptors';
 import * as MessageCommands from '@app/features/messaging/commands/MessageCommands';
 import {Logger} from '@app/features/platform/utils/AppLogger';
+import {remFromPx} from '@app/features/theme/layout/RemFromPx';
 import {Input} from '@app/features/ui/components/form/FormInput';
 import {useCopyLinkHandler} from '@app/lib/copy-link';
 import * as SnowflakeUtils from '@fluxer/snowflake/src/SnowflakeUtils';
@@ -22,10 +23,6 @@ import {MagnifyingGlassIcon} from '@phosphor-icons/react';
 import {observer} from 'mobx-react-lite';
 import {useCallback, useState} from 'react';
 
-const I_CAN_T_REDEEM_THIS_BECAUSE_I_ALREADY_DESCRIPTOR = msg({
-	message: "I can't redeem this because I already have lifetime {premiumProductName}, so this gift is all yours!",
-	comment: 'Gift redemption pre-filled DM message for a sender who already owns lifetime premium.',
-});
 const YOU_ALREADY_HAVE_LIFETIME_DESCRIPTOR = msg({
 	message: 'You already have lifetime {premiumProductName}',
 	comment: 'Status label shown to a user who already owns the lifetime premium tier.',
@@ -61,7 +58,7 @@ export const GiftSendToFriendModal = observer(function GiftSendToFriendModal({co
 					? item.channelId
 					: await PrivateChannelCommands.ensureDMChannel(item.user.id);
 				const result = await MessageCommands.send(targetChannelId, {
-					content: `${i18n._(I_CAN_T_REDEEM_THIS_BECAUSE_I_ALREADY_DESCRIPTOR, {premiumProductName: PREMIUM_PRODUCT_NAME})}\n${giftUrl}`,
+					content: giftUrl,
 					nonce: SnowflakeUtils.fromTimestamp(Date.now()),
 				});
 				if (result) {
@@ -78,7 +75,7 @@ export const GiftSendToFriendModal = observer(function GiftSendToFriendModal({co
 				});
 			}
 		},
-		[giftUrl, i18n],
+		[giftUrl],
 	);
 	return (
 		<Modal.Root size="small" centered data-flx="expressions.gift-send-to-friend-modal.modal-root">
@@ -88,7 +85,7 @@ export const GiftSendToFriendModal = observer(function GiftSendToFriendModal({co
 			>
 				<p className={styles.description} data-flx="expressions.gift-send-to-friend-modal.description">
 					<Trans>
-						We'd love to give you more than infinity of {PREMIUM_PRODUCT_NAME}, but that breaks the space-time
+						We'd love to give you more than a lifetime of {PREMIUM_PRODUCT_NAME}, but that breaks the space-time
 						continuum. Send the gift to a friend instead?
 					</Trans>
 				</p>
@@ -99,7 +96,7 @@ export const GiftSendToFriendModal = observer(function GiftSendToFriendModal({co
 						placeholder={i18n._(SEARCH_FRIENDS_DESCRIPTOR)}
 						leftIcon={
 							<MagnifyingGlassIcon
-								size={20}
+								size={remFromPx(20)}
 								weight="bold"
 								className={selectorStyles.searchIcon}
 								data-flx="expressions.gift-send-to-friend-modal.magnifying-glass-icon"

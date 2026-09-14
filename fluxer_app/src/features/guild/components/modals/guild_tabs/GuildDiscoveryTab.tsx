@@ -6,6 +6,7 @@ import {showGuildErrorModal} from '@app/features/guild/components/alerts/GuildEr
 import styles from '@app/features/guild/components/modals/guild_tabs/GuildDiscoveryTab.module.css';
 import {TRY_AGAIN_IN_A_MOMENT_DESCRIPTOR} from '@app/features/i18n/utils/CommonMessageDescriptors';
 import {Logger} from '@app/features/platform/utils/AppLogger';
+import {remFromPx} from '@app/features/theme/layout/RemFromPx';
 import {Button} from '@app/features/ui/button/Button';
 import * as ToastCommands from '@app/features/ui/commands/ToastCommands';
 import {Form} from '@app/features/ui/components/form/Form';
@@ -29,7 +30,7 @@ import type {
 	DiscoveryStatusResponse,
 } from '@fluxer/schema/src/domains/guild/GuildDiscoverySchemas';
 import {msg} from '@lingui/core/macro';
-import {Trans, useLingui} from '@lingui/react/macro';
+import {Plural, Trans, useLingui} from '@lingui/react/macro';
 import {InfoIcon, WarningIcon} from '@phosphor-icons/react';
 import {clsx} from 'clsx';
 import type React from 'react';
@@ -334,15 +335,26 @@ const GuildDiscoveryTab: React.FC<{guildId: string}> = ({guildId}) => {
 				<div className={styles.warning} data-flx="guild.guild-tabs.guild-discovery-tab.warning">
 					<div className={styles.warningContent} data-flx="guild.guild-tabs.guild-discovery-tab.warning-content">
 						<div className={styles.warningIcon} data-flx="guild.guild-tabs.guild-discovery-tab.warning-icon">
-							<WarningIcon size={20} weight="fill" data-flx="guild.guild-tabs.guild-discovery-tab.warning-icon--2" />
+							<WarningIcon
+								size={remFromPx(20)}
+								weight="fill"
+								data-flx="guild.guild-tabs.guild-discovery-tab.warning-icon--2"
+							/>
 						</div>
 						<div className={styles.warningBody} data-flx="guild.guild-tabs.guild-discovery-tab.warning-body">
 							<p className={styles.warningTitle} data-flx="guild.guild-tabs.guild-discovery-tab.warning-title">
 								<Trans>Not enough members</Trans>
 							</p>
 							<p className={styles.warningText} data-flx="guild.guild-tabs.guild-discovery-tab.warning-text">
-								<Trans>
-									Your community needs at least {minMemberCount} members before it can be listed in Discovery.
+								<Trans comment="Warning in the community Discovery settings tab when the community is below the minimum size. The plural count is the minimum number of members required to be listed.">
+									Your community needs at least{' '}
+									<Plural
+										value={minMemberCount}
+										one="# member"
+										other="# members"
+										data-flx="guild.guild-tabs.guild-discovery-tab.min-member-count.plural"
+									/>{' '}
+									before it can be listed in Discovery.
 								</Trans>
 							</p>
 						</div>
@@ -368,7 +380,11 @@ const GuildDiscoveryTab: React.FC<{guildId: string}> = ({guildId}) => {
 				<div className={styles.info} data-flx="guild.guild-tabs.guild-discovery-tab.info">
 					<div className={styles.infoContent} data-flx="guild.guild-tabs.guild-discovery-tab.info-content">
 						<div className={styles.infoIcon} data-flx="guild.guild-tabs.guild-discovery-tab.info-icon">
-							<InfoIcon size={20} weight="fill" data-flx="guild.guild-tabs.guild-discovery-tab.info-icon--2" />
+							<InfoIcon
+								size={remFromPx(20)}
+								weight="fill"
+								data-flx="guild.guild-tabs.guild-discovery-tab.info-icon--2"
+							/>
 						</div>
 						<p className={styles.infoText} data-flx="guild.guild-tabs.guild-discovery-tab.info-text">
 							<Trans>
@@ -383,7 +399,11 @@ const GuildDiscoveryTab: React.FC<{guildId: string}> = ({guildId}) => {
 				<div className={styles.info} data-flx="guild.guild-tabs.guild-discovery-tab.info--2">
 					<div className={styles.infoContent} data-flx="guild.guild-tabs.guild-discovery-tab.info-content--2">
 						<div className={styles.infoIcon} data-flx="guild.guild-tabs.guild-discovery-tab.info-icon--3">
-							<InfoIcon size={20} weight="fill" data-flx="guild.guild-tabs.guild-discovery-tab.info-icon--4" />
+							<InfoIcon
+								size={remFromPx(20)}
+								weight="fill"
+								data-flx="guild.guild-tabs.guild-discovery-tab.info-icon--4"
+							/>
 						</div>
 						<p className={styles.infoText} data-flx="guild.guild-tabs.guild-discovery-tab.info-text--2">
 							<Trans>
@@ -608,7 +628,7 @@ const GuildDiscoveryTab: React.FC<{guildId: string}> = ({guildId}) => {
 								disabled={!eligible && canApply}
 								data-flx="guild.guild-tabs.guild-discovery-tab.button.submit"
 							>
-								{hasActiveApplication ? <Trans>Save</Trans> : <Trans>Apply</Trans>}
+								{hasActiveApplication ? <Trans>Save</Trans> : <Trans>Submit application</Trans>}
 							</Button>
 						</div>
 					</div>

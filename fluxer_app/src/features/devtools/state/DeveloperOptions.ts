@@ -20,7 +20,8 @@ export type PremiumScenarioOverride =
 	| 'expired_old'
 	| 'visionary';
 export type DeveloperOptionsState = Readonly<{
-	bypassSplashScreen: boolean;
+	bypassLoadingSkeleton: boolean;
+	forceLoadingSkeleton: boolean;
 	forceFailMessageSends: boolean;
 	forceFailMessageLoads: boolean;
 	forceRenderPlaceholders: boolean;
@@ -45,7 +46,6 @@ export type DeveloperOptionsState = Readonly<{
 	selfHostedModeOverride: boolean;
 	forceShowVanityURLDisclaimer: boolean;
 	forceShowVoiceConnection: boolean;
-	showExpressionPacksSettings: boolean;
 	showProfileTimezoneSettings: boolean;
 	premiumScenarioOverride: PremiumScenarioOverride | null;
 	premiumTypeOverride: number | null;
@@ -96,14 +96,15 @@ export type DeveloperOptionsState = Readonly<{
 		}
 	>;
 	noOpInAppReports: boolean;
-	gameCaptureInjectionMethod: 'auto' | 'remote-thread' | 'set-windows-hook';
+	disableTranslationDomGuard: boolean;
 }>;
 type MutableDeveloperOptionsState = {
 	-readonly [K in keyof DeveloperOptionsState]: DeveloperOptionsState[K];
 };
 
 class DeveloperOptions implements DeveloperOptionsState {
-	bypassSplashScreen = false;
+	bypassLoadingSkeleton = false;
+	forceLoadingSkeleton = false;
 	forceFailMessageSends = false;
 	forceFailMessageLoads = false;
 	forceRenderPlaceholders = false;
@@ -128,7 +129,6 @@ class DeveloperOptions implements DeveloperOptionsState {
 	selfHostedModeOverride = false;
 	forceShowVanityURLDisclaimer = false;
 	forceShowVoiceConnection = false;
-	showExpressionPacksSettings = false;
 	showProfileTimezoneSettings = false;
 	premiumScenarioOverride: PremiumScenarioOverride | null = null;
 	premiumTypeOverride: number | null = null;
@@ -180,7 +180,7 @@ class DeveloperOptions implements DeveloperOptionsState {
 	mockGiftRedeemed: boolean | null = null;
 	mockTitlebarPlatformOverride: DeveloperOptionsState['mockTitlebarPlatformOverride'] = 'auto';
 	noOpInAppReports = false;
-	gameCaptureInjectionMethod: DeveloperOptionsState['gameCaptureInjectionMethod'] = 'auto';
+	disableTranslationDomGuard = false;
 
 	constructor() {
 		makeAutoObservable(this, {}, {autoBind: true});
@@ -189,7 +189,8 @@ class DeveloperOptions implements DeveloperOptionsState {
 
 	private async initPersistence(): Promise<void> {
 		await makePersistent(this, 'DeveloperOptions', [
-			'bypassSplashScreen',
+			'bypassLoadingSkeleton',
+			'forceLoadingSkeleton',
 			'forceFailMessageSends',
 			'forceFailMessageLoads',
 			'forceRenderPlaceholders',
@@ -214,7 +215,6 @@ class DeveloperOptions implements DeveloperOptionsState {
 			'selfHostedModeOverride',
 			'forceShowVanityURLDisclaimer',
 			'forceShowVoiceConnection',
-			'showExpressionPacksSettings',
 			'showProfileTimezoneSettings',
 			'premiumScenarioOverride',
 			'premiumTypeOverride',
@@ -252,7 +252,7 @@ class DeveloperOptions implements DeveloperOptionsState {
 			'mockTitlebarPlatformOverride',
 			'mockAttachmentStates',
 			'noOpInAppReports',
-			'gameCaptureInjectionMethod',
+			'disableTranslationDomGuard',
 		]);
 	}
 

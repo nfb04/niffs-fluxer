@@ -9,7 +9,7 @@ packages:
   - '!fluxer_app/pkgs/libfluxcore'
   - fluxer_desktop
   - fluxer_admin
-  - fluxer_marketing
+  - fluxer_docs
 
 allowBuilds:
   '@bufbuild/buf': true
@@ -33,10 +33,15 @@ blockExoticSubdeps: true
 
 catalog:
   '@arborium/arborium': 2.16.0
+  '@astrojs/check': 0.9.9
+  '@astrojs/markdown-remark': 7.2.1
+  '@astrojs/mdx': 7.0.3
+  '@astrojs/node': 11.0.2
+  '@astrojs/starlight': 0.41.4
   '@atproto/api': 0.19.0
-  '@aws-sdk/client-s3': 3.996.0
-  '@aws-sdk/lib-storage': 3.996.0
-  '@aws-sdk/s3-request-presigner': 3.996.0
+  '@aws-sdk/client-s3': 3.1121.0
+  '@aws-sdk/lib-storage': 3.1121.0
+  '@aws-sdk/s3-request-presigner': 3.1121.0
   '@base-ui/react': 1.5.0
   '@biomejs/biome': 2.4.4
   '@bluesky-social/jwk-jose': 0.1.11
@@ -45,43 +50,53 @@ catalog:
   '@floating-ui/react': 0.27.18
   '@floating-ui/react-dom': 2.1.7
   '@hcaptcha/react-hcaptcha': 2.0.2
-  '@hono/node-server': 1.19.9
+  '@hono/node-server': 1.19.17
+  '@lexical/history': 0.48.0
+  '@lexical/react': 0.48.0
+  '@lexical/utils': 0.48.0
   '@lingui/cli': 5.9.2
   '@lingui/core': 5.9.2
   '@lingui/react': 5.9.2
   '@lingui/swc-plugin': 5.11.0
   '@livekit/components-react': 2.9.20
   '@marsidev/react-turnstile': 1.4.2
+  '@mdx-js/mdx': 3.1.1
   '@messageformat/core': 3.4.0
   '@messageformat/parser': 5.1.1
   '@phosphor-icons/react': 2.1.10
-  '@protontech/tidy-url': 1.18.5
   '@radix-ui/react-checkbox': 1.3.3
   '@radix-ui/react-radio-group': 1.3.8
   '@radix-ui/react-switch': 1.2.6
+  '@redocly/openapi-core': 2.52.0
   '@rspack/cli': 1.7.6
   '@rspack/core': 1.7.6
+  '@sapphi-red/web-noise-suppressor': 0.4.0
   '@simplewebauthn/browser': 13.2.2
   '@simplewebauthn/server': 13.2.3
   '@svgr/webpack': 8.1.0
   '@tailwindcss/cli': 4.2.1
   '@types/archiver': 7.0.0
   '@types/combokeys': 2.4.9
+  '@types/hast': 3.0.5
   '@types/lodash': 4.17.24
   '@types/luxon': 3.7.1
+  '@types/mdast': 4.0.4
   '@types/node': 25.3.0
   '@types/nodemailer': 7.0.11
   '@types/pg': 8.16.0
   '@types/qrcode': 1.5.6
   '@types/react': 19.2.14
   '@types/react-dom': 19.2.3
+  '@types/send': 1.2.1
   '@types/validator': 13.15.10
   '@typescript/native-preview': 7.0.0-dev.20260224.1
-  '@vitest/coverage-v8': 4.0.18
+  '@vitest/coverage-v8': 4.1.11
   '@vvo/tzdb': 6.198.0
+  '@webgpu/types': 0.1.72
   ajv: 8.18.0
   archiver: 7.0.1
   argon2: 0.44.0
+  astro: 7.1.3
   autoprefixer: 10.4.24
   bowser: 2.14.1
   cassandra-driver: 4.8.0
@@ -90,39 +105,45 @@ catalog:
   combokeys: 3.0.1
   deepfilternet3-noise-filter: 1.2.1
   emoji-regex: 10.6.0
-  esbuild: 0.27.3
+  esbuild: 0.28.2
+  eslint: 10.10.0
+  eslint-plugin-react-google-translate: 1.0.4
   eventemitter3: 5.0.4
-  fast-xml-parser: 5.3.7
+  fast-xml-parser: 5.11.1
   favico.js: 0.3.10
   framer-motion: 12.34.3
   hi-base32: 0.5.1
-  hono: 4.12.2
+  hono: 4.13.5
   html-entities: 2.6.0
   idna-uts46-hx: 6.1.1
   ioredis: 5.9.3
   itty-time: 2.0.2
   jose: 6.1.3
   katex: 0.16.33
-  knip: 5.85.0
+  knip: 5.88.1
+  lexical: 0.48.0
   libphonenumber-js: 1.12.41
   livekit-server-sdk: 2.15.0
-  lodash: 4.17.23
+  lodash: 4.18.1
   lru-cache: 11.2.6
   luxon: 3.7.2
   match-sorter: 8.2.0
+  maxmind: 5.0.5
+  mdast-util-mdx-jsx: 3.2.0
+  mdast-util-to-hast: 13.2.1
   mime: 4.1.0
   mobx: 6.15.0
   mobx-persist-store: 1.1.8
   mobx-react-lite: 4.1.1
   motion: 12.34.3
-  maxmind: 5.0.5
   msw: 2.12.10
   nats: 2.29.3
-  nodemailer: 8.0.1
+  nodemailer: 9.0.6
+  onnxruntime-web: 1.27.0
+  pg: 8.16.3
   pino: 10.3.1
   pino-pretty: 13.1.3
-  pg: 8.16.3
-  postcss: 8.5.6
+  postcss: 8.5.26
   postcss-discard-comments: 7.0.5
   postcss-loader: 8.2.1
   postcss-preset-env: 11.2.0
@@ -137,27 +158,55 @@ catalog:
   react-dom: 19.2.4
   react-hook-form: 7.71.2
   react-hotkeys-hook: 5.2.4
+  remark-gfm: 4.0.1
   rxjs: 7.8.2
-  sharp: 0.34.5
+  send: 1.2.1
+  sharp: 0.35.4
   stripe: 22.0.2
   tailwindcss: 4.2.1
   tempy: 3.2.0
   thumbhash: 0.1.1
+  tiny-invariant: 1.3.3
   transliteration: 2.6.1
   ts-morph: 28.0.0
   tsx: 4.21.0
   typed-css-modules: 0.9.1
+  typescript: 6.0.2
+  typescript-eslint: 8.70.0
   uint8array-extras: 1.5.0
+  undici: 7.29.0
+  undici-types: 7.18.2
   unique-names-generator: 4.7.1
   urlpattern-polyfill: 10.1.0
-  valibot: 1.2.0
+  valibot: 1.4.2
   validator: 13.15.26
-  vite-tsconfig-paths: 6.1.1
-  vitest: 4.0.18
-  yaml: 2.8.2
+  vite: 7.3.6
+  vitest: 4.1.11
+  yaml: 2.9.0
   zod: 4.3.6
 
 minimumReleaseAge: 1440
+
+overrides:
+  '@astrojs/check@0.9.9>chokidar': 5.0.0
+  '@floating-ui/dom': 1.7.5
+  '@lingui/swc-plugin': 'catalog:'
+  '@rspack/cli': 'catalog:'
+  '@rspack/core': 'catalog:'
+  '@rspack/dev-server@1.1.5>webpack-dev-server': 5.2.6
+  cassandra-driver@4.8.0>adm-zip: 0.6.0
+  emscripten-wasm-loader@3.0.3>nanoid: 3.3.18
+  hunspell-asm@4.0.2>nanoid: 3.3.18
+  qs@6.14.2: 6.16.0
+  semver: 7.7.4
+  sockjs@0.3.24>uuid: 11.1.1
+
+patchedDependencies:
+  '@hono/node-server@1.19.17': patches/@hono__node-server@1.19.17.patch
+  '@phosphor-icons/react@2.1.10': patches/@phosphor-icons__react@2.1.10.patch
+  emscripten-wasm-loader@3.0.3: patches/emscripten-wasm-loader@3.0.3.patch
+  eslint-plugin-react-google-translate@1.0.4: patches/eslint-plugin-react-google-translate@1.0.4.patch
+  hunspell-asm@4.0.2: patches/hunspell-asm@4.0.2.patch
 
 peerDependencyRules:
   allowedVersions:
@@ -165,17 +214,6 @@ peerDependencyRules:
   ignoreMissing:
     - webpack
     - babel-plugin-macros
-
-overrides:
-  '@floating-ui/dom': 1.7.5
-  '@lingui/swc-plugin': 'catalog:'
-  '@rspack/cli': 'catalog:'
-  '@rspack/core': 'catalog:'
-  semver: 7.7.4
-
-patchedDependencies:
-  '@hono/node-server@1.19.9': patches/@hono__node-server@1.19.9.patch
-  '@phosphor-icons/react@2.1.10': patches/@phosphor-icons__react@2.1.10.patch
 
 strictDepBuilds: true
 

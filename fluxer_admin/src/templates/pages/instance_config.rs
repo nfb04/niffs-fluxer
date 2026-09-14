@@ -2,10 +2,14 @@
 
 use crate::{
     api::types::{
-        AppPublicConfigResponse, GatewayRolloutConfigResponse, InstanceConfigResponse,
+        AppPublicConfigResponse, BlockedMessageGroupsConfigResponse,
+        ExperimentDeliveryConfigResponse, GatewayRolloutConfigResponse,
+        GuildActivityLogPresentationConfigResponse, InstanceConfigResponse,
         InstanceIntegrationsResponse, InstanceMediaResponse, InstancePolicyResponse,
-        InstanceRegistrationResponse, LimitConfigResponse, PendingRegistrationResponse,
-        RegistrationUrlResponse, SsoConfigResponse,
+        InstanceRegistrationResponse, LimitConfigResponse, MessageHoverTrackingConfigResponse,
+        MessageKeyboardFocusConfigResponse, NoiseSuppressionBackend, PendingRegistrationResponse,
+        RegistrationUrlResponse, SsoConfigResponse, VOICE_NS_MAX_GUILD_OVERRIDES,
+        VOICE_NS_MAX_TARGETED_USERS, VoiceNoiseSuppressionConfigResponse,
     },
     config::AdminConfig,
     middleware::auth::AuthContext,
@@ -39,6 +43,17 @@ fn format_decimal(value: f64) -> String {
         format!("{}", value as u64)
     } else {
         value.to_string()
+    }
+}
+
+fn entry_count_hint(count: usize, cap: usize) -> Markup {
+    html! {
+        p class="text-xs text-neutral-500" {
+            (count) " of " (cap) " stored"
+            @if count >= cap {
+                " (at the cap; remove an entry before adding another)"
+            }
+        }
     }
 }
 
@@ -103,6 +118,7 @@ pub fn instance_config_page(
                             instance_config.self_hosted,
                         ))
                         (sso_config_section(base, csrf_token, &instance_config.sso))
+                        (deferred_phone_gate_form(base, csrf_token, &instance_config.policy))
                     },
                 ))
                 @if instance_config.self_hosted {
@@ -133,6 +149,12 @@ pub fn instance_config_page(
                     "Gateway rollout behavior and the limit rules applied to users and guilds.",
                     html! {
                         (gateway_rollout_section(base, csrf_token, &instance_config.gateway_rollout))
+                        (voice_noise_suppression_section(base, csrf_token, &instance_config.voice_noise_suppression))
+                        (message_hover_tracking_section(base, csrf_token, &instance_config.message_hover_tracking))
+                        (message_keyboard_focus_section(base, csrf_token, &instance_config.message_keyboard_focus))
+                        (blocked_message_groups_section(base, csrf_token, &instance_config.blocked_message_groups))
+                        (guild_activity_log_presentation_section(base, csrf_token, &instance_config.guild_activity_log_presentation))
+                        (experiment_delivery_section(base, csrf_token, &instance_config.experiment_delivery))
                         @if let Some(limit_config) = limit_config {
                             (limit_config_section(base, limit_config))
                         } @else {
@@ -208,18 +230,14 @@ fn single_community_form(base: &str, csrf_token: &str, policy: &InstancePolicyRe
             div class="flex flex-wrap items-center gap-2" {
                 h3 class="text-sm font-semibold text-neutral-900" { "Single community" }
                 (badge(status.0, status.1))
-                @if policy.single_community_locked {
-                    (badge("Locked", BadgeVariant::Warning))
-                }
             }
             @if let Some(guild_id) = policy.single_community_guild_id.as_deref() {
                 p class="break-all text-xs text-neutral-500" { "Community guild ID: " (guild_id) }
             }
-            @if policy.single_community_enabled && !policy.single_community_locked {
+            @if policy.single_community_enabled {
                 p class="text-sm text-neutral-500" {
-                    "This instance funnels every member into a single community. Disabling it is \
-                     permanent: single-community mode can only be enabled again from the \
-                     self-host setup wizard, never from this panel."
+                    "This instance funnels every member into a single community. You can turn this \
+                     off and on again from here. The community itself is kept either way."
                 }
                 form method="post" action={(base) "/instance-config?action=disable_single_community"} {
                     (csrf_input(csrf_token))
@@ -227,15 +245,21 @@ fn single_community_form(base: &str, csrf_token: &str, policy: &InstancePolicyRe
                         (danger_button("Disable single-community mode"))
                     }))
                 }
-            } @else if policy.single_community_enabled {
+            } @else if policy.single_community_guild_id.is_some() {
                 p class="text-sm text-neutral-500" {
-                    "Single-community mode is enabled and locked for this instance. It cannot be \
-                     changed from the admin panel."
+                    "Single-community mode is off. Turning it on again reuses the community above \
+                     if it still exists, otherwise a new one is created."
+                }
+                form method="post" action={(base) "/instance-config?action=enable_single_community"} {
+                    (csrf_input(csrf_token))
+                    (form_actions(html! {
+                        (submit_button("Enable single-community mode"))
+                    }))
                 }
             } @else {
                 p class="text-sm text-neutral-500" {
-                    "Single-community mode is off. It can only be turned on from the self-host \
-                     setup wizard, not from this panel."
+                    "Single-community mode is off. It can only be turned on for the first time \
+                     from the self-host setup wizard."
                 }
             }
         }
@@ -275,6 +299,57 @@ fn direct_messages_form(base: &str, csrf_token: &str, policy: &InstancePolicyRes
                             (submit_button("Save direct message policy"))
                         }))
                     }
+                }
+            }
+        }
+    }
+}
+
+fn deferred_phone_gate_form(
+    base: &str,
+    csrf_token: &str,
+    policy: &InstancePolicyResponse,
+) -> Markup {
+    let gate = &policy.deferred_phone_gate;
+    let status = if gate.enabled {
+        ("Enabled", BadgeVariant::Success)
+    } else {
+        ("Disabled", BadgeVariant::Default)
+    };
+    html! {
+        div class="space-y-4 border-t border-neutral-200 pt-6" {
+            div class="flex flex-wrap items-center gap-2" {
+                h3 class="text-sm font-semibold text-neutral-900" { "Deferred phone verification" }
+                (badge(status.0, status.1))
+            }
+            p class="text-sm text-neutral-500" {
+                "When enabled, a phone requirement raised at registration is held back and only \
+                 applied if the account joins a discoverable community, or one above the member \
+                 threshold, within the window. Accounts that wait out the window are not challenged. \
+                 Inbound-SMS requirements are never deferred."
+            }
+            form method="post" action={(base) "/instance-config?action=update_policy"} {
+                (csrf_input(csrf_token))
+                div class="space-y-4" {
+                    (select_input("policy_deferred_phone_gate_enabled", "Deferred phone verification", &[
+                        ("true", "Enabled"),
+                        ("false", "Disabled"),
+                    ], if gate.enabled { "true" } else { "false" }))
+                    (text_input(
+                        "policy_deferred_phone_gate_window_hours",
+                        "Window (hours)",
+                        &gate.window_hours.to_string(),
+                        "6",
+                    ))
+                    (text_input(
+                        "policy_deferred_phone_gate_member_threshold",
+                        "Member threshold",
+                        &gate.member_threshold.to_string(),
+                        "50",
+                    ))
+                    (form_actions(html! {
+                        (submit_button("Save deferred phone verification"))
+                    }))
                 }
             }
         }
@@ -899,6 +974,669 @@ fn gateway_rollout_section(
     )
 }
 
+fn voice_noise_suppression_section(
+    base: &str,
+    csrf_token: &str,
+    voice_noise_suppression: &VoiceNoiseSuppressionConfigResponse,
+) -> Markup {
+    let status = if voice_noise_suppression.enabled {
+        ("Live", BadgeVariant::Success)
+    } else {
+        ("Inert", BadgeVariant::Default)
+    };
+    let backend_labels =
+        NoiseSuppressionBackend::ALL.map(|backend| (backend.to_string(), backend.label()));
+    let backend_options = backend_labels
+        .iter()
+        .map(|(value, label)| (value.as_str(), *label))
+        .collect::<Vec<_>>();
+    let included_user_ids = voice_noise_suppression.included_user_ids.join("\n");
+    let excluded_user_ids = voice_noise_suppression.excluded_user_ids.join("\n");
+    let guild_overrides = voice_noise_suppression
+        .guild_overrides
+        .iter()
+        .map(|entry| format!("{}={}", entry.guild_id, entry.backend))
+        .collect::<Vec<_>>()
+        .join("\n");
+    section_card_with_description(
+        "Voice Noise Suppression",
+        "Pick which noise suppression backend targeted clients load in voice calls, and how many \
+         of them are targeted. While the master switch below is off nothing on this form reaches \
+         any client: every user keeps the audio pipeline they have today, whatever the rest of \
+         these fields say.",
+        html! {
+            form method="post" action={(base) "/instance-config?action=update_voice_noise_suppression"} {
+                (csrf_input(csrf_token))
+                div class="space-y-6" {
+                    div class="flex flex-wrap items-center gap-2" {
+                        h3 class="text-sm font-semibold text-neutral-900" { "Master switch" }
+                        (badge(status.0, status.1))
+                        span class="text-xs text-neutral-500" {
+                            "Config version " (voice_noise_suppression.config_version)
+                        }
+                    }
+                    (checkbox(
+                        "voice_ns_enabled",
+                        "true",
+                        "Serve noise suppression assignments to clients",
+                        voice_noise_suppression.enabled,
+                        true,
+                    ))
+                    p class="text-xs text-neutral-500" {
+                        "Off is the safe state. With this unchecked every client is told the \
+                         feature is inert and keeps its current behavior, so the rollout, targeting \
+                         and override fields below have no effect at all."
+                    }
+
+                    h3 class="text-sm font-semibold text-neutral-900" { "Backends" }
+                    (select_input(
+                        "voice_ns_default_backend",
+                        "Default Backend",
+                        &backend_options,
+                        &voice_noise_suppression.default_backend.to_string(),
+                    ))
+                    p class="text-xs text-neutral-500" {
+                        "The backend assigned by always-on user rules and the canary. A default \
+                         that is not ticked below is unavailable, but per-guild overrides can \
+                         still target users."
+                    }
+                    div class="grid grid-cols-1 gap-2 sm:grid-cols-2" {
+                        @for backend in NoiseSuppressionBackend::ALL {
+                            (checkbox(
+                                "voice_ns_enabled_backends[]",
+                                &backend.to_string(),
+                                backend.label(),
+                                voice_noise_suppression.enabled_backends.contains(&backend),
+                                true,
+                            ))
+                        }
+                    }
+                    p class="text-xs text-neutral-500" {
+                        "Backends clients are allowed to load. Unticking one withdraws it from \
+                         every user, including anyone who picked it themselves."
+                    }
+                    (checkbox(
+                        "voice_ns_allow_user_override",
+                        "true",
+                        "Let users pick their own backend from the ticked list",
+                        voice_noise_suppression.allow_user_override,
+                        true,
+                    ))
+                    p class="text-xs text-neutral-500" {
+                        "Applies only to users who are already targeted. It never pulls anyone \
+                         into the rollout."
+                    }
+
+                    h3 class="text-sm font-semibold text-neutral-900" { "Rollout" }
+                    (number_field(
+                        "voice_ns_rollout_basis_points",
+                        "Rollout (basis points)",
+                        &voice_noise_suppression.rollout_basis_points.to_string(),
+                        Some(0), Some(10000), "1",
+                        Some("Share of users bucketed into the canary, in basis points: 0 is nobody, 100 is 1%, 10000 is everybody."),
+                    ))
+                    div class="flex flex-col gap-2" {
+                        (text_input(
+                            "voice_ns_rollout_salt",
+                            "Rollout Salt",
+                            &voice_noise_suppression.rollout_salt,
+                            "voice-ns-v1",
+                        ))
+                        p class="text-xs text-neutral-500" {
+                            "Seeds the bucketing hash. Changing it reshuffles which users fall \
+                             inside the percentage above. Leave it alone to keep the current \
+                             cohort stable."
+                        }
+                    }
+                    div class="flex flex-col gap-2" {
+                        (textarea_input(
+                            "voice_ns_included_user_ids",
+                            "Always-on User IDs",
+                            "1500000000000000001\n1500000000000000002",
+                            &included_user_ids,
+                            4,
+                            false,
+                        ))
+                        (entry_count_hint(
+                            voice_noise_suppression.included_user_ids.len(),
+                            VOICE_NS_MAX_TARGETED_USERS,
+                        ))
+                        p class="text-xs text-neutral-500" {
+                            "One snowflake per line, or comma separated. These users are targeted \
+                             regardless of the percentage above. IDs must contain 1 to 20 decimal \
+                             digits. Invalid entries prevent the save; blank entries and duplicate \
+                             IDs are ignored."
+                        }
+                    }
+                    div class="flex flex-col gap-2" {
+                        (textarea_input(
+                            "voice_ns_excluded_user_ids",
+                            "Never-on User IDs",
+                            "1500000000000000003\n1500000000000000004",
+                            &excluded_user_ids,
+                            4,
+                            false,
+                        ))
+                        (entry_count_hint(
+                            voice_noise_suppression.excluded_user_ids.len(),
+                            VOICE_NS_MAX_TARGETED_USERS,
+                        ))
+                        p class="text-xs text-neutral-500" {
+                            "Same format. Exclusion wins over both the always-on list and the \
+                             percentage, so this is the per-user kill switch."
+                        }
+                    }
+
+                    h3 class="text-sm font-semibold text-neutral-900" { "Per-guild overrides" }
+                    div class="flex flex-col gap-2" {
+                        (textarea_input(
+                            "voice_ns_guild_overrides",
+                            "Guild Overrides",
+                            "1600000000000000001=rnnoise\n1600000000000000002=deep_filter",
+                            &guild_overrides,
+                            4,
+                            false,
+                        ))
+                        (entry_count_hint(
+                            voice_noise_suppression.guild_overrides.len(),
+                            VOICE_NS_MAX_GUILD_OVERRIDES,
+                        ))
+                        p class="text-xs text-neutral-500" {
+                            "One per line as guild_id=backend. A guild \
+                             rule targets callers even outside the canary. Always-on user rules \
+                             take precedence, and excluded users stay off. Invalid lines and \
+                             conflicting rules for the same guild prevent the save. \
+                             Unticked backends stay stored but are inactive."
+                        }
+                    }
+
+                    h3 class="text-sm font-semibold text-neutral-900" { "Processing" }
+                    (checkbox(
+                        "voice_ns_stereo_enabled",
+                        "true",
+                        "Process stereo input instead of downmixing to mono",
+                        voice_noise_suppression.stereo_enabled,
+                        true,
+                    ))
+                    p class="text-xs text-neutral-500" {
+                        "Costs more CPU on the client. Leave off unless you are testing stereo \
+                         capture."
+                    }
+                    div class="grid grid-cols-1 gap-4 sm:grid-cols-2" {
+                        (number_field(
+                            "voice_ns_suppression_strength",
+                            "Suppression Strength",
+                            &voice_noise_suppression.suppression_strength.to_string(),
+                            Some(0), Some(100), "1",
+                            Some("How aggressively the backend removes noise, 0 to 100. Higher values cut more background but chew more of the voice."),
+                        ))
+                    }
+
+                    (form_actions(html! {
+                        (submit_button("Save Voice Noise Suppression Configuration"))
+                    }))
+                }
+            }
+        },
+    )
+}
+
+fn message_hover_tracking_section(
+    base: &str,
+    csrf_token: &str,
+    message_hover_tracking: &MessageHoverTrackingConfigResponse,
+) -> Markup {
+    let status = if message_hover_tracking.enabled {
+        ("Live", BadgeVariant::Success)
+    } else {
+        ("Inert", BadgeVariant::Default)
+    };
+    let included_user_ids = message_hover_tracking.included_user_ids.join("\n");
+    let excluded_user_ids = message_hover_tracking.excluded_user_ids.join("\n");
+    section_card_with_description(
+        "Message Hover Tracking",
+        "Picks which message hover implementation targeted clients run in the message list. A \
+         targeted client resolves the hovered message from one shared pointer oracle and drives \
+         the message action bar from that state. While the master switch below is off every \
+         client keeps the per-row implementation it ships with, whatever the rest of these \
+         fields say.",
+        html! {
+            form method="post" action={(base) "/instance-config?action=update_message_hover_tracking"} {
+                (csrf_input(csrf_token))
+                div class="space-y-6" {
+                    div class="flex flex-wrap items-center gap-2" {
+                        h3 class="text-sm font-semibold text-neutral-900" { "Master switch" }
+                        (badge(status.0, status.1))
+                        span class="text-xs text-neutral-500" {
+                            "Config version " (message_hover_tracking.config_version)
+                        }
+                    }
+                    (checkbox(
+                        "message_hover_enabled",
+                        "true",
+                        "Serve message hover tracking assignments to clients",
+                        message_hover_tracking.enabled,
+                        true,
+                    ))
+                    p class="text-xs text-neutral-500" {
+                        "Off is the safe state. With this unchecked every client is told the \
+                         rollout is inert and keeps its current hover behavior, so the rollout \
+                         and targeting fields below have no effect at all."
+                    }
+
+                    h3 class="text-sm font-semibold text-neutral-900" { "Rollout" }
+                    (number_field(
+                        "message_hover_rollout_basis_points",
+                        "Rollout (basis points)",
+                        &message_hover_tracking.rollout_basis_points.to_string(),
+                        Some(0), Some(10000), "1",
+                        Some("Share of users bucketed into the canary, in basis points: 0 is nobody, 100 is 1%, 10000 is everybody."),
+                    ))
+                    div class="flex flex-col gap-2" {
+                        (text_input(
+                            "message_hover_rollout_salt",
+                            "Rollout Salt",
+                            &message_hover_tracking.rollout_salt,
+                            "message-hover-tracking-v1",
+                        ))
+                        p class="text-xs text-neutral-500" {
+                            "Seeds the bucketing hash. Changing it reshuffles which users fall \
+                             inside the percentage above. Leave it alone to keep the current \
+                             cohort stable."
+                        }
+                    }
+                    div class="flex flex-col gap-2" {
+                        (textarea_input(
+                            "message_hover_included_user_ids",
+                            "Always-on User IDs",
+                            "1500000000000000001\n1500000000000000002",
+                            &included_user_ids,
+                            4,
+                            false,
+                        ))
+                        p class="text-xs text-neutral-500" {
+                            "One snowflake per line, or comma separated. These users are targeted \
+                             regardless of the percentage above. IDs must contain 1 to 20 decimal \
+                             digits. Invalid entries prevent the save; blank entries and duplicate \
+                             IDs are ignored."
+                        }
+                    }
+                    div class="flex flex-col gap-2" {
+                        (textarea_input(
+                            "message_hover_excluded_user_ids",
+                            "Never-on User IDs",
+                            "1500000000000000003\n1500000000000000004",
+                            &excluded_user_ids,
+                            4,
+                            false,
+                        ))
+                        p class="text-xs text-neutral-500" {
+                            "Same format. Exclusion wins over both the always-on list and the \
+                             percentage, so this is the per-user kill switch."
+                        }
+                    }
+
+                    (form_actions(html! {
+                        (submit_button("Save Message Hover Tracking Configuration"))
+                    }))
+                }
+            }
+        },
+    )
+}
+
+fn message_keyboard_focus_section(
+    base: &str,
+    csrf_token: &str,
+    message_keyboard_focus: &MessageKeyboardFocusConfigResponse,
+) -> Markup {
+    let status = if message_keyboard_focus.enabled {
+        ("Live", BadgeVariant::Success)
+    } else {
+        ("Inert", BadgeVariant::Default)
+    };
+    let included_user_ids = message_keyboard_focus.included_user_ids.join("\n");
+    let excluded_user_ids = message_keyboard_focus.excluded_user_ids.join("\n");
+    section_card_with_description(
+        "Message Keyboard Focus",
+        "Picks whether targeted clients run the keyboard navigation rework in the message list. \
+         A targeted client reaches the message list from the composer with one Tab, walks \
+         messages with the arrow keys through revealed blocked groups, and draws the focus ring \
+         inside each row. While the master switch below is off every client keeps the keyboard \
+         navigation it ships with, whatever the rest of these fields say.",
+        html! {
+            form method="post" action={(base) "/instance-config?action=update_message_keyboard_focus"} {
+                (csrf_input(csrf_token))
+                div class="space-y-6" {
+                    div class="flex flex-wrap items-center gap-2" {
+                        h3 class="text-sm font-semibold text-neutral-900" { "Master switch" }
+                        (badge(status.0, status.1))
+                        span class="text-xs text-neutral-500" {
+                            "Config version " (message_keyboard_focus.config_version)
+                        }
+                    }
+                    (checkbox(
+                        "message_keyboard_focus_enabled",
+                        "true",
+                        "Serve message keyboard focus assignments to clients",
+                        message_keyboard_focus.enabled,
+                        true,
+                    ))
+                    p class="text-xs text-neutral-500" {
+                        "Off is the safe state. With this unchecked every client is told the \
+                         rollout is inert and keeps its current keyboard navigation, so the rollout \
+                         and targeting fields below have no effect at all."
+                    }
+
+                    h3 class="text-sm font-semibold text-neutral-900" { "Rollout" }
+                    (number_field(
+                        "message_keyboard_focus_rollout_basis_points",
+                        "Rollout (basis points)",
+                        &message_keyboard_focus.rollout_basis_points.to_string(),
+                        Some(0), Some(10000), "1",
+                        Some("Share of users bucketed into the canary, in basis points: 0 is nobody, 100 is 1%, 10000 is everybody."),
+                    ))
+                    div class="flex flex-col gap-2" {
+                        (text_input(
+                            "message_keyboard_focus_rollout_salt",
+                            "Rollout Salt",
+                            &message_keyboard_focus.rollout_salt,
+                            "message-keyboard-focus-v1",
+                        ))
+                        p class="text-xs text-neutral-500" {
+                            "Seeds the bucketing hash. Changing it reshuffles which users fall \
+                             inside the percentage above. Leave it alone to keep the current \
+                             cohort stable."
+                        }
+                    }
+                    div class="flex flex-col gap-2" {
+                        (textarea_input(
+                            "message_keyboard_focus_included_user_ids",
+                            "Always-on User IDs",
+                            "1500000000000000001\n1500000000000000002",
+                            &included_user_ids,
+                            4,
+                            false,
+                        ))
+                        p class="text-xs text-neutral-500" {
+                            "One snowflake per line, or comma separated. These users are targeted \
+                             regardless of the percentage above. IDs must contain 1 to 20 decimal \
+                             digits. Invalid entries prevent the save; blank entries and duplicate \
+                             IDs are ignored."
+                        }
+                    }
+                    div class="flex flex-col gap-2" {
+                        (textarea_input(
+                            "message_keyboard_focus_excluded_user_ids",
+                            "Never-on User IDs",
+                            "1500000000000000003\n1500000000000000004",
+                            &excluded_user_ids,
+                            4,
+                            false,
+                        ))
+                        p class="text-xs text-neutral-500" {
+                            "Same format. Exclusion wins over both the always-on list and the \
+                             percentage, so this is the per-user kill switch."
+                        }
+                    }
+
+                    (form_actions(html! {
+                        (submit_button("Save Message Keyboard Focus Configuration"))
+                    }))
+                }
+            }
+        },
+    )
+}
+
+fn blocked_message_groups_section(
+    base: &str,
+    csrf_token: &str,
+    blocked_message_groups: &BlockedMessageGroupsConfigResponse,
+) -> Markup {
+    let status = if blocked_message_groups.enabled {
+        ("Live", BadgeVariant::Success)
+    } else {
+        ("Inert", BadgeVariant::Default)
+    };
+    let included_user_ids = blocked_message_groups.included_user_ids.join("\n");
+    let excluded_user_ids = blocked_message_groups.excluded_user_ids.join("\n");
+    section_card_with_description(
+        "Blocked Message Groups",
+        "Picks how targeted clients render a revealed block of blocked or suspected spam \
+         messages. A targeted client draws the block full width, spaces consecutive message \
+         groups inside it, and keys an unread divider apart from the group below it. While the \
+         master switch below is off every client keeps the rendering it ships with, whatever the \
+         rest of these fields say.",
+        html! {
+            form method="post" action={(base) "/instance-config?action=update_blocked_message_groups"} {
+                (csrf_input(csrf_token))
+                div class="space-y-6" {
+                    div class="flex flex-wrap items-center gap-2" {
+                        h3 class="text-sm font-semibold text-neutral-900" { "Master switch" }
+                        (badge(status.0, status.1))
+                        span class="text-xs text-neutral-500" {
+                            "Config version " (blocked_message_groups.config_version)
+                        }
+                    }
+                    (checkbox(
+                        "blocked_groups_enabled",
+                        "true",
+                        "Serve blocked message groups assignments to clients",
+                        blocked_message_groups.enabled,
+                        true,
+                    ))
+                    p class="text-xs text-neutral-500" {
+                        "Off is the safe state. With this unchecked every client is told the \
+                         rollout is inert and keeps its current rendering, so the rollout \
+                         and targeting fields below have no effect at all."
+                    }
+
+                    h3 class="text-sm font-semibold text-neutral-900" { "Rollout" }
+                    (number_field(
+                        "blocked_groups_rollout_basis_points",
+                        "Rollout (basis points)",
+                        &blocked_message_groups.rollout_basis_points.to_string(),
+                        Some(0), Some(10000), "1",
+                        Some("Share of users bucketed into the canary, in basis points: 0 is nobody, 100 is 1%, 10000 is everybody."),
+                    ))
+                    div class="flex flex-col gap-2" {
+                        (text_input(
+                            "blocked_groups_rollout_salt",
+                            "Rollout Salt",
+                            &blocked_message_groups.rollout_salt,
+                            "blocked-message-groups-v1",
+                        ))
+                        p class="text-xs text-neutral-500" {
+                            "Seeds the bucketing hash. Changing it reshuffles which users fall \
+                             inside the percentage above. Leave it alone to keep the current \
+                             cohort stable."
+                        }
+                    }
+                    div class="flex flex-col gap-2" {
+                        (textarea_input(
+                            "blocked_groups_included_user_ids",
+                            "Always-on User IDs",
+                            "1500000000000000001\n1500000000000000002",
+                            &included_user_ids,
+                            4,
+                            false,
+                        ))
+                        p class="text-xs text-neutral-500" {
+                            "One snowflake per line, or comma separated. These users are targeted \
+                             regardless of the percentage above. IDs must contain 1 to 20 decimal \
+                             digits. Invalid entries prevent the save; blank entries and duplicate \
+                             IDs are ignored."
+                        }
+                    }
+                    div class="flex flex-col gap-2" {
+                        (textarea_input(
+                            "blocked_groups_excluded_user_ids",
+                            "Never-on User IDs",
+                            "1500000000000000003\n1500000000000000004",
+                            &excluded_user_ids,
+                            4,
+                            false,
+                        ))
+                        p class="text-xs text-neutral-500" {
+                            "Same format. Exclusion wins over both the always-on list and the \
+                             percentage, so this is the per-user kill switch."
+                        }
+                    }
+
+                    (form_actions(html! {
+                        (submit_button("Save Blocked Message Groups Configuration"))
+                    }))
+                }
+            }
+        },
+    )
+}
+
+fn guild_activity_log_presentation_section(
+    base: &str,
+    csrf_token: &str,
+    guild_activity_log_presentation: &GuildActivityLogPresentationConfigResponse,
+) -> Markup {
+    let status = if guild_activity_log_presentation.enabled {
+        ("Live", BadgeVariant::Success)
+    } else {
+        ("Inert", BadgeVariant::Default)
+    };
+    let included_user_ids = guild_activity_log_presentation.included_user_ids.join("\n");
+    let excluded_user_ids = guild_activity_log_presentation.excluded_user_ids.join("\n");
+    section_card_with_description(
+        "Guild Activity Log Presentation",
+        "Picks which activity log rendering targeted clients run in community settings. A \
+         targeted client renders each activity log entry through the rewritten presenters. \
+         While the master switch below is off every client keeps the previous activity log \
+         rendering, whatever the rest of these fields say.",
+        html! {
+            form method="post" action={(base) "/instance-config?action=update_guild_activity_log_presentation"} {
+                (csrf_input(csrf_token))
+                div class="space-y-6" {
+                    div class="flex flex-wrap items-center gap-2" {
+                        h3 class="text-sm font-semibold text-neutral-900" { "Master switch" }
+                        (badge(status.0, status.1))
+                        span class="text-xs text-neutral-500" {
+                            "Config version " (guild_activity_log_presentation.config_version)
+                        }
+                    }
+                    (checkbox(
+                        "guild_activity_log_presentation_enabled",
+                        "true",
+                        "Serve guild activity log presentation assignments to clients",
+                        guild_activity_log_presentation.enabled,
+                        true,
+                    ))
+                    p class="text-xs text-neutral-500" {
+                        "Off is the safe state. With this unchecked every client is told the \
+                         rollout is inert and keeps the previous activity log rendering, so the \
+                         rollout and targeting fields below have no effect at all."
+                    }
+
+                    h3 class="text-sm font-semibold text-neutral-900" { "Rollout" }
+                    (number_field(
+                        "guild_activity_log_presentation_rollout_basis_points",
+                        "Rollout (basis points)",
+                        &guild_activity_log_presentation.rollout_basis_points.to_string(),
+                        Some(0), Some(10000), "1",
+                        Some("Share of users bucketed into the canary, in basis points: 0 is nobody, 100 is 1%, 10000 is everybody."),
+                    ))
+                    div class="flex flex-col gap-2" {
+                        (text_input(
+                            "guild_activity_log_presentation_rollout_salt",
+                            "Rollout Salt",
+                            &guild_activity_log_presentation.rollout_salt,
+                            "guild-activity-log-presentation-v1",
+                        ))
+                        p class="text-xs text-neutral-500" {
+                            "Seeds the bucketing hash. Changing it reshuffles which users fall \
+                             inside the percentage above. Leave it alone to keep the current \
+                             cohort stable."
+                        }
+                    }
+                    div class="flex flex-col gap-2" {
+                        (textarea_input(
+                            "guild_activity_log_presentation_included_user_ids",
+                            "Always-on User IDs",
+                            "1500000000000000001\n1500000000000000002",
+                            &included_user_ids,
+                            4,
+                            false,
+                        ))
+                        p class="text-xs text-neutral-500" {
+                            "One snowflake per line, or comma separated. These users are targeted \
+                             regardless of the percentage above. IDs must contain 1 to 20 decimal \
+                             digits. Invalid entries prevent the save. Blank entries and duplicate \
+                             IDs are ignored."
+                        }
+                    }
+                    div class="flex flex-col gap-2" {
+                        (textarea_input(
+                            "guild_activity_log_presentation_excluded_user_ids",
+                            "Never-on User IDs",
+                            "1500000000000000003\n1500000000000000004",
+                            &excluded_user_ids,
+                            4,
+                            false,
+                        ))
+                        p class="text-xs text-neutral-500" {
+                            "Same format. Exclusion wins over both the always-on list and the \
+                             percentage, so this is the per-user kill switch."
+                        }
+                    }
+
+                    (form_actions(html! {
+                        (submit_button("Save Guild Activity Log Presentation Configuration"))
+                    }))
+                }
+            }
+        },
+    )
+}
+
+fn experiment_delivery_section(
+    base: &str,
+    csrf_token: &str,
+    experiment_delivery: &ExperimentDeliveryConfigResponse,
+) -> Markup {
+    section_card_with_description(
+        "Experiment Delivery",
+        "How often every client revalidates its experiment assignments. This is instance-wide \
+         and covers every experiment, not just the one above. Raising the interval sheds \
+         request volume and makes a change take longer to reach a client. Raising the jitter \
+         spreads a fleet that has synchronised on one tick back out across the interval.",
+        html! {
+            form method="post" action={(base) "/instance-config?action=update_experiment_delivery"} {
+                (csrf_input(csrf_token))
+                div class="space-y-6" {
+                    div class="grid grid-cols-1 gap-4 sm:grid-cols-2" {
+                        (number_field(
+                            "experiment_delivery_poll_interval_seconds",
+                            "Assignment Poll Interval (s)",
+                            &experiment_delivery.poll_interval_seconds.to_string(),
+                            Some(60), Some(86400), "1",
+                            Some("How often a client re-reads its assignments, 60 to 86400 seconds. Lower values pick up changes sooner at the cost of more requests."),
+                        ))
+                        (number_field(
+                            "experiment_delivery_poll_jitter_percent",
+                            "Assignment Poll Jitter (%)",
+                            &experiment_delivery.poll_jitter_percent.to_string(),
+                            Some(0), Some(50), "1",
+                            Some("How far each client spreads its poll around the interval, 0 to 50 percent. Raise it to break up a fleet that polls on the same tick, set it to 0 for an exact interval."),
+                        ))
+                    }
+
+                    (form_actions(html! {
+                        (submit_button("Save Experiment Delivery Configuration"))
+                    }))
+                }
+            }
+        },
+    )
+}
+
 fn registration_config_section(
     config: &AdminConfig,
     csrf_token: &str,
@@ -1467,4 +2205,50 @@ fn limit_config_section(base: &str, limit_config: &LimitConfigResponse) -> Marku
             }
         },
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::api::types::VoiceNoiseSuppressionGuildOverride;
+
+    fn rendered_voice_noise_suppression_section(
+        voice_noise_suppression: &VoiceNoiseSuppressionConfigResponse,
+    ) -> String {
+        voice_noise_suppression_section("/admin", "csrf", voice_noise_suppression).into_string()
+    }
+
+    #[test]
+    fn voice_noise_suppression_section_shows_list_counts_and_caps() {
+        let voice_noise_suppression = VoiceNoiseSuppressionConfigResponse {
+            included_user_ids: vec!["1500000000000000001".to_owned()],
+            excluded_user_ids: vec![
+                "1500000000000000002".to_owned(),
+                "1500000000000000003".to_owned(),
+            ],
+            guild_overrides: vec![VoiceNoiseSuppressionGuildOverride {
+                guild_id: "1600000000000000001".to_owned(),
+                backend: NoiseSuppressionBackend::Rnnoise,
+            }],
+            ..VoiceNoiseSuppressionConfigResponse::default()
+        };
+        let markup = rendered_voice_noise_suppression_section(&voice_noise_suppression);
+        assert!(markup.contains("1 of 1000 stored"));
+        assert!(markup.contains("2 of 1000 stored"));
+        assert!(markup.contains("1 of 200 stored"));
+        assert!(!markup.contains("at the cap"));
+    }
+
+    #[test]
+    fn voice_noise_suppression_section_flags_a_list_at_its_cap() {
+        let voice_noise_suppression = VoiceNoiseSuppressionConfigResponse {
+            included_user_ids: (0..VOICE_NS_MAX_TARGETED_USERS)
+                .map(|index| index.to_string())
+                .collect(),
+            ..VoiceNoiseSuppressionConfigResponse::default()
+        };
+        let markup = rendered_voice_noise_suppression_section(&voice_noise_suppression);
+        assert!(markup.contains("1000 of 1000 stored"));
+        assert!(markup.contains("at the cap"));
+    }
 }

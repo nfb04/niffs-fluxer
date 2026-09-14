@@ -291,6 +291,11 @@ fn flags_card(
                 can_update_suspicious,
                 Some(acl::USER_UPDATE_SUSPICIOUS_ACTIVITY),
             ))
+            @if user.phone_verification_deferred {
+                p class="text-sm text-amber-700 dark:text-amber-400" {
+                    "Phone verification is deferred: the requirement above is stored but not enforced until this user joins a discoverable or large community within the deferral window."
+                }
+            }
         }
     }
 }
@@ -555,6 +560,8 @@ fn traits_form(
     }
 }
 
+const DERIVED_TRAITS: [&str; 1] = ["premium"];
+
 fn parse_trait_definitions(limit_config: Option<&LimitConfigResponse>) -> Vec<&str> {
     limit_config
         .map(|response| {
@@ -564,6 +571,7 @@ fn parse_trait_definitions(limit_config: Option<&LimitConfigResponse>) -> Vec<&s
                 .iter()
                 .map(|value| value.trim())
                 .filter(|value| !value.is_empty())
+                .filter(|value| !DERIVED_TRAITS.contains(value))
                 .collect()
         })
         .unwrap_or_default()
@@ -574,5 +582,6 @@ fn custom_traits<'a>(user: &'a AdminUser, trait_definitions: &[&str]) -> Vec<&'a
         .iter()
         .map(String::as_str)
         .filter(|trait_name| !trait_definitions.contains(trait_name))
+        .filter(|trait_name| !DERIVED_TRAITS.contains(trait_name))
         .collect()
 }

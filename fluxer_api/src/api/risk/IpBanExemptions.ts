@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import {Config} from '@app/api/Config';
 import {getSameIpDecisionKey} from '@fluxer/ip_utils/src/IpAddress';
-import {Config} from '../Config';
 
 let exemptDecisionKeys: ReadonlySet<string> | null = null;
 
@@ -27,4 +27,8 @@ export function isIpBanExempt(ip: string | null | undefined): boolean {
 	}
 	const key = getSameIpDecisionKey(ip);
 	return key !== null && getExemptDecisionKeys().has(key);
+}
+
+export function resetIpBanExemptionsForTesting(): void {
+	exemptDecisionKeys = null;
 }

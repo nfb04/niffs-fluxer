@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type {VoiceEngineV2BridgeApi} from '@fluxer/voice_engine_v2/bridge';
+import type {VoiceEngineV2BridgeHardwareEncoderApi} from '@fluxer/voice_engine_v2/bridge';
 import type {
 	AuthenticationResponseJSON,
 	PublicKeyCredentialCreationOptionsJSON,
@@ -76,7 +76,6 @@ export interface DesktopWindowBehaviorSettings {
 	activeSmoothScrolling: boolean;
 	middleClickAutoscroll: boolean;
 	activeMiddleClickAutoscroll: boolean;
-	firstClickPassThroughWhenUnfocused: boolean;
 }
 
 export interface ThemeLocalFileReference {
@@ -320,7 +319,6 @@ export interface ElectronAPI {
 	clearThemeLocalFiles: () => Promise<void>;
 	importThemeDirectory: () => Promise<Array<ThemeDirectoryCssFile>>;
 	cacheVoiceBackgroundMedia: (options: VoiceBackgroundMediaCacheRequest) => Promise<VoiceBackgroundMediaCacheResult>;
-	resolveVoiceBackgroundMedia: (id: string) => Promise<VoiceBackgroundMediaCacheResult | null>;
 	readVoiceBackgroundMedia: (id: string) => Promise<VoiceBackgroundMediaReadResult | null>;
 	deleteVoiceBackgroundMedia: (id: string) => Promise<void>;
 	onUpdaterEvent: (callback: (event: UpdaterEvent) => void) => () => void;
@@ -346,7 +344,6 @@ export interface ElectronAPI {
 	pasteFromClipboard: () => Promise<void>;
 	onDeepLink: (callback: (url: string) => void) => () => void;
 	getInitialDeepLink: () => Promise<string | null>;
-	onRpcNavigate: (callback: (path: string) => void) => () => void;
 	autostartEnable: () => Promise<void>;
 	autostartDisable: () => Promise<void>;
 	autostartIsEnabled: () => Promise<boolean>;
@@ -441,7 +438,7 @@ export interface ElectronAPI {
 	selectDisplayMediaSource: (requestId: string, sourceId: string | null, withAudio: boolean) => void;
 	virtmic: VirtmicApi;
 	nativeAudio: NativeAudioApi;
-	voiceEngine?: VoiceEngineV2BridgeApi;
+	voiceEngine?: VoiceEngineV2BridgeHardwareEncoderApi;
 }
 
 export type VirtmicUnavailableReason =
@@ -559,6 +556,7 @@ export interface NativeAudioApi {
 	listAudibleApplications: () => Promise<Array<NativeAudioApplication>>;
 	resolveAudioRootPidForSource: (sourceId: string) => Promise<number | null>;
 	start: (options: NativeAudioStartOptions) => Promise<NativeAudioStartResult>;
+	setRule: (captureId: string, linuxRule: NonNullable<NativeAudioStartOptions['linuxRule']>) => Promise<boolean>;
 	stop: (captureId: string) => Promise<void>;
 	onFrame: (callback: (message: NativeAudioFrameMessage) => void) => () => void;
 	onEnd: (callback: (message: NativeAudioEndMessage) => void) => () => void;

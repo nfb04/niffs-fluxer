@@ -159,6 +159,16 @@ impl RuntimeState<'_> {
             let next_line = &self.lines[self.current_line + consumed].text;
             let trimmed_next = trim_start(next_line);
             if crate::block::is_block_start(trimmed_next, self.parser.flags())
+                || crate::block::is_table_start(
+                    &self.lines,
+                    self.current_line + consumed,
+                    self.parser.flags(),
+                )
+                || crate::block::opens_code_block_midline(
+                    &self.lines,
+                    self.current_line + consumed,
+                    self.parser.flags(),
+                )
                 || trimmed_next.is_empty()
             {
                 break;

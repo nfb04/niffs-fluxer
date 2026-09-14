@@ -6,6 +6,7 @@ import {isMediaOnlyEmbed} from '@app/features/channel/components/embeds/EmbedRen
 import {MessageActionBar, MessageActionBarCore} from '@app/features/channel/components/MessageActionBar';
 import {MessageActionBottomSheet} from '@app/features/channel/components/MessageActionBottomSheet';
 import {requestDeleteMessage} from '@app/features/channel/components/MessageActionUtils';
+import {useMessageHoverState} from '@app/features/channel/components/MessageHoverState';
 import {MessageViewContextProvider} from '@app/features/channel/components/MessageViewContext';
 import type {Channel} from '@app/features/channel/models/Channel';
 import DeveloperOptions from '@app/features/devtools/state/DeveloperOptions';
@@ -14,13 +15,12 @@ import {MarkdownContext} from '@app/features/messaging/components/markdown/rende
 import type {Message as MessageModel} from '@app/features/messaging/models/MessagingMessage';
 import MessageEdit from '@app/features/messaging/state/MessageEdit';
 import MessageFocus from '@app/features/messaging/state/MessageFocus';
+import MessageKeyboardFocusRollout from '@app/features/messaging/state/MessageKeyboardFocusRollout';
 import MessageReply from '@app/features/messaging/state/MessageReply';
 import {getMessageComponent} from '@app/features/messaging/utils/MessageComponentUtils';
-import {getParserFlagsForContext} from '@app/features/messaging/utils/markdown/MarkdownParserFlags';
-import {parseAndRenderToPlaintext} from '@app/features/messaging/utils/markdown/Plaintext';
+import {renderAstToPlaintext} from '@app/features/messaging/utils/markdown/Plaintext';
 import {NodeType} from '@app/features/messaging/utils/markdown/parser/Enums';
 import {SystemMessageUtils} from '@app/features/messaging/utils/SystemMessageUtils';
-import {subscribeWindowFocus} from '@app/features/platform/utils/WindowFocusBroadcast';
 import * as ReadStateCommands from '@app/features/read_state/commands/ReadStateCommands';
 import styles from '@app/features/theme/styles/Message.module.css';
 import {MessageContextMenu} from '@app/features/ui/action_menu/MessageContextMenu';
@@ -39,7 +39,7 @@ import {useLingui} from '@lingui/react/macro';
 import {clsx} from 'clsx';
 import {observer} from 'mobx-react-lite';
 import type React from 'react';
-import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 const ATTACHMENT_DESCRIPTOR = msg({
 	message: 'attachment',
@@ -47,7 +47,7 @@ const ATTACHMENT_DESCRIPTOR = msg({
 		'Screen-reader fragment listing one attachment on a message. Lowercase because it appears inside a longer sentence.',
 });
 const ATTACHMENTS_DESCRIPTOR = msg({
-	message: '{length} attachments',
+	message: '{length, plural, one {# attachment} other {# attachments}}',
 	comment: 'Screen-reader fragment listing multiple attachments on a message. length is the count.',
 });
 const STICKER_DESCRIPTOR = msg({
@@ -56,7 +56,7 @@ const STICKER_DESCRIPTOR = msg({
 		'Screen-reader fragment listing one sticker on a message. Lowercase because it appears inside a longer sentence.',
 });
 const STICKERS_DESCRIPTOR = msg({
-	message: '{length} stickers',
+	message: '{length, plural, one {# sticker} other {# stickers}}',
 	comment: 'Screen-reader fragment listing multiple stickers on a message. length is the count.',
 });
 const EMBED_DESCRIPTOR = msg({
@@ -65,7 +65,7 @@ const EMBED_DESCRIPTOR = msg({
 		'Screen-reader fragment listing one embed on a message. Lowercase because it appears inside a longer sentence.',
 });
 const EMBEDS_DESCRIPTOR = msg({
-	message: '{length} embeds',
+	message: '{length, plural, one {# embed} other {# embeds}}',
 	comment: 'Screen-reader fragment listing multiple embeds on a message. length is the count.',
 });
 const NO_TEXT_CONTENT_DESCRIPTOR = msg({
@@ -89,7 +89,6 @@ const shouldApplyGroupedLayout = (message: MessageModel, _prevMessage?: MessageM
 const isDisplaySystemMessage = (message: MessageModel): boolean =>
 	message.type !== MessageTypes.DEFAULT && message.type !== MessageTypes.REPLY;
 const isActivationKey = (key: string) => key === 'Enter' || key === ' ' || key === 'Spacebar' || key === 'Space';
-const MESSAGE_ARIA_PARSER_FLAGS = getParserFlagsForContext(MarkdownContext.STANDARD_WITHOUT_JUMBO);
 const MAX_ARIA_MESSAGE_TEXT_LENGTH = 220;
 const LONG_PRESS_DELAY = 500;
 const MOVEMENT_THRESHOLD = 10;
@@ -166,99 +165,10 @@ const truncateAriaLabelText = (text: string): string => {
 	}
 	return `${normalized.slice(0, MAX_ARIA_MESSAGE_TEXT_LENGTH - 1).trimEnd()}...`;
 };
-const isPointInsideMessageTree = (messageElement: HTMLElement, point: {x: number; y: number}): boolean => {
-	const target = messageElement.ownerDocument.elementFromPoint(point.x, point.y);
-	return Boolean(target && messageElement.contains(target));
-};
-let lastPointerPosition: {x: number; y: number} | null = null;
-let pointerPositionNotificationFrame: number | null = null;
-let pointerPositionSubscriptionCount = 0;
-const pointerPositionListeners = new Set<() => void>();
-const notifyPointerPositionListeners = (): void => {
-	for (const listener of Array.from(pointerPositionListeners)) {
-		listener();
-	}
-};
-const schedulePointerPositionNotification = (): void => {
-	if (pointerPositionNotificationFrame != null) {
-		return;
-	}
-	pointerPositionNotificationFrame = requestAnimationFrame(() => {
-		pointerPositionNotificationFrame = null;
-		notifyPointerPositionListeners();
-	});
-};
-const notifyPointerPositionListenersOnLayoutChange = (): void => {
-	schedulePointerPositionNotification();
-};
-const updateLastPointerPosition = (event: PointerEvent | MouseEvent): void => {
-	if (lastPointerPosition?.x === event.clientX && lastPointerPosition.y === event.clientY) {
-		return;
-	}
-	lastPointerPosition = {x: event.clientX, y: event.clientY};
-	schedulePointerPositionNotification();
-};
-const clearLastPointerPosition = (): void => {
-	if (!lastPointerPosition) {
-		return;
-	}
-	lastPointerPosition = null;
-	schedulePointerPositionNotification();
-};
-const clearLastPointerPositionOnWindowExit = (event: PointerEvent | MouseEvent): void => {
-	if (event.relatedTarget == null) {
-		clearLastPointerPosition();
-	}
-};
-const supportsPointerPositionEvents = (): boolean => 'PointerEvent' in window;
-const subscribePointerPosition = (listener: () => void): (() => void) => {
-	if (pointerPositionSubscriptionCount === 0) {
-		if (supportsPointerPositionEvents()) {
-			window.addEventListener('pointermove', updateLastPointerPosition, true);
-			window.addEventListener('pointerdown', updateLastPointerPosition, true);
-			window.addEventListener('pointerout', clearLastPointerPositionOnWindowExit, true);
-		} else {
-			window.addEventListener('mousemove', updateLastPointerPosition, true);
-			window.addEventListener('mousedown', updateLastPointerPosition, true);
-			window.addEventListener('mouseout', clearLastPointerPositionOnWindowExit, true);
-		}
-		window.addEventListener('scroll', notifyPointerPositionListenersOnLayoutChange, true);
-		window.addEventListener('resize', notifyPointerPositionListenersOnLayoutChange);
-		window.addEventListener('blur', clearLastPointerPosition);
-	}
-	pointerPositionSubscriptionCount += 1;
-	pointerPositionListeners.add(listener);
-	return () => {
-		pointerPositionListeners.delete(listener);
-		pointerPositionSubscriptionCount = Math.max(0, pointerPositionSubscriptionCount - 1);
-		if (pointerPositionSubscriptionCount !== 0) {
-			return;
-		}
-		lastPointerPosition = null;
-		if (pointerPositionNotificationFrame != null) {
-			cancelAnimationFrame(pointerPositionNotificationFrame);
-			pointerPositionNotificationFrame = null;
-		}
-		if (supportsPointerPositionEvents()) {
-			window.removeEventListener('pointermove', updateLastPointerPosition, true);
-			window.removeEventListener('pointerdown', updateLastPointerPosition, true);
-			window.removeEventListener('pointerout', clearLastPointerPositionOnWindowExit, true);
-		} else {
-			window.removeEventListener('mousemove', updateLastPointerPosition, true);
-			window.removeEventListener('mousedown', updateLastPointerPosition, true);
-			window.removeEventListener('mouseout', clearLastPointerPositionOnWindowExit, true);
-		}
-		window.removeEventListener('scroll', notifyPointerPositionListenersOnLayoutChange, true);
-		window.removeEventListener('resize', notifyPointerPositionListenersOnLayoutChange);
-		window.removeEventListener('blur', clearLastPointerPosition);
-	};
-};
-
 export type MessageBehaviorOverrides = Partial<{
 	mobileLayoutEnabled: boolean;
 	messageGroupSpacing: number;
 	messageDisplayCompact: boolean;
-	prefersReducedMotion: boolean;
 	isEditing: boolean;
 	isReplying: boolean;
 	isHighlight: boolean;
@@ -285,7 +195,7 @@ interface MessageProps {
 	behaviorOverrides?: MessageBehaviorOverrides;
 	compact?: boolean;
 	idPrefix?: string;
-	readonlyPreview?: boolean;
+	suppressMessageActions?: boolean;
 	onHeadingActivate?: () => void;
 }
 
@@ -304,15 +214,13 @@ export const Message: React.FC<MessageProps> = observer((props) => {
 		behaviorOverrides,
 		compact,
 		idPrefix = 'message',
-		readonlyPreview,
+		suppressMessageActions,
 		onHeadingActivate,
 	} = props;
 	const {i18n} = useLingui();
 	const [showActionBar, setShowActionBar] = useState(false);
 	const [isLongPressing, setIsLongPressing] = useState(false);
-	const [isHoveringDesktop, setIsHoveringDesktop] = useState(false);
 	const [isFocusedWithin, setIsFocusedWithin] = useState(false);
-	const [isPopoutOpen, setIsPopoutOpen] = useState(false);
 	const [mobileLongPressLinkUrl, setMobileLongPressLinkUrl] = useState<string | undefined>(undefined);
 	const messageRef = useRef<HTMLDivElement | null>(null);
 	const disableContextMenuTracking = behaviorOverrides?.disableContextMenuTracking ?? false;
@@ -326,7 +234,7 @@ export const Message: React.FC<MessageProps> = observer((props) => {
 	const mobileLayoutEnabled = behaviorOverrides?.mobileLayoutEnabled ?? MobileLayout.isEnabled();
 	const messageDisplayCompact =
 		compact ?? behaviorOverrides?.messageDisplayCompact ?? UserSettings.getMessageDisplayCompact();
-	const prefersReducedMotion = behaviorOverrides?.prefersReducedMotion ?? Accessibility.useReducedMotion;
+	const prefersReducedMotion = Accessibility.useReducedMotion;
 	const isEditing = behaviorOverrides?.isEditing ?? MessageEdit.isEditing(message.channelId, message.id);
 	const isReplying = behaviorOverrides?.isReplying ?? MessageReply.isReplying(message.channelId, message.id);
 	const isHighlight = behaviorOverrides?.isHighlight ?? MessageReply.isHighlight(message.id);
@@ -336,12 +244,20 @@ export const Message: React.FC<MessageProps> = observer((props) => {
 		behaviorOverrides?.messageGroupSpacing ?? Accessibility.getMessageGroupSpacingValue(messageDisplayCompact);
 	const authorName =
 		previewOverrides?.displayName || NicknameUtils.getNickname(message.author, channel.guildId, channel.id);
+	const {nodes: astNodes} = useMemo(
+		() =>
+			parse({
+				content: message.content,
+				context: MarkdownContext.STANDARD_WITH_JUMBO,
+			}),
+		[message.content],
+	);
 	const messageAriaLabel = useMemo(() => {
 		const timeLabel = DateUtils.getFormattedDateTime(message.timestamp);
 		const systemText = message.isSystemMessage() ? SystemMessageUtils.stringify(message, i18n) : null;
 		let text =
 			systemText ||
-			parseAndRenderToPlaintext(message.content, MESSAGE_ARIA_PARSER_FLAGS, {
+			renderAstToPlaintext(astNodes, {
 				channelId: channel.id,
 				preserveMarkdown: false,
 				includeEmojiNames: true,
@@ -370,6 +286,7 @@ export const Message: React.FC<MessageProps> = observer((props) => {
 		}
 		return `${authorName}, ${truncateAriaLabelText(text)}, ${timeLabel}, ${i18n._(MESSAGE_DESCRIPTOR)}`;
 	}, [
+		astNodes,
 		authorName,
 		channel.id,
 		i18n.locale,
@@ -442,15 +359,6 @@ export const Message: React.FC<MessageProps> = observer((props) => {
 	const velocitySamples = useRef<Array<{x: number; y: number; timestamp: number}>>([]);
 	const highlightTimerRef = useRef<NodeJS.Timeout | null>(null);
 	const suppressClickUntilRef = useRef(0);
-	const popoutCloseRafRef = useRef<number | null>(null);
-	const isHoveringDesktopRef = useRef(false);
-	const setDesktopHoverState = useCallback((isHovered: boolean) => {
-		if (isHoveringDesktopRef.current === isHovered) {
-			return;
-		}
-		isHoveringDesktopRef.current = isHovered;
-		setIsHoveringDesktop(isHovered);
-	}, []);
 	const unsubscribeLongPressScrollCancel = useCallback(() => {
 		unsubscribeLongPressScrollCancelRef.current?.();
 		unsubscribeLongPressScrollCancelRef.current = null;
@@ -570,47 +478,13 @@ export const Message: React.FC<MessageProps> = observer((props) => {
 		setMobileLongPressLinkUrl(undefined);
 	}, []);
 	const keyboardModeEnabled = KeyboardMode.keyboardModeEnabled;
-	const isPointerInsideMessage = useCallback((): boolean => {
-		if (mobileLayoutEnabled) {
-			return false;
-		}
-		const element = messageRef.current;
-		if (!element) {
-			return false;
-		}
-		if (!lastPointerPosition) {
-			return element.matches(':hover');
-		}
-		return isPointInsideMessageTree(element, lastPointerPosition);
-	}, [mobileLayoutEnabled]);
-	const syncPointerHoverState = useCallback((): boolean => {
-		const isHovered = isPointerInsideMessage();
-		setDesktopHoverState(isHovered);
-		return isHovered;
-	}, [isPointerInsideMessage, setDesktopHoverState]);
-	const cancelScheduledPopoutClose = useCallback(() => {
-		if (popoutCloseRafRef.current == null) {
-			return;
-		}
-		cancelAnimationFrame(popoutCloseRafRef.current);
-		popoutCloseRafRef.current = null;
-	}, []);
-	const handleMessagePopoutToggle = useCallback(
-		(isOpen: boolean) => {
-			if (isOpen) {
-				cancelScheduledPopoutClose();
-				setIsPopoutOpen(true);
-				return;
-			}
-			cancelScheduledPopoutClose();
-			popoutCloseRafRef.current = requestAnimationFrame(() => {
-				popoutCloseRafRef.current = null;
-				syncPointerHoverState();
-				setIsPopoutOpen(false);
-			});
-		},
-		[cancelScheduledPopoutClose, syncPointerHoverState],
-	);
+	const {
+		isHovering,
+		isPopoutOpen,
+		handlePopoutToggle,
+		trackingEnabled: hoverTrackingEnabled,
+	} = useMessageHoverState({messageRef, mobileLayoutEnabled, keyboardModeEnabled, contextMenuOpen});
+	const keyboardNavigationEnabled = MessageKeyboardFocusRollout.enabled;
 	const handleFocusWithin = useCallback(() => {
 		if (!keyboardModeEnabled) {
 			return;
@@ -630,53 +504,6 @@ export const Message: React.FC<MessageProps> = observer((props) => {
 		[channel.id, message.id],
 	);
 	useEffect(() => {
-		if (mobileLayoutEnabled || !messageRef.current) return;
-		const element = messageRef.current;
-		const handleMouseEnter = (event: MouseEvent) => {
-			updateLastPointerPosition(event);
-			setDesktopHoverState(true);
-		};
-		const handleMouseLeave = (event: MouseEvent) => {
-			updateLastPointerPosition(event);
-			setDesktopHoverState(false);
-		};
-		element.addEventListener('mouseenter', handleMouseEnter);
-		element.addEventListener('mouseleave', handleMouseLeave);
-		const unsubscribeFocus = subscribeWindowFocus(syncPointerHoverState);
-		const rafId = requestAnimationFrame(syncPointerHoverState);
-		return () => {
-			cancelAnimationFrame(rafId);
-			element.removeEventListener('mouseenter', handleMouseEnter);
-			element.removeEventListener('mouseleave', handleMouseLeave);
-			unsubscribeFocus();
-		};
-	}, [mobileLayoutEnabled, keyboardModeEnabled, syncPointerHoverState]);
-	const shouldTrackActivePointer = !mobileLayoutEnabled && (isHoveringDesktop || isPopoutOpen || contextMenuOpen);
-	useEffect(() => {
-		if (!shouldTrackActivePointer) {
-			return;
-		}
-		const rafId = requestAnimationFrame(syncPointerHoverState);
-		const unsubscribePointerPosition = subscribePointerPosition(syncPointerHoverState);
-		return () => {
-			cancelAnimationFrame(rafId);
-			unsubscribePointerPosition();
-		};
-	}, [shouldTrackActivePointer, syncPointerHoverState]);
-	const wasContextMenuOpenRef = useRef(false);
-	useLayoutEffect(() => {
-		const wasOpen = wasContextMenuOpenRef.current;
-		wasContextMenuOpenRef.current = contextMenuOpen;
-		if (wasOpen && !contextMenuOpen) {
-			syncPointerHoverState();
-		}
-	}, [contextMenuOpen, syncPointerHoverState]);
-	useEffect(() => {
-		return () => {
-			cancelScheduledPopoutClose();
-		};
-	}, [cancelScheduledPopoutClose]);
-	useEffect(() => {
 		if (!keyboardModeEnabled) return;
 		if (contextMenuOpen) {
 			MessageFocus.holdContextFocus(channel.id, message.id, message, channel);
@@ -687,6 +514,17 @@ export const Message: React.FC<MessageProps> = observer((props) => {
 			MessageFocus.clearFocusedMessageIfMatches(channel.id, message.id);
 		}
 	}, [channel, contextMenuOpen, isFocusedWithin, keyboardModeEnabled, message, message.id]);
+	const isFocusedWithinRef = useRef(isFocusedWithin);
+	isFocusedWithinRef.current = isFocusedWithin;
+	const keyboardNavigationEnabledRef = useRef(keyboardNavigationEnabled);
+	keyboardNavigationEnabledRef.current = keyboardNavigationEnabled;
+	useEffect(() => {
+		return () => {
+			if (keyboardNavigationEnabledRef.current && isFocusedWithinRef.current) {
+				MessageFocus.clearFocusedMessageIfMatches(channel.id, message.id);
+			}
+		};
+	}, [channel.id, message.id]);
 	useEffect(() => {
 		const wasEditing = wasEditingInPreviousUpdateRef.current;
 		const justStartedEditing = !wasEditing && isEditing;
@@ -706,7 +544,6 @@ export const Message: React.FC<MessageProps> = observer((props) => {
 			}
 		};
 	}, [unsubscribeLongPressScrollCancel]);
-	const isHovering = mobileLayoutEnabled ? false : isHoveringDesktop;
 	useEffect(() => {
 		if (!keyboardModeEnabled) {
 			setIsFocusedWithin(false);
@@ -741,8 +578,8 @@ export const Message: React.FC<MessageProps> = observer((props) => {
 						shouldRenderSuppressEmbeds: false,
 					}
 				: undefined,
-			onPopoutToggle: handleMessagePopoutToggle,
-			readonlyPreview,
+			onPopoutToggle: handlePopoutToggle,
+			suppressMessageActions,
 			onHeadingActivate,
 		}),
 		[
@@ -755,8 +592,8 @@ export const Message: React.FC<MessageProps> = observer((props) => {
 			previewContext,
 			previewOverrides,
 			previewMode,
-			handleMessagePopoutToggle,
-			readonlyPreview,
+			handlePopoutToggle,
+			suppressMessageActions,
 			onHeadingActivate,
 		],
 	);
@@ -765,14 +602,6 @@ export const Message: React.FC<MessageProps> = observer((props) => {
 			{getMessageComponent(message, channel, forceUnknownMessageType)}
 		</MessageViewContextProvider>
 	);
-	const {nodes: astNodes} = useMemo(
-		() =>
-			parse({
-				content: message.content,
-				context: MarkdownContext.STANDARD_WITH_JUMBO,
-			}),
-		[message.content],
-	);
 	const shouldHideContent =
 		UserSettings.getRenderEmbeds() &&
 		message.embeds.length > 0 &&
@@ -780,8 +609,9 @@ export const Message: React.FC<MessageProps> = observer((props) => {
 		astNodes.length === 1 &&
 		astNodes[0].type === NodeType.Link &&
 		!message.suppressEmbeds;
-	const shouldDisableHoverBackground = (prefersReducedMotion && !isEditing) || readonlyPreview;
+	const shouldDisableHoverBackground = !hoverTrackingEnabled && prefersReducedMotion && !isEditing;
 	const isKeyboardFocused = keyboardModeEnabled && isFocusedWithin;
+	const isPreview = previewContext != null;
 	const shouldApplySpacing = !shouldGroup && !removeTopSpacing && previewContext !== MessagePreviewContext.LIST_POPOUT;
 	const systemFollowsSystem = Boolean(
 		shouldGroup && prevMessage && isDisplaySystemMessage(prevMessage) && isDisplaySystemMessage(message),
@@ -790,7 +620,7 @@ export const Message: React.FC<MessageProps> = observer((props) => {
 		() =>
 			clsx(
 				messageDisplayCompact ? styles.messageCompact : styles.message,
-				isHovering && styles.messageHovered,
+				isHovering && !isPreview && styles.messageHovered,
 				shouldDisableHoverBackground && styles.messageNoHover,
 				isEditing && styles.messageEditing,
 				!messageDisplayCompact &&
@@ -812,8 +642,8 @@ export const Message: React.FC<MessageProps> = observer((props) => {
 					!isEditing &&
 					message.isUserMessage() &&
 					styles.messageNoText,
-				isKeyboardFocused && styles.keyboardFocused,
-				isKeyboardFocused && 'keyboard-focus-active',
+				isKeyboardFocused && !isPreview && styles.keyboardFocused,
+				isKeyboardFocused && !isPreview && 'keyboard-focus-active',
 				shouldApplySpacing && previewContext && styles.messagePreviewSpacing,
 			),
 		[
@@ -836,21 +666,26 @@ export const Message: React.FC<MessageProps> = observer((props) => {
 			shouldHideContent,
 			isKeyboardFocused,
 			shouldApplySpacing,
+			isPreview,
 		],
 	);
 	const shouldShowActionBar = useMemo(
 		() =>
 			!previewContext &&
-			!readonlyPreview &&
+			!suppressMessageActions &&
 			message.state !== MessageStates.SENDING &&
 			!isEditing &&
 			!mobileLayoutEnabled,
-		[previewContext, readonlyPreview, message.state, isEditing, mobileLayoutEnabled],
+		[previewContext, suppressMessageActions, message.state, isEditing, mobileLayoutEnabled],
 	);
-	const shouldRenderInlineActionBar = useMemo(
-		() => shouldShowActionBar && (previewMode || isHovering || isKeyboardFocused || contextMenuOpen || isPopoutOpen),
-		[shouldShowActionBar, previewMode, isHovering, isKeyboardFocused, contextMenuOpen, isPopoutOpen],
+	const isActionBarForcedVisible = useMemo(
+		() => Boolean(previewMode || isKeyboardFocused || contextMenuOpen || isPopoutOpen),
+		[previewMode, isKeyboardFocused, contextMenuOpen, isPopoutOpen],
 	);
+	const isActionBarActive = isHovering || isActionBarForcedVisible;
+	const wasActionBarActivatedRef = useRef(false);
+	wasActionBarActivatedRef.current = wasActionBarActivatedRef.current || isActionBarActive;
+	const shouldMountActionBar = shouldShowActionBar && wasActionBarActivatedRef.current;
 	const shouldShowBottomSheet = useMemo(
 		() =>
 			mobileLayoutEnabled && showActionBar && !previewContext && message.state !== MessageStates.SENDING && !isEditing,
@@ -867,7 +702,12 @@ export const Message: React.FC<MessageProps> = observer((props) => {
 	);
 	return (
 		<>
-			<FocusRing data-flx="channel.message.focus-ring">
+			<FocusRing
+				enabled={keyboardNavigationEnabled ? keyboardModeEnabled : undefined}
+				within={keyboardNavigationEnabled}
+				offset={keyboardNavigationEnabled ? -2 : undefined}
+				data-flx="channel.message.focus-ring"
+			>
 				<div
 					role="article"
 					aria-label={messageAriaLabel}
@@ -893,6 +733,9 @@ export const Message: React.FC<MessageProps> = observer((props) => {
 					data-flx-edited={message.editedTimestamp != null ? 'true' : undefined}
 					data-flx-compact={messageDisplayCompact ? 'true' : undefined}
 					data-flx-grouped={shouldGroup && shouldApplyGroupedLayout(message, prevMessage) ? 'true' : undefined}
+					data-flx-action-bar={shouldShowActionBar ? 'true' : undefined}
+					data-flx-action-bar-active={shouldShowActionBar && isActionBarActive ? 'true' : undefined}
+					data-flx-action-bar-forced={shouldShowActionBar && isActionBarForcedVisible ? 'true' : undefined}
 					tabIndex={keyboardModeEnabled ? -1 : undefined}
 					className={messageClasses}
 					ref={messageRef}
@@ -910,7 +753,7 @@ export const Message: React.FC<MessageProps> = observer((props) => {
 					data-flx="channel.message.article.alt-click"
 				>
 					{messageComponent}
-					{shouldRenderInlineActionBar &&
+					{shouldMountActionBar &&
 						(previewMode ? (
 							<MessageActionBarCore
 								message={message}
@@ -925,9 +768,9 @@ export const Message: React.FC<MessageProps> = observer((props) => {
 									canForwardMessage: true,
 									shouldRenderSuppressEmbeds: true,
 								}}
-								isSaved={false}
 								developerMode={false}
-								onPopoutToggle={handleMessagePopoutToggle}
+								isActive={isActionBarActive}
+								onPopoutToggle={handlePopoutToggle}
 								data-flx="channel.message.message-action-bar-core"
 							/>
 						) : (
@@ -935,7 +778,8 @@ export const Message: React.FC<MessageProps> = observer((props) => {
 								message={message}
 								handleDelete={handleDelete}
 								sourceChannel={channel}
-								onPopoutToggle={handleMessagePopoutToggle}
+								isActive={isActionBarActive}
+								onPopoutToggle={handlePopoutToggle}
 								data-flx="channel.message.message-action-bar"
 							/>
 						))}

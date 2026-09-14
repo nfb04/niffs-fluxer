@@ -1,5 +1,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import {createUserID} from '@app/api/BrandedTypes';
+import {Config} from '@app/api/Config';
+import {
+	type InstancePolicyConfig,
+	REGISTRATION_PENDING_APPROVAL_TRAIT,
+	REGISTRATION_REJECTED_TRAIT,
+} from '@app/api/instance/InstanceConfigRepository';
+import {deriveSsoRedirectUri, normalizeAndValidateSsoConfig} from '@app/api/instance/SsoConfigValidation';
+import {requireAdminACL} from '@app/api/middleware/AdminMiddleware';
+import {RateLimitMiddleware} from '@app/api/middleware/RateLimitMiddleware';
+import {OpenAPI} from '@app/api/middleware/ResponseTypeMiddleware';
+import {getGatewayRolloutConfigPublisher, getInstanceConfigRepository} from '@app/api/middleware/ServiceSingletons';
+import {RateLimitConfigs} from '@app/api/RateLimitConfig';
+import type {HonoApp, HonoEnv} from '@app/api/types/HonoEnv';
+import {Validator} from '@app/api/Validator';
 import {AdminACLs} from '@fluxer/constants/src/AdminACLs';
 import {InstancePolicyTransitionNotAllowedError} from '@fluxer/errors/src/domains/core/InstancePolicyTransitionNotAllowedError';
 import {
@@ -11,28 +26,20 @@ import {
 	InstanceEmailSmtpTestRequest,
 	InstanceEmailSmtpTestResponse,
 	PendingRegistrationActionRequest,
-	RegistrationUrlActionRequest,
+	RegistrationUrlIdParam,
 } from '@fluxer/schema/src/domains/admin/AdminSchemas';
 import {GatewayRolloutConfigSchema} from '@fluxer/schema/src/domains/admin/GatewayRolloutSchemas';
+import {VoiceNoiseSuppressionConfigSchema} from '@fluxer/schema/src/domains/admin/VoiceNoiseSuppressionSchemas';
+import {UserIdParam} from '@fluxer/schema/src/domains/common/CommonParamSchemas';
+import {BlockedMessageGroupsConfigSchema} from '@fluxer/schema/src/domains/experiment/BlockedMessageGroupsSchemas';
+import {ExperimentDeliveryConfigSchema} from '@fluxer/schema/src/domains/experiment/ExperimentSchemas';
+import {GuildActivityLogPresentationConfigSchema} from '@fluxer/schema/src/domains/experiment/GuildActivityLogPresentationSchemas';
+import {MessageHoverTrackingConfigSchema} from '@fluxer/schema/src/domains/experiment/MessageHoverTrackingSchemas';
+import {MessageKeyboardFocusConfigSchema} from '@fluxer/schema/src/domains/experiment/MessageKeyboardFocusSchemas';
+import type {InstanceBranding} from '@fluxer/schema/src/domains/instance/InstanceSchemas';
 import {SmtpEmailProvider} from '@pkgs/email/src/SmtpEmailProvider';
 import type {Context} from 'hono';
 import {createMiddleware} from 'hono/factory';
-import {createUserID} from '../../BrandedTypes';
-import {Config} from '../../Config';
-import {
-	type InstanceBrandingConfig,
-	type InstancePolicyConfig,
-	REGISTRATION_PENDING_APPROVAL_TRAIT,
-	REGISTRATION_REJECTED_TRAIT,
-} from '../../instance/InstanceConfigRepository';
-import {deriveSsoRedirectUri, normalizeAndValidateSsoConfig} from '../../instance/SsoConfigValidation';
-import {requireAdminACL} from '../../middleware/AdminMiddleware';
-import {RateLimitMiddleware} from '../../middleware/RateLimitMiddleware';
-import {OpenAPI} from '../../middleware/ResponseTypeMiddleware';
-import {getGatewayRolloutConfigPublisher, getInstanceConfigRepository} from '../../middleware/ServiceSingletons';
-import {RateLimitConfigs} from '../../RateLimitConfig';
-import type {HonoApp, HonoEnv} from '../../types/HonoEnv';
-import {Validator} from '../../Validator';
 
 const INSTANCE_BRANDING_ENTITY_ID = 0n;
 
@@ -50,9 +57,27 @@ function omitUndefinedFields<T extends object>(value: T): Partial<T> {
 
 async function buildInstanceConfigResponse(): Promise<InstanceConfigResponse> {
 	const instanceConfigRepository = getInstanceConfigRepository();
-	const [ssoConfig, gatewayRollout, registrationConfig, registrationUrls, pendingRegistrations] = await Promise.all([
+	const [
+		ssoConfig,
+		gatewayRollout,
+		voiceNoiseSuppression,
+		guildActivityLogPresentation,
+		experimentDelivery,
+		messageHoverTracking,
+		messageKeyboardFocus,
+		blockedMessageGroups,
+		registrationConfig,
+		registrationUrls,
+		pendingRegistrations,
+	] = await Promise.all([
 		instanceConfigRepository.getSsoConfig(),
 		instanceConfigRepository.getGatewayRolloutConfig(),
+		instanceConfigRepository.getVoiceNoiseSuppressionConfig(),
+		instanceConfigRepository.getGuildActivityLogPresentationConfig(),
+		instanceConfigRepository.getExperimentDeliveryConfig(),
+		instanceConfigRepository.getMessageHoverTrackingConfig(),
+		instanceConfigRepository.getMessageKeyboardFocusConfig(),
+		instanceConfigRepository.getBlockedMessageGroupsConfig(),
 		instanceConfigRepository.getRegistrationConfig(),
 		instanceConfigRepository.getRegistrationUrlsForAdmin(),
 		instanceConfigRepository.getPendingRegistrations(),
@@ -82,6 +107,12 @@ async function buildInstanceConfigResponse(): Promise<InstanceConfigResponse> {
 			redirect_uri: deriveSsoRedirectUri(Config.endpoints.webApp),
 		},
 		gateway_rollout: gatewayRollout,
+		voice_noise_suppression: voiceNoiseSuppression,
+		guild_activity_log_presentation: guildActivityLogPresentation,
+		experiment_delivery: experimentDelivery,
+		message_hover_tracking: messageHoverTracking,
+		message_keyboard_focus: messageKeyboardFocus,
+		blocked_message_groups: blockedMessageGroups,
 		registration: {
 			...registrationConfig,
 			urls: registrationUrls,
@@ -91,7 +122,6 @@ async function buildInstanceConfigResponse(): Promise<InstanceConfigResponse> {
 		app_public: appPublic,
 		policy: {
 			single_community_enabled: policy.single_community_enabled,
-			single_community_locked: policy.single_community_locked,
 			single_community_guild_id: policy.single_community_guild_id,
 			direct_messages_disabled: policy.direct_messages_disabled,
 			direct_messages_locked: policy.direct_messages_locked,
@@ -100,6 +130,11 @@ async function buildInstanceConfigResponse(): Promise<InstanceConfigResponse> {
 				gif_enabled: policy.gif_enabled,
 				youtube_enabled: policy.youtube_enabled,
 				bluesky_enabled: policy.bluesky_enabled,
+			},
+			deferred_phone_gate: {
+				enabled: policy.deferred_phone_gate_enabled,
+				window_hours: policy.deferred_phone_gate_window_hours,
+				member_threshold: policy.deferred_phone_gate_member_threshold,
 			},
 			services_resolved: resolvedServices,
 			services_available: {
@@ -162,12 +197,12 @@ async function grantSetupCompleterAdminACL(ctx: Context<HonoEnv>): Promise<void>
 
 export function InstanceConfigAdminController(app: HonoApp) {
 	const instanceConfigRepository = getInstanceConfigRepository();
-	app.post(
-		'/admin/instance-config/get',
+	app.get(
+		'/admin/instance/config',
 		RateLimitMiddleware(RateLimitConfigs.ADMIN_LOOKUP),
 		requireSetupSessionOrAdminACL(AdminACLs.INSTANCE_CONFIG_VIEW),
 		OpenAPI({
-			operationId: 'get_instance_config',
+			operationId: 'get_admin_instance_config',
 			summary: 'Get instance configuration',
 			description:
 				'Retrieves instance-wide configuration including webhooks and SSO configuration. Requires INSTANCE_CONFIG_VIEW permission.',
@@ -180,13 +215,13 @@ export function InstanceConfigAdminController(app: HonoApp) {
 			return ctx.json(await buildInstanceConfigResponse());
 		},
 	);
-	app.post(
-		'/admin/instance-config/update',
+	app.patch(
+		'/admin/instance/config',
 		RateLimitMiddleware(RateLimitConfigs.ADMIN_USER_MODIFY),
 		requireSetupSessionOrAdminACL(AdminACLs.INSTANCE_CONFIG_UPDATE),
 		Validator('json', InstanceConfigUpdateRequest),
 		OpenAPI({
-			operationId: 'update_instance_config',
+			operationId: 'update_admin_instance_config',
 			summary: 'Update instance configuration',
 			description:
 				'Updates instance configuration settings including webhook URLs and SSO parameters. Changes apply immediately. Requires INSTANCE_CONFIG_UPDATE permission.',
@@ -208,6 +243,75 @@ export function InstanceConfigAdminController(app: HonoApp) {
 				const validated = GatewayRolloutConfigSchema.parse(merged);
 				await instanceConfigRepository.setGatewayRolloutConfig(validated);
 				await getGatewayRolloutConfigPublisher().publish(validated);
+			}
+			if (data.voice_noise_suppression) {
+				const patch = omitUndefinedFields(data.voice_noise_suppression);
+				if (Object.keys(patch).length > 0) {
+					const currentNoiseSuppression = await instanceConfigRepository.getVoiceNoiseSuppressionConfig();
+					const validated = VoiceNoiseSuppressionConfigSchema.parse({
+						...currentNoiseSuppression,
+						...patch,
+						config_version: currentNoiseSuppression.config_version + 1,
+					});
+					await instanceConfigRepository.setVoiceNoiseSuppressionConfig(validated);
+				}
+			}
+			if (data.guild_activity_log_presentation) {
+				const patch = omitUndefinedFields(data.guild_activity_log_presentation);
+				if (Object.keys(patch).length > 0) {
+					const currentGuildActivityLogPresentation =
+						await instanceConfigRepository.getGuildActivityLogPresentationConfig();
+					const validated = GuildActivityLogPresentationConfigSchema.parse({
+						...currentGuildActivityLogPresentation,
+						...patch,
+						config_version: currentGuildActivityLogPresentation.config_version + 1,
+					});
+					await instanceConfigRepository.setGuildActivityLogPresentationConfig(validated);
+				}
+			}
+			if (data.message_hover_tracking) {
+				const patch = omitUndefinedFields(data.message_hover_tracking);
+				if (Object.keys(patch).length > 0) {
+					const currentMessageHoverTracking = await instanceConfigRepository.getMessageHoverTrackingConfig();
+					const validated = MessageHoverTrackingConfigSchema.parse({
+						...currentMessageHoverTracking,
+						...patch,
+						config_version: currentMessageHoverTracking.config_version + 1,
+					});
+					await instanceConfigRepository.setMessageHoverTrackingConfig(validated);
+				}
+			}
+			if (data.message_keyboard_focus) {
+				const patch = omitUndefinedFields(data.message_keyboard_focus);
+				if (Object.keys(patch).length > 0) {
+					const currentMessageKeyboardFocus = await instanceConfigRepository.getMessageKeyboardFocusConfig();
+					const validated = MessageKeyboardFocusConfigSchema.parse({
+						...currentMessageKeyboardFocus,
+						...patch,
+						config_version: currentMessageKeyboardFocus.config_version + 1,
+					});
+					await instanceConfigRepository.setMessageKeyboardFocusConfig(validated);
+				}
+			}
+			if (data.blocked_message_groups) {
+				const patch = omitUndefinedFields(data.blocked_message_groups);
+				if (Object.keys(patch).length > 0) {
+					const currentBlockedMessageGroups = await instanceConfigRepository.getBlockedMessageGroupsConfig();
+					const validated = BlockedMessageGroupsConfigSchema.parse({
+						...currentBlockedMessageGroups,
+						...patch,
+						config_version: currentBlockedMessageGroups.config_version + 1,
+					});
+					await instanceConfigRepository.setBlockedMessageGroupsConfig(validated);
+				}
+			}
+			if (data.experiment_delivery) {
+				const currentExperimentDelivery = await instanceConfigRepository.getExperimentDeliveryConfig();
+				const validated = ExperimentDeliveryConfigSchema.parse({
+					...currentExperimentDelivery,
+					...data.experiment_delivery,
+				});
+				await instanceConfigRepository.setExperimentDeliveryConfig(validated);
 			}
 			if (data.sso) {
 				const sso = data.sso;
@@ -375,13 +479,13 @@ export function InstanceConfigAdminController(app: HonoApp) {
 		},
 	);
 	app.post(
-		'/admin/instance-config/branding-asset',
+		'/admin/instance/config/branding-assets',
 		RateLimitMiddleware(RateLimitConfigs.ADMIN_USER_MODIFY),
 		requireSetupSessionOrAdminACL(AdminACLs.INSTANCE_CONFIG_UPDATE),
 		Validator('json', BrandingAssetUploadRequest),
 		OpenAPI({
-			operationId: 'upload_instance_branding_asset',
-			summary: 'Upload or clear an instance branding asset',
+			operationId: 'create_admin_instance_branding_asset',
+			summary: 'Upload an instance branding asset',
 			description:
 				'Uploads a branding image served by the media proxy and stores its URL, or clears it when no image is provided. Requires INSTANCE_CONFIG_UPDATE permission.',
 			responseSchema: InstanceConfigResponse,
@@ -399,19 +503,19 @@ export function InstanceConfigAdminController(app: HonoApp) {
 				base64Image: image ?? null,
 				errorPath: 'image',
 			});
-			const brandingPatch: Partial<InstanceBrandingConfig> = {[`${kind}_url`]: prepared.newCdnUrl};
+			const brandingPatch: Partial<InstanceBranding> = {[`${kind}_url`]: prepared.newCdnUrl};
 			await instanceConfigRepository.setAppPublicConfig({branding: brandingPatch});
 			return ctx.json(await buildInstanceConfigResponse());
 		},
 	);
 	app.post(
-		'/admin/instance-config/integrations/smtp/test',
+		'/admin/instance/config/smtp-tests',
 		RateLimitMiddleware(RateLimitConfigs.ADMIN_USER_MODIFY),
 		requireSetupSessionOrAdminACL(AdminACLs.INSTANCE_CONFIG_UPDATE),
 		Validator('json', InstanceEmailSmtpTestRequest),
 		OpenAPI({
-			operationId: 'test_instance_smtp_config',
-			summary: 'Validate SMTP configuration',
+			operationId: 'create_admin_instance_smtp_test',
+			summary: 'Run an SMTP configuration test',
 			description:
 				'Validates that an SMTP configuration can authenticate and accept a connection. Requires INSTANCE_CONFIG_UPDATE permission.',
 			responseSchema: InstanceEmailSmtpTestResponse,
@@ -440,12 +544,12 @@ export function InstanceConfigAdminController(app: HonoApp) {
 		},
 	);
 	app.post(
-		'/admin/instance-config/registration-urls/create',
+		'/admin/instance/registration-urls',
 		RateLimitMiddleware(RateLimitConfigs.ADMIN_USER_MODIFY),
 		requireAdminACL(AdminACLs.INSTANCE_CONFIG_UPDATE),
 		Validator('json', CreateRegistrationUrlRequest),
 		OpenAPI({
-			operationId: 'create_registration_url',
+			operationId: 'create_admin_registration_url',
 			summary: 'Create an admin-issued registration URL',
 			description:
 				'Creates a one-time-display registration URL that can be sent manually by an administrator. Requires INSTANCE_CONFIG_UPDATE permission.',
@@ -470,13 +574,13 @@ export function InstanceConfigAdminController(app: HonoApp) {
 			});
 		},
 	);
-	app.post(
-		'/admin/instance-config/registration-urls/revoke',
+	app.delete(
+		'/admin/instance/registration-urls/:registration_url_id',
 		RateLimitMiddleware(RateLimitConfigs.ADMIN_USER_MODIFY),
 		requireAdminACL(AdminACLs.INSTANCE_CONFIG_UPDATE),
-		Validator('json', RegistrationUrlActionRequest),
+		Validator('param', RegistrationUrlIdParam),
 		OpenAPI({
-			operationId: 'revoke_registration_url',
+			operationId: 'revoke_admin_registration_url',
 			summary: 'Revoke an admin-issued registration URL',
 			description:
 				'Revokes an admin-issued registration URL so it can no longer be used. Requires INSTANCE_CONFIG_UPDATE permission.',
@@ -486,50 +590,31 @@ export function InstanceConfigAdminController(app: HonoApp) {
 			tags: 'Admin',
 		}),
 		async (ctx) => {
-			await instanceConfigRepository.revokeRegistrationUrl(ctx.req.valid('json').id);
+			await instanceConfigRepository.revokeRegistrationUrl(ctx.req.valid('param').registration_url_id);
 			return ctx.json(await buildInstanceConfigResponse());
 		},
 	);
-	app.post(
-		'/admin/instance-config/pending-registrations/approve',
+	app.patch(
+		'/admin/instance/pending-registrations/:user_id',
 		RateLimitMiddleware(RateLimitConfigs.ADMIN_USER_MODIFY),
 		requireAdminACL(AdminACLs.INSTANCE_CONFIG_UPDATE),
+		Validator('param', UserIdParam),
 		Validator('json', PendingRegistrationActionRequest),
 		OpenAPI({
-			operationId: 'approve_pending_registration',
-			summary: 'Approve a pending registration',
+			operationId: 'update_admin_pending_registration',
+			summary: 'Approve or reject a pending registration',
 			description:
-				'Approves a registration waiting for manual review by removing its pending registration trait. Requires INSTANCE_CONFIG_UPDATE permission.',
+				'Decides a registration waiting for manual review. Approving removes its pending registration trait, rejecting also prevents the account from logging in. Requires INSTANCE_CONFIG_UPDATE permission.',
 			responseSchema: InstanceConfigResponse,
 			statusCode: 200,
 			security: 'adminApiKey',
 			tags: 'Admin',
 		}),
 		async (ctx) => {
-			const userId = ctx.req.valid('json').user_id;
-			await updatePendingRegistrationUser(ctx, userId, 'approve');
-			await instanceConfigRepository.removePendingRegistration(userId);
-			return ctx.json(await buildInstanceConfigResponse());
-		},
-	);
-	app.post(
-		'/admin/instance-config/pending-registrations/reject',
-		RateLimitMiddleware(RateLimitConfigs.ADMIN_USER_MODIFY),
-		requireAdminACL(AdminACLs.INSTANCE_CONFIG_UPDATE),
-		Validator('json', PendingRegistrationActionRequest),
-		OpenAPI({
-			operationId: 'reject_pending_registration',
-			summary: 'Reject a pending registration',
-			description:
-				'Rejects a registration waiting for manual review and prevents the account from logging in. Requires INSTANCE_CONFIG_UPDATE permission.',
-			responseSchema: InstanceConfigResponse,
-			statusCode: 200,
-			security: 'adminApiKey',
-			tags: 'Admin',
-		}),
-		async (ctx) => {
-			const userId = ctx.req.valid('json').user_id;
-			await updatePendingRegistrationUser(ctx, userId, 'reject');
+			const userId = ctx.req.valid('param').user_id.toString();
+			const decision = ctx.req.valid('json').status === 'approved' ? 'approve' : 'reject';
+			await instanceConfigRepository.getPendingRegistrations();
+			await updatePendingRegistrationUser(ctx, userId, decision);
 			await instanceConfigRepository.removePendingRegistration(userId);
 			return ctx.json(await buildInstanceConfigResponse());
 		},
@@ -551,27 +636,30 @@ async function applyInstancePolicyUpdate(
 		policy.single_community_enabled !== current.single_community_enabled
 	) {
 		if (policy.single_community_enabled) {
-			if (appPublic.setup.configured || current.single_community_locked) {
+			if (appPublic.setup.configured && current.single_community_guild_id == null) {
 				throw new InstancePolicyTransitionNotAllowedError();
 			}
 			const adminUser = await ctx.get('userRepository').findUnique(ctx.get('adminUserId'));
 			if (!adminUser) {
 				throw new InstancePolicyTransitionNotAllowedError();
 			}
-			await ctx.get('singleCommunityService').createStockCommunity({
+			await ctx.get('singleCommunityService').ensureStockCommunity({
 				owner: adminUser,
 				name: policy.single_community_name?.trim() || appPublic.branding.product_name,
 			});
 		} else {
 			patch.single_community_enabled = false;
-			patch.single_community_locked = true;
 		}
+	}
+	const unlockDirectMessages = policy.direct_messages_locked === false;
+	if (unlockDirectMessages && current.direct_messages_locked) {
+		patch.direct_messages_locked = false;
 	}
 	if (
 		policy.direct_messages_disabled !== undefined &&
 		policy.direct_messages_disabled !== current.direct_messages_disabled
 	) {
-		if (current.direct_messages_locked) {
+		if (current.direct_messages_locked && !unlockDirectMessages) {
 			throw new InstancePolicyTransitionNotAllowedError();
 		}
 		patch.direct_messages_disabled = policy.direct_messages_disabled;
@@ -593,11 +681,21 @@ async function applyInstancePolicyUpdate(
 			patch.bluesky_enabled = policy.services.bluesky_enabled ?? null;
 		}
 	}
-	if (Object.keys(patch).length > 0) {
-		await instanceConfigRepository.setInstancePolicyConfig(patch);
+	if (policy.deferred_phone_gate) {
+		if (policy.deferred_phone_gate.enabled !== undefined) {
+			patch.deferred_phone_gate_enabled = policy.deferred_phone_gate.enabled;
+		}
+		if (policy.deferred_phone_gate.window_hours !== undefined) {
+			patch.deferred_phone_gate_window_hours = policy.deferred_phone_gate.window_hours;
+		}
+		if (policy.deferred_phone_gate.member_threshold !== undefined) {
+			patch.deferred_phone_gate_member_threshold = policy.deferred_phone_gate.member_threshold;
+		}
 	}
-	if (policy.premium_mode !== undefined && policy.premium_mode !== current.premium_mode) {
-		await ctx.get('limitConfigService').reloadForPolicyChange();
+	if (patch.premium_mode !== undefined) {
+		await ctx.get('limitConfigService').updatePolicyConfig(patch);
+	} else if (Object.keys(patch).length > 0) {
+		await instanceConfigRepository.setInstancePolicyConfig(patch);
 	}
 }
 
@@ -612,13 +710,16 @@ async function updatePendingRegistrationUser(
 		return;
 	}
 	const traits = new Set(user.traits);
-	traits.delete(REGISTRATION_PENDING_APPROVAL_TRAIT);
+	const wasPendingApproval = traits.delete(REGISTRATION_PENDING_APPROVAL_TRAIT);
 	if (decision === 'reject') {
 		traits.add(REGISTRATION_REJECTED_TRAIT);
 	} else {
 		traits.delete(REGISTRATION_REJECTED_TRAIT);
 	}
 	await userRepository.patchUpsert(user.id, {traits: traits.size > 0 ? traits : null}, user.toRow());
+	if (decision === 'approve' && wasPendingApproval) {
+		await ctx.get('singleCommunityService').joinStockCommunity(user.id, ctx.get('requestCache'));
+	}
 	await ctx.get('adminService').auditService.createAuditLog({
 		adminUserId: ctx.get('adminUserId'),
 		targetType: 'user',

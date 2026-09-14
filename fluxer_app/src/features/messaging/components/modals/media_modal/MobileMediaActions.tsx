@@ -22,6 +22,7 @@ import {
 	ROTATE_ANTICLOCKWISE_DESCRIPTOR,
 	ROTATE_CLOCKWISE_DESCRIPTOR,
 } from '@app/features/messaging/components/modals/media_modal/shared';
+import {remFromPx} from '@app/features/theme/layout/RemFromPx';
 import {
 	MenuBottomSheet,
 	type MenuGroupType,
@@ -63,13 +64,15 @@ interface MobileMediaActionsProps {
 	onForward?: () => void;
 	onClose: () => void;
 	canReset?: boolean;
+	canZoomIn?: boolean;
+	canZoomOut?: boolean;
 	enableZoomControls?: boolean;
 	onPointerEnter?: () => void;
 	onPointerLeave?: () => void;
 	rootRef?: Ref<HTMLDivElement>;
 }
 
-const iconSize = 20;
+const iconSize = remFromPx(20);
 
 function compactGroups(groups: Array<MenuGroupType>): Array<MenuGroupType> {
 	return groups.filter((group) => group.items.length > 0);
@@ -92,6 +95,8 @@ export const MobileMediaActions: FC<MobileMediaActionsProps> = observer(
 		onForward,
 		onClose,
 		canReset = false,
+		canZoomIn = true,
+		canZoomOut = true,
 		enableZoomControls = false,
 		onPointerEnter,
 		onPointerLeave,
@@ -275,7 +280,7 @@ export const MobileMediaActions: FC<MobileMediaActionsProps> = observer(
 										),
 										label: i18n._(ZOOM_IN_DESCRIPTOR),
 										action: onZoomIn ?? (() => undefined),
-										disabled: !onZoomIn,
+										disabled: !onZoomIn || !canZoomIn,
 									}),
 									createItem({
 										id: 'media-zoom-out',
@@ -288,7 +293,7 @@ export const MobileMediaActions: FC<MobileMediaActionsProps> = observer(
 										),
 										label: i18n._(ZOOM_OUT_DESCRIPTOR),
 										action: onZoomOut ?? (() => undefined),
-										disabled: !onZoomOut,
+										disabled: !onZoomOut || !canZoomOut,
 									}),
 								]
 							: [],
@@ -332,6 +337,8 @@ export const MobileMediaActions: FC<MobileMediaActionsProps> = observer(
 				]),
 			[
 				canReset,
+				canZoomIn,
+				canZoomOut,
 				createItem,
 				enableZoomControls,
 				favoriteLabel,
@@ -363,7 +370,13 @@ export const MobileMediaActions: FC<MobileMediaActionsProps> = observer(
 					data-flx="messaging.media-modal.mobile-media-actions.action-bar"
 				>
 					<ControlButton
-						icon={<XIcon size={22} weight="bold" data-flx="messaging.media-modal.mobile-media-actions.close-icon" />}
+						icon={
+							<XIcon
+								size={remFromPx(22)}
+								weight="bold"
+								data-flx="messaging.media-modal.mobile-media-actions.close-icon"
+							/>
+						}
 						label={i18n._(CLOSE_MODAL_DESCRIPTOR)}
 						onClick={onClose}
 						variant="danger"
@@ -372,7 +385,7 @@ export const MobileMediaActions: FC<MobileMediaActionsProps> = observer(
 					<ControlButton
 						icon={
 							<DotsThreeIcon
-								size={26}
+								size={remFromPx(26)}
 								weight="bold"
 								data-flx="messaging.media-modal.mobile-media-actions.more-options-icon"
 							/>

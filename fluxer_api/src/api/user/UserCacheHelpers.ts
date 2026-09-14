@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import type {UserID} from '@app/api/BrandedTypes';
+import type {UserCacheService} from '@app/api/infrastructure/UserCacheService';
+import type {RequestCache} from '@app/api/middleware/RequestCacheMiddleware';
+import type {User} from '@app/api/models/User';
 import type {UserPartialResponse} from '@fluxer/schema/src/domains/user/UserResponseSchemas';
-import type {UserID} from '../BrandedTypes';
-import type {UserCacheService} from '../infrastructure/UserCacheService';
-import type {RequestCache} from '../middleware/RequestCacheMiddleware';
-import type {User} from '../models/User';
 
 export async function getCachedUserPartialResponse(params: {
 	userId: UserID;
@@ -24,17 +24,17 @@ export async function getCachedUserPartialResponses(params: {
 	return await userCacheService.getUserPartialResponses(userIds, requestCache);
 }
 
-export async function mapUserToPartialResponseWithCache(params: {
+export function mapUserToPartialResponseWithCache(params: {
 	user: User;
-	userCacheService: Pick<UserCacheService, 'setUserPartialResponseFromUserInBackground'>;
+	userCacheService: Pick<UserCacheService, 'setUserPartialResponseFromUserInRequestCache'>;
 	requestCache: RequestCache;
-}): Promise<UserPartialResponse> {
+}): UserPartialResponse {
 	const {user, userCacheService, requestCache} = params;
 	const cached = requestCache.userPartials.get(user.id);
 	if (cached) {
 		return cached;
 	}
-	return userCacheService.setUserPartialResponseFromUserInBackground(user, requestCache);
+	return userCacheService.setUserPartialResponseFromUserInRequestCache(user, requestCache);
 }
 
 export async function invalidateUserCache(params: {

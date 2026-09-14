@@ -1,12 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import {createVoiceEngineV2AppTestControllerHost} from '@app/features/voice/engine/v2/VoiceEngineV2AppControllerHostTestUtils';
+import {createVoiceEngineV2AppIngestionPort} from '@app/features/voice/engine/v2/VoiceEngineV2AppHostPorts';
+import {createVoiceEngineV2AppLifecycleAdapter} from '@app/features/voice/engine/v2/VoiceEngineV2AppLifecycleAdapter';
+import {createVoiceEngineV2AppProductionHostPorts} from '@app/features/voice/engine/v2/VoiceEngineV2AppProductionHostPorts';
+import type {VoiceEngineV2AppTimerScheduler} from '@app/features/voice/engine/v2/VoiceEngineV2AppTimerAdapter';
+import {
+	createVoiceEngineV2ShadowHostPorts,
+	type VoiceEngineV2ShadowHostPortCall,
+} from '@app/features/voice/engine/v2/VoiceEngineV2ShadowHostPorts';
 import {
 	availableVoiceEngineV2Capabilities,
-	type LiveKitMediaPort,
 	type NativeMediaPort,
 	type StatsPort,
 	type SubscriptionPort,
-	type VoiceEngineV2CameraEncodingOptions,
 	type VoiceEngineV2CameraOptions,
 	type VoiceEngineV2Event,
 	type VoiceEngineV2MicrophoneOptions,
@@ -16,12 +23,6 @@ import {createVoiceEngineV2DeterministicClockPort} from '@fluxer/voice_engine_v2
 import {waitForRuntime} from '@fluxer/voice_engine_v2/testing';
 import type {Room} from 'livekit-client';
 import {describe, expect, it} from 'vitest';
-import {createVoiceEngineV2AppTestControllerHost} from './VoiceEngineV2AppControllerHostTestUtils';
-import {createVoiceEngineV2AppIngestionPort} from './VoiceEngineV2AppHostPorts';
-import {createVoiceEngineV2AppLifecycleAdapter} from './VoiceEngineV2AppLifecycleAdapter';
-import {createVoiceEngineV2AppProductionHostPorts} from './VoiceEngineV2AppProductionHostPorts';
-import type {VoiceEngineV2AppTimerScheduler} from './VoiceEngineV2AppTimerAdapter';
-import {createVoiceEngineV2ShadowHostPorts, type VoiceEngineV2ShadowHostPortCall} from './VoiceEngineV2ShadowHostPorts';
 
 type ProductionCall =
 	| {type: 'connect'; guildId: string | null; channelId: string}
@@ -31,11 +32,6 @@ type ProductionCall =
 type NativeMediaCall =
 	| {type: 'startCapture'; captureId: string; zeroCopyRequired: boolean}
 	| {type: 'attachFrameSink'; captureId: string; sinkId: string; zeroCopyRequired: boolean};
-type NativeVoiceMediaCall =
-	| {type: 'connect'; url: string}
-	| {type: 'publishCamera'; options: VoiceEngineV2CameraOptions}
-	| {type: 'updateCameraEncoding'; options: VoiceEngineV2CameraEncodingOptions}
-	| {type: 'unpublishCamera'; options?: VoiceEngineV2CameraOptions};
 
 function createStatsPort(): StatsPort {
 	return {
@@ -74,35 +70,6 @@ function createNativeMediaPort(calls: Array<NativeMediaCall>): NativeMediaPort {
 			});
 		},
 		async detachFrameSink(): Promise<void> {},
-	};
-}
-
-function createNativeVoiceMediaPort(calls: Array<NativeVoiceMediaCall>): LiveKitMediaPort {
-	return {
-		async prewarm(): Promise<void> {},
-		async connect(options): Promise<void> {
-			calls.push({type: 'connect', url: options.url});
-		},
-		async disconnect(): Promise<void> {},
-		async publishMicrophone(): Promise<void> {},
-		async unpublishMicrophone(): Promise<void> {},
-		async setMicrophoneEnabled(): Promise<void> {},
-		async publishCamera(options): Promise<void> {
-			calls.push({type: 'publishCamera', options});
-		},
-		async updateCameraEncoding(options): Promise<void> {
-			calls.push({type: 'updateCameraEncoding', options});
-		},
-		async unpublishCamera(options): Promise<void> {
-			calls.push({type: 'unpublishCamera', options});
-		},
-		async publishScreen(): Promise<void> {},
-		async updateScreenEncoding(): Promise<void> {},
-		async unpublishScreen(): Promise<void> {},
-		async publishScreenAudio(): Promise<void> {},
-		async unpublishScreenAudio(): Promise<void> {},
-		async setOutputDevice(): Promise<void> {},
-		async publishData(): Promise<void> {},
 	};
 }
 
@@ -244,68 +211,6 @@ describe('VoiceEngineV2AppProductionHostPorts', () => {
 			{type: 'setCameraEnabled', enabled: false, options: undefined},
 		]);
 		expect(shadowCalls).toEqual([]);
-		host.dispose();
-	});
-
-	it('routes native-selected camera commands through native media without touching JS camera delegates', async () => {
-		const productionCalls: Array<ProductionCall> = [];
-		const nativeVoiceMediaCalls: Array<NativeVoiceMediaCall> = [];
-		const host = createVoiceEngineV2AppTestControllerHost({
-			ports: createVoiceEngineV2AppProductionHostPorts({
-				gateway: {
-					async writeVoiceState(): Promise<void> {},
-					async clearVoiceState(): Promise<void> {},
-				},
-				connection: {
-					startConnection(guildId, channelId): boolean {
-						productionCalls.push({type: 'connect', guildId, channelId});
-						return true;
-					},
-				},
-				media: {
-					async enableMicrophone(): Promise<void> {},
-					async disableMicrophone(): Promise<void> {},
-					async setMicrophoneEnabled(): Promise<void> {},
-					async setCameraEnabled(): Promise<'applied'> {
-						throw new Error('JS camera delegate must not be called in native mode');
-					},
-					async updateCameraEncoding(): Promise<void> {},
-				},
-				screenShare: {
-					async publishControllerScreenViaLiveKitFlows(): Promise<void> {},
-					async unpublishControllerScreenViaLiveKitFlows(): Promise<void> {},
-					async updateActiveScreenShareSettings(): Promise<boolean> {
-						return true;
-					},
-					setScreenShareAudioMuted(): void {},
-				},
-				getRoom: () => ({}) as Room,
-				getActiveGuildId: () => 'guild-1',
-				getActiveChannelId: () => 'channel-1',
-				stats: createStatsPort(),
-				subscriptions: createSubscriptionPort(),
-				audioOutputStore: {
-					async setOutputDevice(): Promise<void> {},
-				},
-				nativeVoiceMedia: createNativeVoiceMediaPort(nativeVoiceMediaCalls),
-				getSelectedMediaMode: () => 'native',
-				logger: createLogger(),
-			}),
-		});
-
-		host.controller.connect({url: 'wss://voice.example.test', token: 'token'});
-		await waitForRuntime();
-		host.controller.publishCamera({deviceId: 'native-cam-1'});
-		await waitForRuntime();
-		host.controller.unpublishCamera({sendUpdate: false});
-		await waitForRuntime();
-
-		expect(nativeVoiceMediaCalls).toEqual([
-			{type: 'connect', url: 'wss://voice.example.test'},
-			{type: 'publishCamera', options: {deviceId: 'native-cam-1'}},
-			{type: 'unpublishCamera', options: {sendUpdate: false}},
-		]);
-		expect(productionCalls).toEqual([]);
 		host.dispose();
 	});
 

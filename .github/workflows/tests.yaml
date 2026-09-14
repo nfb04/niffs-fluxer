@@ -3,21 +3,29 @@ name: Tests
 
 on:
   pull_request:
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   GHCR_REGISTRY: ghcr.io/${{ github.repository_owner }}
+  CARGO_PROFILE_DEV_DEBUG: none
+  CARGO_PROFILE_TEST_DEBUG: none
+  CARGO_INCREMENTAL: '0'
 
 jobs:
   typecheck:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    env:
+      FLUXER_CI_BIN: ${{ github.workspace }}/target/debug/fluxer-ci
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
@@ -27,6 +35,28 @@ jobs:
         with:
           toolchain: "1.93.0"
           targets: wasm32-unknown-unknown
+
+      - name: Restore ci helper
+        id: ci-helper
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: target/debug/fluxer-ci
+          key: >-
+            fluxer-ci-bin-${{ runner.os }}-1.93.0-${{ hashFiles('Cargo.lock', 'Cargo.toml',
+            'tools/ci/Cargo.toml', 'tools/ci/src/**', 'tools/ci/templates/**') }}
+
+      - name: Build ci helper
+        if: steps.ci-helper.outputs.cache-hit != 'true'
+        run: cargo build --locked --package fluxer-ci
+
+      - name: Save ci helper
+        if: github.ref == 'refs/heads/main' && steps.ci-helper.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: target/debug/fluxer-ci
+          key: >-
+            fluxer-ci-bin-${{ runner.os }}-1.93.0-${{ hashFiles('Cargo.lock', 'Cargo.toml',
+            'tools/ci/Cargo.toml', 'tools/ci/src/**', 'tools/ci/templates/**') }}
 
       - name: Install pnpm
         uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
@@ -38,18 +68,19 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: >-
-          cargo run --locked --quiet --manifest-path tools/ci/Cargo.toml -- ci
-          --step install_dependencies
+        run: |
+          "$FLUXER_CI_BIN" ci --step install_dependencies
 
       - name: Run typecheck
-        run: >-
-          cargo run --locked --quiet --manifest-path tools/ci/Cargo.toml -- ci
-          --step typecheck
+        run: |
+          "$FLUXER_CI_BIN" ci --step typecheck
 
   test:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    env:
+      FLUXER_CI_BIN: ${{ github.workspace }}/target/debug/fluxer-ci
+      PNPM_TEST_WORKSPACE_CONCURRENCY: '2'
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
@@ -59,6 +90,19 @@ jobs:
         with:
           toolchain: "1.93.0"
           targets: wasm32-unknown-unknown
+
+      - name: Restore ci helper
+        id: ci-helper
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: target/debug/fluxer-ci
+          key: >-
+            fluxer-ci-bin-${{ runner.os }}-1.93.0-${{ hashFiles('Cargo.lock', 'Cargo.toml',
+            'tools/ci/Cargo.toml', 'tools/ci/src/**', 'tools/ci/templates/**') }}
+
+      - name: Build ci helper
+        if: steps.ci-helper.outputs.cache-hit != 'true'
+        run: cargo build --locked --package fluxer-ci
 
       - name: Install pnpm
         uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
@@ -70,18 +114,46 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: >-
-          cargo run --locked --quiet --manifest-path tools/ci/Cargo.toml -- ci
-          --step install_dependencies
+        run: |
+          "$FLUXER_CI_BIN" ci --step install_dependencies
+
+      - name: Restore fluxer_app wasm artifacts
+        id: app-wasm
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: |
+            fluxer_app/pkgs/libfluxcore
+            fluxer_app/src/features/messaging/utils/markdown/parser/MarkdownParserWasmBytes.ts
+          key: >-
+            app-wasm-${{ runner.os }}-1.93.0-${{ hashFiles('Cargo.lock', 'tools/ci/src/app_wasm.rs',
+            'tools/ci/templates/libfluxcore_wrapper.js', 'tools/ci/templates/libfluxcore_wrapper.d.ts',
+            'fluxer_app/rust/libfluxcore/Cargo.toml', 'fluxer_app/rust/libfluxcore/Cargo.lock',
+            'fluxer_app/rust/libfluxcore/.cargo/config.toml', 'fluxer_app/rust/libfluxcore/src/**',
+            'packages/markdown_parser/rust/Cargo.toml', 'packages/markdown_parser/rust/.cargo/config.toml',
+            'packages/markdown_parser/rust/src/**') }}
 
       - name: Run tests
-        run: >-
-          cargo run --locked --quiet --manifest-path tools/ci/Cargo.toml -- ci
-          --step test
+        run: |
+          "$FLUXER_CI_BIN" ci --step test
+
+      - name: Save fluxer_app wasm artifacts
+        if: always() && github.ref == 'refs/heads/main' && steps.app-wasm.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: |
+            fluxer_app/pkgs/libfluxcore
+            fluxer_app/src/features/messaging/utils/markdown/parser/MarkdownParserWasmBytes.ts
+          key: >-
+            app-wasm-${{ runner.os }}-1.93.0-${{ hashFiles('Cargo.lock', 'tools/ci/src/app_wasm.rs',
+            'tools/ci/templates/libfluxcore_wrapper.js', 'tools/ci/templates/libfluxcore_wrapper.d.ts',
+            'fluxer_app/rust/libfluxcore/Cargo.toml', 'fluxer_app/rust/libfluxcore/Cargo.lock',
+            'fluxer_app/rust/libfluxcore/.cargo/config.toml', 'fluxer_app/rust/libfluxcore/src/**',
+            'packages/markdown_parser/rust/Cargo.toml', 'packages/markdown_parser/rust/.cargo/config.toml',
+            'packages/markdown_parser/rust/src/**') }}
 
   rust:
     runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
@@ -89,7 +161,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
         with:
-          toolchain: stable
+          toolchain: "1.93.0"
           components: clippy, rustfmt
 
       - name: Install pnpm
@@ -108,37 +180,97 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: rust-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          key: rust-${{ runner.os }}-${{ hashFiles('fluxer_media_proxy/tools/install-native-deps.sh') }}-${{ hashFiles('Cargo.lock') }}
           restore-keys: |
-            rust-${{ runner.os }}-
+            rust-${{ runner.os }}-${{ hashFiles('fluxer_media_proxy/tools/install-native-deps.sh') }}-
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --version 0.19.6 --locked
+
+      - name: Check Rust dependencies
+        run: cargo deny --locked check -D warnings
+
+      - name: Check desktop native dependencies
+        run: tools/ci/check-desktop-native-workspaces.sh dependencies
+
+      - name: Cache native media dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: /opt/fluxer-native
+          key: media-native-${{ runner.os }}-${{ hashFiles('fluxer_media_proxy/tools/install-native-deps.sh') }}
 
       - name: Install native dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            pkg-config \
             build-essential \
-            libcurl4-openssl-dev \
-            libvips-dev \
+            binutils \
+            clang \
+            cmake \
+            curl \
+            libaom-dev \
             libavfilter-dev \
+            libclang-dev \
+            libcurl4-openssl-dev \
+            libdav1d-dev \
+            libde265-dev \
+            libfido2-dev \
             libheif-dev \
-            libwebp-dev
+            liblcms2-dev \
+            libpipewire-0.3-dev \
+            libspa-0.2-dev \
+            libssl-dev \
+            libudev-dev \
+            libvips-dev \
+            libwebp-dev \
+            libyuv-dev \
+            meson \
+            nasm \
+            ninja-build \
+            pkg-config \
+            xz-utils \
+            yasm \
+            zlib1g-dev
+          sudo fluxer_media_proxy/tools/install-native-deps.sh /opt/fluxer-native
+          echo "PKG_CONFIG_PATH=/opt/fluxer-native/lib/pkgconfig:/opt/fluxer-native/lib64/pkgconfig" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=/opt/fluxer-native/lib:/opt/fluxer-native/lib64" >> "$GITHUB_ENV"
+          echo "/opt/fluxer-native/bin" >> "$GITHUB_PATH"
 
       - name: Install Node.js dependencies
-        run: pnpm --filter fluxer_admin --filter fluxer_marketing install
+        run: pnpm --filter fluxer_admin install
 
       - name: Check formatting
         run: cargo fmt --all -- --check
 
+      - name: Check formatting (desktop native workspaces)
+        run: tools/ci/check-desktop-native-workspaces.sh fmt
+
       - name: Clippy (warnings as errors)
-        run: cargo clippy --workspace -- -D warnings
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+
+      - name: Clippy (desktop native workspaces on Linux, warnings as errors)
+        run: tools/ci/check-desktop-native-workspaces.sh clippy
+
+      - name: Verify the source-built ffmpeg CLI is on PATH
+        run: |
+          set -euo pipefail
+          command -v ffmpeg
+          test "$(command -v ffmpeg)" = /opt/fluxer-native/bin/ffmpeg
+          ffmpeg -hide_banner -version
 
       - name: Run tests
-        run: cargo test --workspace
+        env:
+          FLUXER_REQUIRE_MEDIA_FIXTURES: "1"
+        run: cargo test --workspace --all-features --locked
+
+      - name: Run desktop native workspace tests on Linux
+        run: tools/ci/check-desktop-native-workspaces.sh test
 
   gateway:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    env:
+      FLUXER_CI_BIN: ${{ github.workspace }}/target/debug/fluxer-ci
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
@@ -148,45 +280,82 @@ jobs:
         with:
           toolchain: "1.93.0"
 
+      - name: Cache cargo (gateway NIFs)
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+        with:
+          workspaces: |
+            fluxer_gateway/native/guild_member_list_oset_nif -> target
+            fluxer_gateway/native/push_markdown_plaintext_nif -> target
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Restore ci helper
+        id: ci-helper
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: target/debug/fluxer-ci
+          key: >-
+            fluxer-ci-bin-${{ runner.os }}-1.93.0-${{ hashFiles('Cargo.lock', 'Cargo.toml',
+            'tools/ci/Cargo.toml', 'tools/ci/src/**', 'tools/ci/templates/**') }}
+
+      - name: Build ci helper
+        if: steps.ci-helper.outputs.cache-hit != 'true'
+        run: cargo build --locked --package fluxer-ci
+
       - name: Set up Erlang
         uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124
         with:
           otp-version: '28'
           rebar3-version: '3.24.0'
 
-      - name: Cache rebar3 dependencies
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+      - name: Restore rebar3 dependencies
+        id: rebar3-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: |
-            fluxer_gateway/_build
             ~/.cache/rebar3
-          key: rebar3-${{ runner.os }}-${{ hashFiles('fluxer_gateway/rebar.lock') }}
+            fluxer_gateway/_build
+            !fluxer_gateway/_build/default/lib/fluxer_gateway/**
+            !fluxer_gateway/_build/test/lib/fluxer_gateway/**
+          key: >-
+            rebar3-${{ runner.os }}-otp28-rebar3.24.0-${{ hashFiles('fluxer_gateway/rebar.lock',
+            'fluxer_gateway/rebar.config') }}
           restore-keys: |
-            rebar3-${{ runner.os }}-
+            rebar3-${{ runner.os }}-otp28-rebar3.24.0-
 
       - name: Check formatting
-        run: >-
-          cargo run --locked --quiet --manifest-path tools/ci/Cargo.toml -- ci
-          --step gateway_fmt
+        run: |
+          "$FLUXER_CI_BIN" ci --step gateway_fmt
 
       - name: Compile
-        run: >-
-          cargo run --locked --quiet --manifest-path tools/ci/Cargo.toml -- ci
-          --step gateway_compile
+        run: |
+          "$FLUXER_CI_BIN" ci --step gateway_compile
 
       - name: Run dialyzer
-        run: >-
-          cargo run --locked --quiet --manifest-path tools/ci/Cargo.toml -- ci
-          --step gateway_dialyzer
+        run: |
+          "$FLUXER_CI_BIN" ci --step gateway_dialyzer
 
       - name: Run eunit tests
-        run: >-
-          cargo run --locked --quiet --manifest-path tools/ci/Cargo.toml -- ci
-          --step gateway_eunit
+        run: |
+          "$FLUXER_CI_BIN" ci --step gateway_eunit
+
+      - name: Save rebar3 dependencies
+        if: always() && github.ref == 'refs/heads/main' && steps.rebar3-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: |
+            ~/.cache/rebar3
+            fluxer_gateway/_build
+            !fluxer_gateway/_build/default/lib/fluxer_gateway/**
+            !fluxer_gateway/_build/test/lib/fluxer_gateway/**
+          key: >-
+            rebar3-${{ runner.os }}-otp28-rebar3.24.0-${{ hashFiles('fluxer_gateway/rebar.lock',
+            'fluxer_gateway/rebar.config') }}
 
   knip:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    env:
+      FLUXER_CI_BIN: ${{ github.workspace }}/target/debug/fluxer-ci
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
@@ -196,6 +365,19 @@ jobs:
         with:
           toolchain: "1.93.0"
           targets: wasm32-unknown-unknown
+
+      - name: Restore ci helper
+        id: ci-helper
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: target/debug/fluxer-ci
+          key: >-
+            fluxer-ci-bin-${{ runner.os }}-1.93.0-${{ hashFiles('Cargo.lock', 'Cargo.toml',
+            'tools/ci/Cargo.toml', 'tools/ci/src/**', 'tools/ci/templates/**') }}
+
+      - name: Build ci helper
+        if: steps.ci-helper.outputs.cache-hit != 'true'
+        run: cargo build --locked --package fluxer-ci
 
       - name: Install pnpm
         uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
@@ -207,14 +389,126 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: >-
-          cargo run --locked --quiet --manifest-path tools/ci/Cargo.toml -- ci
-          --step install_dependencies
+        run: |
+          "$FLUXER_CI_BIN" ci --step install_dependencies
+
+      - name: Restore fluxer_app wasm artifacts
+        id: app-wasm
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: |
+            fluxer_app/pkgs/libfluxcore
+            fluxer_app/src/features/messaging/utils/markdown/parser/MarkdownParserWasmBytes.ts
+          key: >-
+            app-wasm-${{ runner.os }}-1.93.0-${{ hashFiles('Cargo.lock', 'tools/ci/src/app_wasm.rs',
+            'tools/ci/templates/libfluxcore_wrapper.js', 'tools/ci/templates/libfluxcore_wrapper.d.ts',
+            'fluxer_app/rust/libfluxcore/Cargo.toml', 'fluxer_app/rust/libfluxcore/Cargo.lock',
+            'fluxer_app/rust/libfluxcore/.cargo/config.toml', 'fluxer_app/rust/libfluxcore/src/**',
+            'packages/markdown_parser/rust/Cargo.toml', 'packages/markdown_parser/rust/.cargo/config.toml',
+            'packages/markdown_parser/rust/src/**') }}
 
       - name: Run knip
-        run: >-
-          cargo run --locked --quiet --manifest-path tools/ci/Cargo.toml -- ci
-          --step knip
+        run: |
+          "$FLUXER_CI_BIN" ci --step knip
+
+      - name: Save fluxer_app wasm artifacts
+        if: always() && github.ref == 'refs/heads/main' && steps.app-wasm.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: |
+            fluxer_app/pkgs/libfluxcore
+            fluxer_app/src/features/messaging/utils/markdown/parser/MarkdownParserWasmBytes.ts
+          key: >-
+            app-wasm-${{ runner.os }}-1.93.0-${{ hashFiles('Cargo.lock', 'tools/ci/src/app_wasm.rs',
+            'tools/ci/templates/libfluxcore_wrapper.js', 'tools/ci/templates/libfluxcore_wrapper.d.ts',
+            'fluxer_app/rust/libfluxcore/Cargo.toml', 'fluxer_app/rust/libfluxcore/Cargo.lock',
+            'fluxer_app/rust/libfluxcore/.cargo/config.toml', 'fluxer_app/rust/libfluxcore/src/**',
+            'packages/markdown_parser/rust/Cargo.toml', 'packages/markdown_parser/rust/.cargo/config.toml',
+            'packages/markdown_parser/rust/src/**') }}
+
+  lint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+
+      - name: Install Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check formatting and lint
+        run: pnpm exec biome ci .
+
+      - name: Lint JSX for browser-translation safety
+        run: pnpm exec eslint . --max-warnings 0
+
+  i18n:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+
+      - name: Install Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Compile locale catalogs
+        run: pnpm i18n:compile
+
+      - name: Check drift of compiled locale modules
+        run: |
+          if ! git diff --exit-code -- \
+            packages/errors/src/i18n/locales \
+            packages/errors/src/i18n/ErrorI18nTypes.generated.ts \
+            fluxer_api/pkgs/email/src/email_i18n/locales \
+            fluxer_api/pkgs/email/src/email_i18n/EmailI18nTypes.generated.ts \
+            fluxer_api/src/api/content_i18n/locales; then
+            echo "::error::Compiled locale modules are outdated. Run 'pnpm i18n:compile' and commit the result. Translations belong in the weblate/ catalogs, not in the generated locales/ modules."
+            exit 1
+          fi
+
+  docs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+
+      - name: Install Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --filter fluxer_docs...
+
+      - name: Verify documentation matches the live API
+        run: pnpm --filter fluxer_docs verify
+
+      - name: Build documentation
+        run: pnpm --filter fluxer_docs build
 
   fonts:
     runs-on: ubuntu-24.04
@@ -233,133 +527,3 @@ jobs:
 
       - name: Verify shipped fonts match the lockfile
         run: python3 tools/fonts/build_fonts.py --verify
-
-  ci-scripts:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 25
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
-        with:
-          toolchain: stable
-          components: rustfmt
-
-      - name: Sync ci helper dependencies
-        run: >-
-          cargo run --locked --quiet --manifest-path tools/ci/Cargo.toml -- ci-scripts
-          --step sync
-
-      - name: Run ci helper tests
-        run: >-
-          cargo run --locked --quiet --manifest-path tools/ci/Cargo.toml -- ci-scripts
-          --step test
-
-  helm-and-scripts:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-
-      - name: Set up Rust toolchain (CI helpers)
-        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
-        with:
-          toolchain: "1.93.0"
-
-      - name: Install helm
-        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310
-
-      - name: Resolve Helm test build version
-        run: >-
-          cargo run --locked --quiet --manifest-path tools/ci/Cargo.toml -- resolve-calver
-          --github-env
-          --env-name HELM_TEST_BUILD_VERSION
-
-      - name: Helm dependency update (all charts)
-        run: |
-          set -euo pipefail
-          for chart_dir in deploy/helm/*/; do
-            if [[ -f "${chart_dir}Chart.yaml" ]]; then
-              helm dependency update "$chart_dir"
-            fi
-          done
-
-      - name: Helm lint (all charts)
-        run: |
-          set -euo pipefail
-          FAILED=0
-          for chart_dir in deploy/helm/*/; do
-            if [[ -f "${chart_dir}Chart.yaml" ]]; then
-              echo "--- Linting ${chart_dir} ---"
-              VALUES_ARGS=()
-              if [[ -f "${chart_dir}values.yaml" ]]; then
-                VALUES_ARGS=(-f "${chart_dir}values.yaml")
-              fi
-              EXTRA_SETS=(--set-string "global.registry=${GHCR_REGISTRY}")
-              case "${chart_dir}" in
-                *gateway*)
-                  EXTRA_SETS+=(--set-string "gateway.tag=${HELM_TEST_BUILD_VERSION}" --set-string "gateway.build.version=${HELM_TEST_BUILD_VERSION}")
-                  ;;
-                *api*)
-                  EXTRA_SETS+=(--set-string app.name=api --set-string "app.tag=${HELM_TEST_BUILD_VERSION}" --set-string app.config=stable --set-string "app.build.version=${HELM_TEST_BUILD_VERSION}")
-                  ;;
-                *app-proxy*)
-                  EXTRA_SETS+=(--set-string app.name=app-proxy --set-string "app.tag=${HELM_TEST_BUILD_VERSION}" --set-string app.config=stable --set-string "app.build.version=${HELM_TEST_BUILD_VERSION}")
-                  ;;
-                *admin*)
-                  EXTRA_SETS+=(--set-string app.name=admin --set-string "app.tag=${HELM_TEST_BUILD_VERSION}" --set-string app.config=stable --set-string "app.build.version=${HELM_TEST_BUILD_VERSION}")
-                  ;;
-                *marketing*)
-                  EXTRA_SETS+=(--set-string app.name=marketing --set-string "app.tag=${HELM_TEST_BUILD_VERSION}" --set-string app.config=stable --set-string "app.build.version=${HELM_TEST_BUILD_VERSION}")
-                  ;;
-                *docs*)
-                  EXTRA_SETS+=(--set-string app.name=docs --set-string "app.tag=${HELM_TEST_BUILD_VERSION}" --set-string app.config=stable --set-string "app.build.version=${HELM_TEST_BUILD_VERSION}")
-                  ;;
-                *media-proxy*)
-                  EXTRA_SETS+=(--set-string "mediaProxy.tag=${HELM_TEST_BUILD_VERSION}" --set-string "staticProxy.tag=${HELM_TEST_BUILD_VERSION}" --set-string "mediaProxy.build.version=${HELM_TEST_BUILD_VERSION}" --set-string "staticProxy.build.version=${HELM_TEST_BUILD_VERSION}")
-                  ;;
-                *uploads*)
-                  EXTRA_SETS+=(--set-string app.name=uploads --set-string "app.tag=${HELM_TEST_BUILD_VERSION}" --set-string app.config=stable --set-string "app.build.version=${HELM_TEST_BUILD_VERSION}")
-                  ;;
-                *worker*)
-                  EXTRA_SETS+=(--set-string "workerRealtime.tag=${HELM_TEST_BUILD_VERSION}" --set-string "workerUnfurl.tag=${HELM_TEST_BUILD_VERSION}" --set-string "workerLifecycle.tag=${HELM_TEST_BUILD_VERSION}" --set-string "workerBatch.tag=${HELM_TEST_BUILD_VERSION}" --set-string "workerRealtime.build.version=${HELM_TEST_BUILD_VERSION}" --set-string "workerUnfurl.build.version=${HELM_TEST_BUILD_VERSION}" --set-string "workerLifecycle.build.version=${HELM_TEST_BUILD_VERSION}" --set-string "workerBatch.build.version=${HELM_TEST_BUILD_VERSION}")
-                  ;;
-                *gifs*|*messages*|*snowflakes*|*unfurl*|*users*)
-                  EXTRA_SETS+=(--set-string "svc.tag=${HELM_TEST_BUILD_VERSION}" --set-string "svc.build.version=${HELM_TEST_BUILD_VERSION}" --set-string svc.build.channel=stable)
-                  ;;
-              esac
-              if ! helm lint "$chart_dir" "${VALUES_ARGS[@]}" "${EXTRA_SETS[@]}" --strict; then
-                FAILED=1
-              fi
-            fi
-          done
-          if [[ "$FAILED" -ne 0 ]]; then
-            echo "::error::One or more Helm charts failed linting"
-            exit 1
-          fi
-
-      - name: Helm template (gateway)
-        run: |
-          set -euo pipefail
-          helm template fluxer-gateway deploy/helm/gateway \
-            -f deploy/helm/gateway/values.yaml \
-            --set-string "global.registry=${GHCR_REGISTRY}" \
-            --set-string "gateway.tag=${HELM_TEST_BUILD_VERSION}" \
-            --set-string "gateway.build.version=${HELM_TEST_BUILD_VERSION}" \
-            -n fluxer > /dev/null
-          echo "Gateway chart templates render successfully."
-
-      - name: Validate gateway manifests with kubeconform
-        run: |
-          set -euo pipefail
-          helm template fluxer-gateway deploy/helm/gateway \
-            -f deploy/helm/gateway/values.yaml \
-            --set-string "global.registry=${GHCR_REGISTRY}" \
-            --set-string "gateway.tag=${HELM_TEST_BUILD_VERSION}" \
-            --set-string "gateway.build.version=${HELM_TEST_BUILD_VERSION}" \
-            -n fluxer \
-            | docker run -i --rm ghcr.io/yannh/kubeconform:v0.6.7 \
-                -strict -summary -kubernetes-version 1.31.0

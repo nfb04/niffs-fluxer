@@ -1,18 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type {SearchResult as SchemaSearchResult} from '@fluxer/schema/src/contracts/search/SearchAdapterTypes';
+import type {GuildID} from '@app/api/BrandedTypes';
+import type {IGuildDiscoveryRepository} from '@app/api/guild/repositories/GuildDiscoveryRepository';
+import type {Guild} from '@app/api/models/Guild';
+import {convertToSearchableGuild, type GuildDiscoveryContext} from '@app/api/search/guild/GuildSearchSerializer';
+import {resolveDiscoveryContextForIndexing} from '@app/api/search/guild/LazyDiscoveryMigration';
+import type {IGuildSearchService} from '@app/api/search/IGuildSearchService';
+import {SearchAdapterServiceBase} from '@app/api/search/SearchAdapterServiceBase';
+import type {
+	SearchOptions as SchemaSearchOptions,
+	SearchResult as SchemaSearchResult,
+} from '@fluxer/schema/src/contracts/search/SearchAdapterTypes';
 import type {GuildSearchFilters, SearchableGuild} from '@fluxer/schema/src/contracts/search/SearchDocumentTypes';
 import {
 	ElasticsearchGuildAdapter,
 	type ElasticsearchGuildAdapterOptions,
 } from '@pkgs/elasticsearch_search/src/adapters/ElasticsearchGuildAdapter';
-import type {GuildID} from '../../BrandedTypes';
-import type {IGuildDiscoveryRepository} from '../../guild/repositories/GuildDiscoveryRepository';
-import type {Guild} from '../../models/Guild';
-import {convertToSearchableGuild, type GuildDiscoveryContext} from '../guild/GuildSearchSerializer';
-import {resolveDiscoveryContextForIndexing} from '../guild/LazyDiscoveryMigration';
-import type {IGuildSearchService} from '../IGuildSearchService';
-import {SearchAdapterServiceBase} from '../SearchAdapterServiceBase';
 
 interface ElasticsearchGuildSearchServiceOptions extends ElasticsearchGuildAdapterOptions {
 	discoveryRepository?: IGuildDiscoveryRepository;
@@ -60,10 +63,7 @@ export class ElasticsearchGuildSearchService
 	searchGuilds(
 		query: string,
 		filters: GuildSearchFilters,
-		options?: {
-			limit?: number;
-			offset?: number;
-		},
+		options?: SchemaSearchOptions,
 	): Promise<SchemaSearchResult<SearchableGuild>> {
 		return this.search(query, filters, options);
 	}

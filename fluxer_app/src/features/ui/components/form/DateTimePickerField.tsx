@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import {getCachedDateTimeFormat} from '@app/features/i18n/utils/IntlCache';
 import {PASSWORD_MANAGER_IGNORE_ATTRIBUTES} from '@app/features/platform/utils/PasswordManagerAutocomplete';
+import {remFromPx} from '@app/features/theme/layout/RemFromPx';
 import styles from '@app/features/ui/components/form/DateTimePickerField.module.css';
 import surfaceStyles from '@app/features/ui/components/form/FormSurface.module.css';
 import FocusRing from '@app/features/ui/focus_ring/FocusRing';
@@ -8,7 +10,6 @@ import {msg} from '@lingui/core/macro';
 import {useLingui} from '@lingui/react/macro';
 import {CalendarBlankIcon} from '@phosphor-icons/react';
 import {clsx} from 'clsx';
-import {DateTime} from 'luxon';
 import type React from 'react';
 import {useCallback, useMemo, useState} from 'react';
 import {Button, Dialog, DialogTrigger, Popover} from 'react-aria-components';
@@ -47,12 +48,11 @@ interface DateTimePickerFieldProps {
 	className?: string;
 }
 
-function formatDisplayDate(date: Date | null): string {
+function formatDisplayDate(locale: string, date: Date | null): string {
 	if (!date) {
 		return '';
 	}
-	const dt = DateTime.fromJSDate(date);
-	return dt.toFormat('d LLL yyyy, HH:mm');
+	return getCachedDateTimeFormat(locale, {dateStyle: 'medium', timeStyle: 'short'}).format(date);
 }
 
 function toTimeString(date: Date): string {
@@ -63,7 +63,7 @@ export const DateTimePickerField: React.FC<DateTimePickerFieldProps> = (props) =
 	const {i18n} = useLingui();
 	const {label, description, value, onChange, minDate, maxDate, disabled, error, className} = props;
 	const [popoutOpen, setPopoutOpen] = useState(false);
-	const displayValue = useMemo(() => formatDisplayDate(value), [value]);
+	const displayValue = useMemo(() => formatDisplayDate(i18n.locale, value), [i18n.locale, value]);
 	const timeValue = useMemo(() => (value ? toTimeString(value) : '00:00'), [value]);
 	const handleDaySelect = useCallback(
 		(selected: Date | undefined) => {
@@ -162,7 +162,7 @@ export const DateTimePickerField: React.FC<DateTimePickerFieldProps> = (props) =
 								isDisabled={disabled}
 								data-flx="ui.form.date-time-picker-field.calendar-button"
 							>
-								<CalendarBlankIcon size={18} data-flx="ui.form.date-time-picker-field.calendar-blank-icon" />
+								<CalendarBlankIcon size={remFromPx(18)} data-flx="ui.form.date-time-picker-field.calendar-blank-icon" />
 							</Button>
 							<Popover
 								placement="bottom start"

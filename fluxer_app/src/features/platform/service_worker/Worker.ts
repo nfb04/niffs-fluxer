@@ -5,6 +5,14 @@ import {
 	getNotificationAlertOptions,
 	isMobileOrTabletUserAgent,
 } from '@app/features/platform/notifications/NotificationAlertOptions';
+import {
+	type AppShellRuntime,
+	fetchAppShellNavigation,
+	isCacheableResponse,
+	type PrecacheEntry,
+	precacheAssets,
+	seedAppShell,
+} from '@app/features/platform/service_worker/WorkerAppShell';
 import {shouldDeleteWorkerCache, WORKER_CACHE_PREFIX} from '@app/features/platform/service_worker/WorkerCacheCleanup';
 import {getWorkerFetchRoute} from '@app/features/platform/service_worker/WorkerFetchRouting';
 import {
@@ -27,11 +35,6 @@ declare const self: ServiceWorkerGlobalScope &
 		console: Console;
 	};
 
-interface PrecacheEntry {
-	url: string;
-	revision: string;
-}
-
 declare const __FLUXER_PRECACHE_MANIFEST__: ReadonlyArray<PrecacheEntry>;
 declare const __FLUXER_SW_VERSION__: string;
 const workerNavigator = self.navigator as {readonly userAgent: string; readonly maxTouchPoints?: number};
@@ -39,9 +42,8 @@ const ensureServiceWorkerReady: Promise<void> = Promise.resolve();
 const SERVICE_WORKER_VERSION = typeof __FLUXER_SW_VERSION__ === 'string' ? __FLUXER_SW_VERSION__ : 'dev';
 const PRECACHE_MANIFEST = typeof __FLUXER_PRECACHE_MANIFEST__ === 'undefined' ? [] : __FLUXER_PRECACHE_MANIFEST__;
 const PRECACHE_CACHE = `${WORKER_CACHE_PREFIX}-precache-${SERVICE_WORKER_VERSION}`;
-const ASSET_CACHE = `${WORKER_CACHE_PREFIX}-assets-${SERVICE_WORKER_VERSION}`;
 const NAVIGATION_CACHE = `${WORKER_CACHE_PREFIX}-navigation-${SERVICE_WORKER_VERSION}`;
-const EXPECTED_CACHES = new Set([PRECACHE_CACHE, ASSET_CACHE, NAVIGATION_CACHE]);
+const EXPECTED_CACHES = new Set([PRECACHE_CACHE, NAVIGATION_CACHE]);
 const NAVIGATION_NETWORK_TIMEOUT_MS = 650;
 const serviceWorkerCaches = self.caches;
 const isNativeDesktopUserAgent = (userAgent: string): boolean => /\bElectron\/\d+(?:\.\d+)*/.test(userAgent);
@@ -66,23 +68,18 @@ const log = async (level: SwLogLevel, message: string, data?: unknown): Promise<
 		}
 	} catch {}
 };
-const isCacheableResponse = (response: Response): boolean => {
-	return response.ok || response.type === 'opaque';
+const appShellRuntime: AppShellRuntime = {
+	caches: serviceWorkerCaches,
+	fetch: (request) => fetch(request),
+	origin: self.location.origin,
+	precacheName: PRECACHE_CACHE,
+	navigationCacheName: NAVIGATION_CACHE,
+	networkTimeoutMs: NAVIGATION_NETWORK_TIMEOUT_MS,
+	onCacheWriteError: (error) => {
+		void log('warn', 'app shell cache put failed', {error: describeError(error)});
+	},
 };
-const pruneCacheEntries = async (cache: Cache, maxEntries: number): Promise<void> => {
-	const keys = await cache.keys();
-	const overflow = keys.length - maxEntries;
-	if (overflow <= 0) {
-		return;
-	}
-	await Promise.all(keys.slice(0, overflow).map((request) => cache.delete(request)));
-};
-const cacheRequest = async (
-	cacheName: string,
-	request: Request | string,
-	response: Response,
-	maxEntries?: number,
-): Promise<void> => {
+const cacheRequest = async (cacheName: string, request: Request | string, response: Response): Promise<void> => {
 	if (!isCacheableResponse(response)) {
 		return;
 	}
@@ -92,27 +89,9 @@ const cacheRequest = async (
 		}
 		const cache = await serviceWorkerCaches.open(cacheName);
 		await cache.put(request, response.clone());
-		if (maxEntries != null) {
-			await pruneCacheEntries(cache, maxEntries);
-		}
 	} catch (error) {
 		await log('warn', 'cache put failed', {cacheName, error: describeError(error)});
 	}
-};
-const precacheAppShell = async (): Promise<void> => {
-	if (!serviceWorkerCaches) {
-		return;
-	}
-	const cache = await serviceWorkerCaches.open(PRECACHE_CACHE);
-	await Promise.allSettled(
-		PRECACHE_MANIFEST.map(async (entry) => {
-			const request = new Request(new URL(entry.url, self.location.origin).toString(), {cache: 'reload'});
-			const response = await fetch(request);
-			if (isCacheableResponse(response)) {
-				await cache.put(entry.url, response);
-			}
-		}),
-	);
 };
 const cleanupOldCaches = async (): Promise<void> => {
 	if (!serviceWorkerCaches) {
@@ -127,51 +106,6 @@ const cleanupOldCaches = async (): Promise<void> => {
 			return serviceWorkerCaches.delete(name);
 		}),
 	);
-};
-const getCachedAppShell = async (): Promise<Response | undefined> => {
-	if (!serviceWorkerCaches) {
-		return undefined;
-	}
-	return (
-		(await serviceWorkerCaches.match('/index.html')) ??
-		(await serviceWorkerCaches.match('/')) ??
-		(await serviceWorkerCaches.match(new Request('/index.html', {cache: 'reload'}))) ??
-		undefined
-	);
-};
-const fetchNavigation = async (request: Request): Promise<Response> => {
-	const timeout = new Promise<Response | undefined>((resolve) => {
-		setTimeout(() => resolve(undefined), NAVIGATION_NETWORK_TIMEOUT_MS);
-	});
-	const network = fetch(request).then(async (response) => {
-		await cacheRequest(NAVIGATION_CACHE, '/index.html', response);
-		return response;
-	});
-	let networkResponse: Response | undefined;
-	try {
-		networkResponse = await Promise.race([network, timeout]);
-		if (networkResponse && isCacheableResponse(networkResponse)) {
-			return networkResponse;
-		}
-	} catch {}
-	const cached = await getCachedAppShell();
-	if (cached) {
-		network.catch(() => undefined);
-		return cached;
-	}
-	if (networkResponse) {
-		return networkResponse;
-	}
-	return network;
-};
-const fetchCacheFirst = async (request: Request): Promise<Response> => {
-	const cached = await serviceWorkerCaches?.match(request);
-	if (cached) {
-		return cached;
-	}
-	const response = await fetch(request);
-	await cacheRequest(ASSET_CACHE, request, response);
-	return response;
 };
 const fetchNetworkFirst = async (request: Request): Promise<Response> => {
 	try {
@@ -191,7 +125,7 @@ self.addEventListener('install', (event: ExtendableEvent) => {
 	event.waitUntil(
 		(async () => {
 			await ensureServiceWorkerReady;
-			await precacheAppShell();
+			await Promise.allSettled([precacheAssets(appShellRuntime, PRECACHE_MANIFEST), seedAppShell(appShellRuntime)]);
 			await log('info', 'install');
 			self.skipWaiting();
 		})(),
@@ -214,11 +148,7 @@ self.addEventListener('fetch', (event: FetchEvent) => {
 	const request = event.request;
 	const route = getWorkerFetchRoute(request, self.location.origin);
 	if (route === 'navigation') {
-		event.respondWith(fetchNavigation(request));
-		return;
-	}
-	if (route === 'static-asset') {
-		event.respondWith(fetchCacheFirst(request));
+		event.respondWith(fetchAppShellNavigation(appShellRuntime, request));
 		return;
 	}
 	if (route === 'metadata') {

@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {CLEAR_SEARCH_DESCRIPTOR} from '@app/features/i18n/utils/CommonMessageDescriptors';
+import {remFromPx} from '@app/features/theme/layout/RemFromPx';
+import styles from '@app/features/theme_studio/ui/StudioSearchInput.module.css';
 import {msg} from '@lingui/core/macro';
 import {useLingui} from '@lingui/react/macro';
 import {MagnifyingGlassIcon, XCircleIcon} from '@phosphor-icons/react';
 import {clsx} from 'clsx';
 import {forwardRef, type InputHTMLAttributes, useImperativeHandle, useRef} from 'react';
-import styles from './StudioSearchInput.module.css';
 
 const SEARCH_DESCRIPTOR = msg({
 	message: 'Search…',
@@ -41,7 +42,7 @@ export const StudioSearchInput = forwardRef<StudioSearchInputHandle, StudioSearc
 		<label className={clsx(styles.wrapper, className)} data-flx="theme-studio.ui.studio-search-input.wrapper">
 			<span className={styles.icon} data-flx="theme-studio.ui.studio-search-input.icon">
 				<MagnifyingGlassIcon
-					size={14}
+					size={remFromPx(14)}
 					weight="bold"
 					data-flx="theme-studio.ui.studio-search-input.magnifying-glass-icon"
 				/>
@@ -68,7 +69,11 @@ export const StudioSearchInput = forwardRef<StudioSearchInputHandle, StudioSearc
 					}}
 					data-flx="theme-studio.ui.studio-search-input.clear.change.button"
 				>
-					<XCircleIcon size={14} weight="fill" data-flx="theme-studio.ui.studio-search-input.x-circle-icon" />
+					<XCircleIcon
+						size={remFromPx(14)}
+						weight="fill"
+						data-flx="theme-studio.ui.studio-search-input.x-circle-icon"
+					/>
 				</button>
 			) : shortcut ? (
 				<span className={styles.shortcut} data-flx="theme-studio.ui.studio-search-input.shortcut">

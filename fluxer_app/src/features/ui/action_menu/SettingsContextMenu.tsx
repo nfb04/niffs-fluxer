@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import {remFromPx} from '@app/features/theme/layout/RemFromPx';
 import {MenuGroup} from '@app/features/ui/action_menu/MenuGroup';
 import {MenuItem} from '@app/features/ui/action_menu/MenuItem';
 import {MenuItemSubmenu} from '@app/features/ui/action_menu/MenuItemSubmenu';
@@ -13,7 +14,6 @@ import {
 	type SettingsTab,
 } from '@app/features/user/components/settings_utils/SettingsConstants';
 import UserSettings from '@app/features/user/state/UserSettings';
-import Users from '@app/features/user/state/Users';
 import {useLingui} from '@lingui/react/macro';
 import {observer} from 'mobx-react-lite';
 import type React from 'react';
@@ -25,7 +25,6 @@ interface SettingsContextMenuProps {
 
 export const SettingsContextMenu: React.FC<SettingsContextMenuProps> = observer(({onClose}) => {
 	const {i18n} = useLingui();
-	const hasExpressionPackAccess = Users.getCurrentUser()?.isStaff() ?? false;
 	const handleOpenSettings = useCallback(
 		(tab: SettingsTab, subtab?: SettingsSubtab) => {
 			ModalCommands.push(
@@ -51,7 +50,7 @@ export const SettingsContextMenu: React.FC<SettingsContextMenuProps> = observer(
 						key={tab.type}
 						icon={
 							<IconComponent
-								size={16}
+								size={remFromPx(16)}
 								weight={tab.iconWeight ?? 'fill'}
 								data-flx="ui.action-menu.settings-context-menu.render-settings-menu-item.icon-component"
 							/>
@@ -91,15 +90,12 @@ export const SettingsContextMenu: React.FC<SettingsContextMenuProps> = observer(
 	const accessibleTabs = useMemo(() => {
 		const allTabs = getSettingsTabs(i18n);
 		return allTabs.filter((tab) => {
-			if (!hasExpressionPackAccess && tab.type === 'expression_packs') {
-				return false;
-			}
 			if (!isDeveloperModeEnabled && (tab.type === 'embed_debugger' || tab.type === 'component_gallery')) {
 				return false;
 			}
 			return true;
 		});
-	}, [hasExpressionPackAccess, i18n.locale, isDeveloperModeEnabled]);
+	}, [i18n.locale, isDeveloperModeEnabled]);
 	const userSettingsTabs = accessibleTabs.filter((tab) => tab.category === 'user_settings');
 	const billingTabs = accessibleTabs.filter((tab) => tab.category === 'billing');
 	const appSettingsTabs = accessibleTabs.filter((tab) => tab.category === 'app_settings');

@@ -24,9 +24,16 @@ import {
 	setEnabledThemeIds,
 } from '@app/features/theme/utils/ThemeLibraryDb';
 import {getElectronAPI} from '@app/features/ui/utils/NativeUtils';
+import {i18n} from '@lingui/core';
+import {msg} from '@lingui/core/macro';
 import {makeAutoObservable, runInAction} from 'mobx';
 
 const logger = new Logger('ThemeLibrary');
+const DUPLICATE_THEME_NAME_DESCRIPTOR = msg({
+	message: '{themeName} Copy',
+	comment:
+		'Name given to the copy created by the Duplicate button in the Theme Studio theme library. {themeName} is the name of the theme being duplicated.',
+});
 
 export type ThemeLibraryThemeSource = 'quick_css' | 'css_file' | 'desktop_directory' | 'shared_theme' | 'import';
 
@@ -125,6 +132,7 @@ class ThemeLibrary {
 	localFiles: Array<ThemeLibraryLocalFileReference> = [];
 	enabledThemeIds: Array<string> = [];
 	isHydrated = false;
+	loadFailed = false;
 	isBusy = false;
 	revision = 0;
 	private initPromise: Promise<void> | null = null;
@@ -173,12 +181,13 @@ class ThemeLibrary {
 				this.localFiles = localFiles.sort((a, b) => a.name.localeCompare(b.name));
 				this.enabledThemeIds = enabledThemeIds.filter((id) => themes.some((theme) => theme.id === id));
 				this.isHydrated = true;
+				this.loadFailed = false;
 				this.revision += 1;
 			});
 		} catch (error) {
 			logger.error('Failed to hydrate theme library', error);
 			runInAction(() => {
-				this.isHydrated = true;
+				this.loadFailed = true;
 			});
 		}
 	}
@@ -309,7 +318,7 @@ class ThemeLibrary {
 		const duplicate: ThemeLibraryTheme = {
 			...existing,
 			id: createThemeLibraryId('theme'),
-			name: `${existing.name} Copy`,
+			name: i18n._(DUPLICATE_THEME_NAME_DESCRIPTOR, {themeName: existing.name}),
 			fileName: sanitizeFileName(existing.fileName.replace(/\.css$/i, '-copy.css')),
 			source: 'import',
 			createdAt: now(),

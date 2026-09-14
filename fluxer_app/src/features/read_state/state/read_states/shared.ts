@@ -64,8 +64,7 @@ export interface PendingAck {
 
 export interface ArchivedReadState {
 	ackMessageId: string | null;
-	ackPinTimestamp: number;
-	readStateKnown: boolean;
+	acknowledgedPinTimestamp: number;
 }
 
 export function parseTimestamp(timestamp?: string | null): number {

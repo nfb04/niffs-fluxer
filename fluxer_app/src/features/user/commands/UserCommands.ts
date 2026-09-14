@@ -12,7 +12,11 @@ import {http} from '@app/features/platform/transport/RestTransport';
 import {Logger} from '@app/features/platform/utils/AppLogger';
 import type {Message as WireMessage} from '@fluxer/schema/src/domains/message/MessageResponseSchemas';
 import type {HarvestStatusResponse} from '@fluxer/schema/src/domains/user/UserHarvestSchemas';
-import type {PasswordChangeCompleteResponse, UserPrivate} from '@fluxer/schema/src/domains/user/UserResponseSchemas';
+import type {
+	PasswordChangeCompleteResponse,
+	PhoneGateEscapePreviewResponse,
+	UserPrivate,
+} from '@fluxer/schema/src/domains/user/UserResponseSchemas';
 import type {PublicKeyCredentialCreationOptionsJSON, RegistrationResponseJSON} from '@simplewebauthn/browser';
 
 export interface BulkDeleteMyMessagesFilter {
@@ -158,8 +162,14 @@ function requestNewEmailBody(
 	ticket: string,
 	newEmail: string,
 	originalProof: string,
-): {ticket: string; new_email: string; original_proof: string} {
-	return {ticket, new_email: newEmail, original_proof: originalProof};
+	newPassword?: string,
+): {ticket: string; new_email: string; original_proof: string; new_password?: string} {
+	return {
+		ticket,
+		new_email: newEmail,
+		original_proof: originalProof,
+		...(newPassword != null ? {new_password: newPassword} : {}),
+	};
 }
 
 function verifyNewEmailBody(
@@ -273,6 +283,29 @@ export async function checkFluxerTagAvailability({
 	}
 }
 
+export async function getPhoneGateEscapePreview(): Promise<PhoneGateEscapePreviewResponse> {
+	try {
+		logger.debug('Fetching phone gate escape preview');
+		const response = await http.get<PhoneGateEscapePreviewResponse>(Endpoints.USER_REQUIRED_ACTION_PHONE_GATE_ESCAPE);
+		return response.body;
+	} catch (error) {
+		logger.error('Failed to fetch phone gate escape preview', error);
+		throw error;
+	}
+}
+
+export async function executePhoneGateEscape(): Promise<UserPrivate> {
+	try {
+		logger.debug('Setting the phone gate check aside');
+		const response = await http.post<UserPrivate>(Endpoints.USER_REQUIRED_ACTION_PHONE_GATE_ESCAPE, {body: {}});
+		logger.debug('Phone gate check set aside');
+		return response.body;
+	} catch (error) {
+		logger.error('Failed to set the phone gate check aside', error);
+		throw error;
+	}
+}
+
 export async function startInboundPhoneChallenge(): Promise<InboundPhoneChallengeResponse> {
 	try {
 		logger.debug('Starting inbound phone challenge');
@@ -365,11 +398,12 @@ export async function requestEmailChangeNew(
 	ticket: string,
 	newEmail: string,
 	originalProof: string,
+	newPassword?: string,
 ): Promise<EmailChangeRequestNewResponse> {
 	try {
 		logger.debug('Requesting new email code');
 		const response = await http.post<EmailChangeRequestNewResponse>(Endpoints.USER_EMAIL_CHANGE_REQUEST_NEW, {
-			body: requestNewEmailBody(ticket, newEmail, originalProof),
+			body: requestNewEmailBody(ticket, newEmail, originalProof, newPassword),
 		});
 		return response.body;
 	} catch (error) {

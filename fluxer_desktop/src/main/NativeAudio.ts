@@ -14,20 +14,19 @@ import type {
 	VirtmicNode,
 	VirtmicRoutingGraph,
 } from '@electron/common/Types';
+import {buildFluxerAudioExcludePatterns, isKnownFluxerAudioProcessPid} from '@electron/main/FluxerAudioIdentity';
 import {getNativeAudioMode} from '@electron/main/LaunchOptions';
-import {ipcMain} from 'electron';
-import {buildFluxerAudioExcludePatterns, isKnownFluxerAudioProcessPid} from './FluxerAudioIdentity';
-import {resolveVirtmicWindowPid} from './LinuxAudioCapture';
-import {parseWindowSourceToken as parseDesktopWindowSourceToken} from './LinuxAudioCaptureHelpers';
-import {getTccStatus} from './MacTcc';
+import {resolveVirtmicWindowPid} from '@electron/main/LinuxAudioCapture';
+import {parseWindowSourceToken as parseDesktopWindowSourceToken} from '@electron/main/LinuxAudioCaptureHelpers';
+import {getTccStatus} from '@electron/main/MacTcc';
 import {
 	audioFrameDebugDetails,
 	isValidAudioFrame,
 	isValidLinuxRule,
 	isValidTargetPid,
 	normalizeTimestampUs,
-} from './NativeAudioValidation';
-import {createScreenAudioSinkHandleForSender, hasActiveNativeEngineForSender} from './NativeVoiceEngine';
+} from '@electron/main/NativeAudioValidation';
+import {ipcMain} from 'electron';
 
 const logger = createChildLogger('NativeAudio');
 const requireModule = createRequire(import.meta.url);
@@ -41,8 +40,7 @@ interface NativeCaptureInstance {
 	removeListener(event: 'closed', listener: () => void): this;
 	start(): Promise<void> | void;
 	stop(): Promise<void> | void;
-	setScreenAudioSink?: (handle: unknown) => boolean;
-	clearScreenAudioSink?: () => void;
+	setRoutingRule?: (target: {linuxRule: NonNullable<NativeAudioStartOptions['linuxRule']>}) => boolean;
 	routingGraph?: () => VirtmicRoutingGraph | null;
 }
 
@@ -634,6 +632,23 @@ async function stopCaptureById(
 	await stopActiveSession(session, reason, detail);
 }
 
+function reconfigureCaptureById(
+	senderId: number,
+	captureId: string,
+	linuxRule: NonNullable<NativeAudioStartOptions['linuxRule']>,
+): boolean {
+	const session = activeSessions.get(captureId);
+	if (!session || session.sender.id !== senderId) return false;
+	if (session.finalized || session.stopping) return false;
+	if (typeof session.capture.setRoutingRule !== 'function') return false;
+	try {
+		return session.capture.setRoutingRule({linuxRule});
+	} catch (error) {
+		logger.warn('Failed to reconfigure native audio routing in place', {captureId, error});
+		return false;
+	}
+}
+
 async function makeRoomForSenderSession(senderId: number): Promise<void> {
 	const senderSessions = activeSessionIdsBySenderId.get(senderId);
 	if (!senderSessions) return;
@@ -749,8 +764,6 @@ async function startNativeAudioCapture(
 		throw new Error('Native audio addon unavailable for this platform');
 	}
 	let firstFrameLogged = false;
-	let nativeSinkAttached = false;
-	let slowPathReported = false;
 	const session: ActiveNativeAudioSession = {
 		captureId,
 		capture,
@@ -772,19 +785,6 @@ async function startNativeAudioCapture(
 				stopActiveSession(session, 'stopped').catch((error) =>
 					logger.warn('stopActiveSession failed after sender destroyed', {captureId, error}),
 				);
-				return;
-			}
-			if (nativeSinkAttached) {
-				if (!slowPathReported) {
-					slowPathReported = true;
-					logger.error(
-						'Native screen-audio fast path stopped engaging: a captured frame reached the JS bridge even though the native engine sink is attached. Failing the capture so this critical regression surfaces immediately instead of silently downgrading to the crackle-prone path.',
-						{captureId, senderId: sender.id, sampleRate: frame.sampleRate, channels: frame.channels},
-					);
-					stopActiveSession(session, 'addon-error', 'native screen-audio fast path stopped engaging').catch((error) =>
-						logger.warn('stopActiveSession failed after native fast-path regression', {captureId, error}),
-					);
-				}
 				return;
 			}
 			try {
@@ -830,25 +830,6 @@ async function startNativeAudioCapture(
 	activeSessions.set(captureId, session);
 	rememberSenderSession(sender.id, captureId);
 	try {
-		if (hasActiveNativeEngineForSender(sender.id)) {
-			if (typeof capture.setScreenAudioSink !== 'function') {
-				throw new Error(
-					`Native screen-audio fast path unavailable for capture ${captureId}: capture binding lacks setScreenAudioSink (stale native build)`,
-				);
-			}
-			const screenAudioSink = createScreenAudioSinkHandleForSender(sender.id);
-			if (!screenAudioSink) {
-				throw new Error(
-					`Native screen-audio fast path unavailable for capture ${captureId}: native voice engine produced no sink handle for the active session`,
-				);
-			}
-			if (capture.setScreenAudioSink(screenAudioSink) !== true) {
-				throw new Error(
-					`Native screen-audio fast path unavailable for capture ${captureId}: native capture binding does not implement setScreenAudioSink (stale native build)`,
-				);
-			}
-			nativeSinkAttached = true;
-		}
 		await Promise.resolve(capture.start());
 	} catch (error) {
 		logger.error('Native audio capture failed to start', {captureId, error});
@@ -922,6 +903,15 @@ export function registerNativeAudioHandlers(): void {
 		(event, options: NativeAudioStartOptions): Promise<NativeAudioStartResult> =>
 			startNativeAudioCapture(event.sender, options),
 	);
+	ipcMain.handle(
+		'native-audio:set-rule',
+		(event, captureId: unknown, linuxRule: NativeAudioStartOptions['linuxRule']): boolean => {
+			if (typeof captureId !== 'string' || !isValidLinuxRule(linuxRule)) {
+				return false;
+			}
+			return reconfigureCaptureById(event.sender.id, captureId, linuxRule);
+		},
+	);
 	ipcMain.handle('native-audio:stop', async (event, captureId: string): Promise<void> => {
 		const session = activeSessions.get(captureId);
 		if (!session || session.sender.id !== event.sender.id) {
@@ -941,6 +931,7 @@ export function cleanupNativeAudio(): void {
 	ipcMain.removeHandler('native-audio:list-applications');
 	ipcMain.removeHandler('native-audio:resolve-root-pid');
 	ipcMain.removeHandler('native-audio:start');
+	ipcMain.removeHandler('native-audio:set-rule');
 	ipcMain.removeHandler('native-audio:stop');
 	ipcMain.removeHandler('native-audio:get-routing-graph');
 	handlersRegistered = false;

@@ -2,7 +2,8 @@
 
 import * as AccessibilityCommands from '@app/features/accessibility/commands/AccessibilityCommands';
 import Accessibility from '@app/features/accessibility/state/Accessibility';
-import {ComponentDispatch} from '@app/features/platform/utils/ComponentBus';
+import {ComponentBus} from '@app/features/platform/utils/ComponentBus';
+import {remFromPx} from '@app/features/theme/layout/RemFromPx';
 import {Switch} from '@app/features/ui/components/form/FormSwitch';
 import {RadioGroup, type RadioOption} from '@app/features/ui/radio_group/RadioGroup';
 import Notification, {TTSNotificationMode} from '@app/features/ui/state/Notification';
@@ -63,7 +64,7 @@ export const TextToSpeech = observer(() => {
 		AccessibilityCommands.update({enableTTSCommand: value});
 	}, []);
 	const handleAccessibilityLinkClick = useCallback(() => {
-		ComponentDispatch.dispatch('USER_SETTINGS_TAB_SELECT', {tab: 'accessibility', section: 'tts'});
+		ComponentBus.dispatch('USER_SETTINGS_TAB_SELECT', {tab: 'accessibility', section: 'tts'});
 	}, []);
 	const ttsNotificationMode = Notification.getTTSNotificationMode();
 	const ttsNotificationOptions: Array<RadioOption<TTSNotificationMode>> = [
@@ -97,7 +98,7 @@ export const TextToSpeech = observer(() => {
 			/>
 			<div className={styles.helperCallout} data-flx="user.notifications-tab.text-to-speech.helper-callout">
 				<InfoIcon
-					size={16}
+					size={remFromPx(16)}
 					weight="fill"
 					className={styles.helperIcon}
 					data-flx="user.notifications-tab.text-to-speech.helper-icon"

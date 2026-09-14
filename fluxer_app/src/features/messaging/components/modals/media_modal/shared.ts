@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {msg} from '@lingui/core/macro';
-import type {ReactNode} from 'react';
+import type {MouseEventHandler, ReactNode} from 'react';
 
 export type ZoomState = 'fit' | 'zoomed';
 
@@ -23,6 +23,7 @@ export interface MediaModalProps {
 	onOpenInBrowser?: () => void;
 	onCopyLink?: () => void;
 	onCopyMedia?: () => void;
+	onDeleteAttachment?: MouseEventHandler<HTMLButtonElement>;
 	onReply?: () => void;
 	onForward?: () => void;
 	onInfo?: () => void;
@@ -94,7 +95,7 @@ export const ROTATE_CLOCKWISE_DESCRIPTOR = msg({
 	comment: 'Tooltip on the media viewer button that rotates the current media item 90 degrees clockwise.',
 });
 export const ROTATE_ANTICLOCKWISE_DESCRIPTOR = msg({
-	message: 'Rotate anticlockwise',
+	message: 'Rotate counterclockwise',
 	comment: 'Tooltip on the media viewer button that rotates the current media item 90 degrees anticlockwise.',
 });
 export const FORWARD_MEDIA_DESCRIPTOR = msg({

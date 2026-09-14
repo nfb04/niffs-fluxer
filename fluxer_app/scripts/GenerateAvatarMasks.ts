@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {TYPING_BRIDGE_RIGHT_SHIFT_RATIO, TYPING_WIDTH_MULTIPLIER} from '../src/features/ui/constants/TypingConstants';
+import {TYPING_BRIDGE_RIGHT_SHIFT_RATIO, TYPING_WIDTH_MULTIPLIER} from '@app/features/ui/constants/TypingConstants';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,7 +20,7 @@ const LARGE_STATUS_CUTOUT_GUTTER_RATIO = 0.2;
 
 const STATUS_CONFIG: Record<number, StatusConfig> = {
 	16: {statusSize: 10, cutoutRadius: 5, cutoutCenter: 13},
-	20: {statusSize: 10, cutoutRadius: 5, cutoutCenter: 17},
+	20: {statusSize: 10, cutoutRadius: 6, cutoutCenter: 17},
 	24: {statusSize: 10, cutoutRadius: 7, cutoutCenter: 20},
 	32: {statusSize: 10, cutoutRadius: 8, cutoutCenter: 27},
 	36: {statusSize: 10, cutoutRadius: 8, cutoutCenter: 30},
@@ -181,16 +181,19 @@ function generateAvatarMaskStatusTyping(size: number): string {
 	const r = size / 2;
 	const status = calculateStatusGeometry(size);
 	const typingWidth = Math.round(status.size * TYPING_WIDTH_MULTIPLIER);
-	const typingHeight = status.size;
 	const typingRx = status.outerRadius;
 	const typingExtension = Math.max(0, typingWidth - status.size);
 	const typingBridgeShift = typingExtension * TYPING_BRIDGE_RIGHT_SHIFT_RATIO;
-	const x = status.cx - typingWidth / 2 + typingBridgeShift;
-	const y = status.cy - typingHeight / 2;
+	const leftCx = status.cx - typingExtension + typingBridgeShift;
+	const rightCx = status.cx + typingBridgeShift;
+	const y = status.cy - typingRx;
+	const bridgeHeight = typingRx * 2;
 	return `(
 				<>
 					<circle fill="white" cx="${r}" cy="${r}" r="${r}" />
-					<rect fill="black" x="${x}" y="${y}" width="${typingWidth}" height="${typingHeight}" rx="${typingRx}" ry="${typingRx}" />
+					<circle fill="black" cx="${rightCx}" cy="${status.cy}" r="${typingRx}" />
+					<rect fill="black" x="${leftCx}" y="${y}" width="${typingExtension}" height="${bridgeHeight}" />
+					<circle fill="black" cx="${leftCx}" cy="${status.cy}" r="${typingRx}" />
 				</>
 			)`;
 }
@@ -285,7 +288,7 @@ function generateStatusTyping(size: number): string {
 	const rx = status.outerRadius;
 	const typingExtension = Math.max(0, typingWidth - status.size);
 	const typingBridgeShift = typingExtension * TYPING_BRIDGE_RIGHT_SHIFT_RATIO;
-	const x = status.cx - typingWidth / 2 + typingBridgeShift;
+	const x = status.cx - status.size / 2 - typingExtension + typingBridgeShift;
 	const y = status.cy - typingHeight / 2;
 	return `<rect fill="white" x="${x}" y="${y}" width="${typingWidth}" height="${typingHeight}" rx="${rx}" ry="${rx}" />`;
 }
@@ -404,12 +407,17 @@ for (const size of SIZES) {
 	const offlineInnerR = Math.round(status.innerRadius * DESIGN_RULES.offline.innerRingRatio) / size;
 	const typingWidthPx = Math.round(status.size * TYPING_WIDTH_MULTIPLIER);
 	const typingExtensionPx = Math.max(0, typingWidthPx - status.size);
-	const typingBridgeShift = (typingExtensionPx * TYPING_BRIDGE_RIGHT_SHIFT_RATIO) / size;
 	const typingWidth = typingWidthPx / size;
 	const typingHeight = status.size / size;
-	const typingX = cx - typingWidth / 2 + typingBridgeShift;
+	const typingX =
+		(status.cx - status.size / 2 - typingExtensionPx + typingExtensionPx * TYPING_BRIDGE_RIGHT_SHIFT_RATIO) / size;
 	const typingY = cy - typingHeight / 2;
 	const typingRx = status.outerRadius / size;
+	const typingCutoutLeftCx =
+		(status.cx - typingExtensionPx + typingExtensionPx * TYPING_BRIDGE_RIGHT_SHIFT_RATIO) / size;
+	const typingCutoutRightCx = (status.cx + typingExtensionPx * TYPING_BRIDGE_RIGHT_SHIFT_RATIO) / size;
+	const typingCutoutY = (status.cy - status.outerRadius) / size;
+	const typingCutoutHeight = (status.outerRadius * 2) / size;
 	const cutoutPhoneWidth = (mobileStatus.phoneWidth + mobileStatus.borderWidth * 2) / size;
 	const cutoutPhoneHeight = (mobileStatus.phoneHeight + mobileStatus.borderWidth * 2) / size;
 	const cutoutPhoneX = (mobileStatus.phoneX - mobileStatus.borderWidth) / size;
@@ -436,72 +444,74 @@ for (const size of SIZES) {
 	const mobileScreenHeight = ((screenHeightPx / mobileStatus.phoneHeight) * DESIGN_RULES.mobileAspectRatio).toFixed(4);
 	const mobileScreenRx = (screenRxPx / mobileStatus.phoneWidth).toFixed(4);
 	const mobileScreenRy = ((screenRxPx / mobileStatus.phoneWidth) * DESIGN_RULES.mobileAspectRatio).toFixed(4);
-	output += `			<mask id="svg-mask-avatar-default-${size}" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
+	output += `			<mask id="flx-mask-avatar-plain-${size}" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
 				<circle fill="white" cx="0.5" cy="0.5" r="0.5" />
 			</mask>
-			<mask id="svg-mask-avatar-status-round-${size}" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
+			<mask id="flx-mask-avatar-notch-circle-${size}" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
 				<circle fill="white" cx="0.5" cy="0.5" r="0.5" />
 				<circle fill="black" cx="${formatNumber(cx)}" cy="${formatNumber(cy)}" r="${formatNumber(r)}" />
 			</mask>
-			<mask id="svg-mask-avatar-status-mobile-${size}" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
+			<mask id="flx-mask-avatar-notch-phone-${size}" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
 				<circle fill="white" cx="0.5" cy="0.5" r="0.5" />
 				<rect fill="black" x="${formatNumber(cutoutPhoneX)}" y="${formatNumber(cutoutPhoneY)}" width="${formatNumber(cutoutPhoneWidth)}" height="${formatNumber(cutoutPhoneHeight)}" rx="${formatNumber(cutoutPhoneRx)}" ry="${formatNumber(cutoutPhoneRx)}" />
 			</mask>
-			<mask id="svg-mask-avatar-status-typing-${size}" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
+			<mask id="flx-mask-avatar-notch-typing-${size}" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
 				<circle fill="white" cx="0.5" cy="0.5" r="0.5" />
-				<rect fill="black" x="${formatNumber(typingX)}" y="${formatNumber(typingY)}" width="${formatNumber(typingWidth)}" height="${formatNumber(typingHeight)}" rx="${formatNumber(typingRx)}" ry="${formatNumber(typingRx)}" />
+				<circle fill="black" cx="${formatNumber(typingCutoutRightCx)}" cy="${formatNumber(cy)}" r="${formatNumber(typingRx)}" />
+				<rect fill="black" x="${formatNumber(typingCutoutLeftCx)}" y="${formatNumber(typingCutoutY)}" width="${formatNumber(typingExtensionPx / size)}" height="${formatNumber(typingCutoutHeight)}" />
+				<circle fill="black" cx="${formatNumber(typingCutoutLeftCx)}" cy="${formatNumber(cy)}" r="${formatNumber(typingRx)}" />
 			</mask>
-			<mask id="svg-mask-status-online-${size}" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
+			<mask id="flx-mask-presence-online-${size}" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
 				<circle fill="white" cx="${formatNumber(cx)}" cy="${formatNumber(cy)}" r="${formatNumber(r)}" />
 			</mask>
-			<mask id="svg-mask-status-online-mobile-${size}" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
+			<mask id="flx-mask-presence-online-mobile-${size}" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
 				<rect fill="white" x="0" y="0" width="1" height="1" rx="${DESIGN_RULES.mobileCornerRadius}" ry="${(DESIGN_RULES.mobileCornerRadius * DESIGN_RULES.mobileAspectRatio).toFixed(4)}" />
 				<rect fill="black" x="${mobileScreenX}" y="${mobileScreenY}" width="${mobileScreenWidth}" height="${mobileScreenHeight}" rx="${mobileScreenRx}" ry="${mobileScreenRy}" />
 				<ellipse fill="black" cx="0.5" cy="${DESIGN_RULES.mobileWheelY}" rx="${DESIGN_RULES.mobileWheelRadius}" ry="${(DESIGN_RULES.mobileWheelRadius * DESIGN_RULES.mobileAspectRatio).toFixed(4)}" />
 			</mask>
-			<mask id="svg-mask-status-idle-${size}" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
+			<mask id="flx-mask-presence-idle-${size}" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
 				<circle fill="white" cx="${formatNumber(cx)}" cy="${formatNumber(cy)}" r="${formatNumber(r)}" />
 				<circle fill="black" cx="${formatNumber(idleCutoutCx)}" cy="${formatNumber(idleCutoutCy)}" r="${formatNumber(idleCutoutR)}" />
 			</mask>
-			<mask id="svg-mask-status-dnd-${size}" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
+			<mask id="flx-mask-presence-dnd-${size}" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
 				<circle fill="white" cx="${formatNumber(cx)}" cy="${formatNumber(cy)}" r="${formatNumber(r)}" />
 				<rect fill="black" x="${formatNumber(dndBarX)}" y="${formatNumber(dndBarY)}" width="${formatNumber(dndBarWidth)}" height="${formatNumber(dndBarHeight)}" rx="${formatNumber(dndBarRx)}" ry="${formatNumber(dndBarRx)}" />
 			</mask>
-			<mask id="svg-mask-status-offline-${size}" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
+			<mask id="flx-mask-presence-offline-${size}" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
 				<circle fill="white" cx="${formatNumber(cx)}" cy="${formatNumber(cy)}" r="${formatNumber(r)}" />
 				<circle fill="black" cx="${formatNumber(cx)}" cy="${formatNumber(cy)}" r="${formatNumber(offlineInnerR)}" />
 			</mask>
-			<mask id="svg-mask-status-typing-${size}" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
+			<mask id="flx-mask-presence-typing-${size}" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
 				<rect fill="white" x="${formatNumber(typingX)}" y="${formatNumber(typingY)}" width="${formatNumber(typingWidth)}" height="${formatNumber(typingHeight)}" rx="${formatNumber(typingRx)}" ry="${formatNumber(typingRx)}" />
 			</mask>
 
 `;
 }
 
-output += `			<mask id="svg-mask-status-online" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
+output += `			<mask id="flx-mask-presence-online" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
 				<circle fill="white" cx="0.5" cy="0.5" r="0.5" />
 			</mask>
-			<mask id="svg-mask-status-idle" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
+			<mask id="flx-mask-presence-idle" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
 				<circle fill="white" cx="0.5" cy="0.5" r="0.5" />
 				<circle fill="black" cx="0.25" cy="0.25" r="0.375" />
 			</mask>
-			<mask id="svg-mask-status-dnd" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
+			<mask id="flx-mask-presence-dnd" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
 				<circle fill="white" cx="0.5" cy="0.5" r="0.5" />
 				<rect fill="black" x="0.125" y="0.375" width="0.75" height="0.25" rx="0.125" ry="0.125" />
 			</mask>
-			<mask id="svg-mask-status-offline" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
+			<mask id="flx-mask-presence-offline" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
 				<circle fill="white" cx="0.5" cy="0.5" r="0.5" />
 				<circle fill="black" cx="0.5" cy="0.5" r="0.25" />
 			</mask>
-			<mask id="svg-mask-status-typing" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
+			<mask id="flx-mask-presence-typing" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
 				<rect fill="white" x="0" y="0" width="1" height="1" rx="0.5" ry="0.5" />
 			</mask>
-			<mask id="svg-mask-status-online-mobile" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
+			<mask id="flx-mask-presence-online-mobile" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
 				<rect fill="white" x="0" y="0" width="1" height="1" rx="${DESIGN_RULES.mobileCornerRadius}" ry="${(DESIGN_RULES.mobileCornerRadius * DESIGN_RULES.mobileAspectRatio).toFixed(2)}" />
 				<rect fill="black" x="${((1 - DESIGN_RULES.mobileScreenWidth) / 2).toFixed(4)}" y="${DESIGN_RULES.mobileScreenY}" width="${DESIGN_RULES.mobileScreenWidth}" height="${(DESIGN_RULES.mobileScreenHeight * DESIGN_RULES.mobileAspectRatio).toFixed(4)}" rx="0.04" ry="${(0.04 * DESIGN_RULES.mobileAspectRatio).toFixed(2)}" />
 				<ellipse fill="black" cx="0.5" cy="${DESIGN_RULES.mobileWheelY}" rx="${DESIGN_RULES.mobileWheelRadius}" ry="${(DESIGN_RULES.mobileWheelRadius * DESIGN_RULES.mobileAspectRatio).toFixed(3)}" />
 			</mask>
-			<mask id="svg-mask-avatar-default" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
+			<mask id="flx-mask-avatar-plain" maskContentUnits="objectBoundingBox" viewBox="0 0 1 1">
 				<circle fill="white" cx="0.5" cy="0.5" r="0.5" />
 			</mask>
 		</defs>

@@ -16,14 +16,17 @@ import {getAcceptString, getAssetFormatErrorMessage} from '@app/features/express
 import {isSvgFile} from '@app/features/expressions/utils/ImageUploadFileUtils';
 import {CloneAllowedToggle} from '@app/features/guild/components/modals/guild_tabs/CloneAllowedToggle';
 import styles from '@app/features/guild/components/modals/guild_tabs/GuildStickersTab.module.css';
+import {resolveEnclosingScrollSurface} from '@app/features/guild/components/modals/guild_tabs/GuildStickersTabScrollSurface';
 import {UploadDropZone} from '@app/features/guild/components/UploadDropZone';
 import {UploadSlotInfo} from '@app/features/guild/components/UploadSlotInfo';
 import Guilds from '@app/features/guild/state/Guilds';
 import {OKAY_DESCRIPTOR, TRY_AGAIN_DESCRIPTOR} from '@app/features/i18n/utils/CommonMessageDescriptors';
+import {NearViewportSurfaceContext} from '@app/features/messaging/hooks/useNearViewport';
 import {openFilePicker} from '@app/features/messaging/utils/FilePickerUtils';
 import {formatFileSize} from '@app/features/messaging/utils/FileUtils';
 import Permission from '@app/features/permissions/state/Permission';
 import {Logger} from '@app/features/platform/utils/AppLogger';
+import {remFromPx} from '@app/features/theme/layout/RemFromPx';
 import * as ModalCommands from '@app/features/ui/commands/ModalCommands';
 import {modal} from '@app/features/ui/commands/ModalCommands';
 import {Input} from '@app/features/ui/components/form/FormInput';
@@ -41,7 +44,7 @@ import {clsx} from 'clsx';
 import {matchSorter} from 'match-sorter';
 import {observer} from 'mobx-react-lite';
 import type React from 'react';
-import {useCallback, useEffect, useMemo, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 const SEARCH_STICKERS_DESCRIPTOR = msg({
 	message: 'Search stickers',
@@ -91,6 +94,8 @@ const GuildStickersTab: React.FC<{guildId: string}> = observer(function GuildSti
 	const [stickers, setStickers] = useState<ReadonlyArray<GuildStickerWithUser>>([]);
 	const [fetchStatus, setFetchStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
 	const [searchQuery, setSearchQuery] = useState('');
+	const gridRef = useRef<HTMLDivElement | null>(null);
+	const resolveGridScrollSurface = useCallback(() => resolveEnclosingScrollSurface(gridRef.current), []);
 	const layoutState = EmojiStickerLayout;
 	const viewMode = layoutState.getStickerViewMode();
 	const guild = Guilds.getGuild(guildId);
@@ -222,7 +227,7 @@ const GuildStickersTab: React.FC<{guildId: string}> = observer(function GuildSti
 		},
 		[canManageExpressions, canCreateExpressions, currentUserId],
 	);
-	const stickerMaxSizeLabel = formatFileSize(GlobalLimits.getStickerMaxSize());
+	const stickerMaxSizeLabel = formatFileSize(i18n.locale, GlobalLimits.getStickerMaxSize());
 	return (
 		<div className={styles.container} data-flx="guild.guild-tabs.guild-stickers-tab.container">
 			<CloneAllowedToggle
@@ -238,7 +243,7 @@ const GuildStickersTab: React.FC<{guildId: string}> = observer(function GuildSti
 					onChange={(e) => setSearchQuery(e.target.value)}
 					leftIcon={
 						<MagnifyingGlassIcon
-							size={16}
+							size={remFromPx(16)}
 							weight="bold"
 							data-flx="guild.guild-tabs.guild-stickers-tab.magnifying-glass-icon"
 						/>
@@ -308,21 +313,24 @@ const GuildStickersTab: React.FC<{guildId: string}> = observer(function GuildSti
 				/>
 			)}
 			{fetchStatus === 'success' && filteredStickers.length > 0 && (
-				<div
-					className={clsx(styles.stickerGrid, viewMode === 'compact' ? styles.compactGrid : styles.cozyGrid)}
-					data-flx="guild.guild-tabs.guild-stickers-tab.sticker-grid"
-				>
-					{filteredStickers.map((sticker) => (
-						<StickerGridItem
-							key={sticker.id}
-							guildId={guildId}
-							sticker={sticker}
-							canModify={canModifySticker(sticker)}
-							onUpdate={fetchStickers}
-							data-flx="guild.guild-tabs.guild-stickers-tab.sticker-grid-item"
-						/>
-					))}
-				</div>
+				<NearViewportSurfaceContext.Provider value={resolveGridScrollSurface}>
+					<div
+						ref={gridRef}
+						className={clsx(styles.stickerGrid, viewMode === 'compact' ? styles.compactGrid : styles.cozyGrid)}
+						data-flx="guild.guild-tabs.guild-stickers-tab.sticker-grid"
+					>
+						{filteredStickers.map((sticker) => (
+							<StickerGridItem
+								key={sticker.id}
+								guildId={guildId}
+								sticker={sticker}
+								canModify={canModifySticker(sticker)}
+								onUpdate={fetchStickers}
+								data-flx="guild.guild-tabs.guild-stickers-tab.sticker-grid-item"
+							/>
+						))}
+					</div>
+				</NearViewportSurfaceContext.Provider>
 			)}
 			{fetchStatus === 'error' && (
 				<StatusSlate

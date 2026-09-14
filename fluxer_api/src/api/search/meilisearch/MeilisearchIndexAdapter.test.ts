@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import type {MeilisearchClient, MeilisearchTask} from '@app/api/search/meilisearch/MeilisearchClient';
+import {MeilisearchMessageAdapter} from '@app/api/search/meilisearch/MeilisearchDomainAdapters';
+import {MEILISEARCH_MAX_TRACKED_BULK_TASKS} from '@app/api/search/meilisearch/MeilisearchIndexAdapter';
 import type {SearchableMessage} from '@fluxer/schema/src/contracts/search/SearchDocumentTypes';
 import {describe, expect, it} from 'vitest';
-import type {MeilisearchClient, MeilisearchTask} from './MeilisearchClient';
-import {MeilisearchMessageAdapter} from './MeilisearchDomainAdapters';
 
 interface RecordedMeilisearchRequest {
 	method: string;
@@ -29,10 +30,13 @@ class FakeMeilisearchClient implements MeilisearchClient {
 			this.indexExists = true;
 			return this.nextTask() as TResponse;
 		}
-		if (method === 'PUT' && path.includes('/settings/')) {
+		if ((method === 'PUT' || method === 'PATCH') && path.includes('/settings/')) {
 			return this.nextTask() as TResponse;
 		}
 		if (method === 'POST' && path.endsWith('/documents')) {
+			return this.nextTask() as TResponse;
+		}
+		if (method === 'POST' && path.endsWith('/documents/delete-batch')) {
 			return this.nextTask() as TResponse;
 		}
 		if (method === 'POST' && path.endsWith('/search')) {
@@ -75,8 +79,12 @@ describe('MeilisearchMessageAdapter', () => {
 			'PUT /indexes/messages/settings/searchable-attributes',
 			'PUT /indexes/messages/settings/filterable-attributes',
 			'PUT /indexes/messages/settings/sortable-attributes',
+			'PATCH /indexes/messages/settings/pagination',
 		]);
-		expect(client.waitedTaskUids).toEqual([1, 2, 3, 4]);
+		expect(client.waitedTaskUids).toEqual([1, 2, 3, 4, 5]);
+		expect(client.requests.find((request) => request.path.endsWith('/settings/pagination'))?.body).toEqual({
+			maxTotalHits: 10000,
+		});
 	});
 
 	it('builds Meilisearch search requests from message filters', async () => {
@@ -116,17 +124,66 @@ describe('MeilisearchMessageAdapter', () => {
 		});
 	});
 
-	it('waits for queued write tasks when refreshed', async () => {
+	it('waits for queued bulk index tasks when refreshed', async () => {
 		const client = new FakeMeilisearchClient();
 		client.indexExists = true;
 		const adapter = new MeilisearchMessageAdapter({client});
 		await adapter.initialize();
 		client.clear();
 
-		await adapter.indexDocument({id: 'message-1'} as SearchableMessage);
+		await adapter.bulkIndexDocuments([{id: 'message-1'} as SearchableMessage]);
 
 		expect(client.waitedTaskUids).toEqual([]);
 		await adapter.refreshIndex();
-		expect(client.waitedTaskUids).toEqual([4]);
+		expect(client.waitedTaskUids).toEqual([5]);
+	});
+
+	it('does not retain task state for per-document writes', async () => {
+		const client = new FakeMeilisearchClient();
+		client.indexExists = true;
+		const adapter = new MeilisearchMessageAdapter({client});
+		await adapter.initialize();
+		client.clear();
+
+		for (let index = 0; index < 500; index++) {
+			await adapter.indexDocument({id: `message-${index}`} as SearchableMessage);
+			await adapter.updateDocument({id: `message-${index}`} as SearchableMessage);
+			await adapter.deleteDocument(`message-${index}`);
+		}
+
+		expect(client.requests).toHaveLength(1500);
+		await adapter.refreshIndex();
+		expect(client.waitedTaskUids).toEqual([]);
+	});
+
+	it('bounds the tracked bulk task set', async () => {
+		const client = new FakeMeilisearchClient();
+		client.indexExists = true;
+		const adapter = new MeilisearchMessageAdapter({client});
+		await adapter.initialize();
+		client.clear();
+
+		const batches = MEILISEARCH_MAX_TRACKED_BULK_TASKS + 100;
+		for (let index = 0; index < batches; index++) {
+			await adapter.bulkIndexDocuments([{id: `message-${index}`} as SearchableMessage]);
+		}
+
+		await adapter.refreshIndex();
+		expect(client.waitedTaskUids).toHaveLength(MEILISEARCH_MAX_TRACKED_BULK_TASKS);
+		expect(client.waitedTaskUids[0]).toBe(105);
+	});
+
+	it('drops tracked bulk tasks on shutdown', async () => {
+		const client = new FakeMeilisearchClient();
+		client.indexExists = true;
+		const adapter = new MeilisearchMessageAdapter({client});
+		await adapter.initialize();
+		client.clear();
+
+		await adapter.bulkIndexDocuments([{id: 'message-1'} as SearchableMessage]);
+		await adapter.shutdown();
+		await adapter.refreshIndex();
+
+		expect(client.waitedTaskUids).toEqual([]);
 	});
 });

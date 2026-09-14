@@ -10,7 +10,6 @@ export interface GuildEmojiShape {
 	allNamesString: string;
 	url: string;
 	animated: boolean;
-	nsfw?: boolean;
 	user?: UserPartial;
 }
 
@@ -23,11 +22,11 @@ export interface UnicodeEmoji {
 	allNamesString: string;
 	url?: string;
 	surrogates: string;
-	hasDiversity: boolean;
+	hasSkinTones: boolean;
 	managed: boolean;
 	useSpriteSheet: boolean;
 	index?: number;
-	diversityIndex?: number;
+	skinToneIndex?: number;
 	guildId?: string;
 }
 
@@ -39,7 +38,7 @@ export type FlatEmoji = Readonly<
 			uniqueName: string;
 			useSpriteSheet?: boolean;
 			index?: number;
-			diversityIndex?: number;
-			hasDiversity?: boolean;
+			skinToneIndex?: number;
+			hasSkinTones?: boolean;
 		}
 >;

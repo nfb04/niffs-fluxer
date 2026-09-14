@@ -6,7 +6,6 @@ import styles from '@app/features/channel/components/TypingUsers.module.css';
 import type {Channel} from '@app/features/channel/models/Channel';
 import DeveloperOptions from '@app/features/devtools/state/DeveloperOptions';
 import GuildMembers from '@app/features/member/state/GuildMembers';
-import {ComponentDispatch} from '@app/features/platform/utils/ComponentBus';
 import Relationships from '@app/features/relationship/state/Relationships';
 import messageStyles from '@app/features/theme/styles/Message.module.css';
 import TypingIndicator from '@app/features/typing/state/TypingIndicator';
@@ -18,7 +17,6 @@ import type {I18n} from '@lingui/core';
 import {msg} from '@lingui/core/macro';
 import {Trans, useLingui} from '@lingui/react/macro';
 import {observer} from 'mobx-react-lite';
-import {useEffect, useState} from 'react';
 
 const SEVERAL_PEOPLE_ARE_TYPING_DESCRIPTOR = msg({
 	message: 'Several people are typing...',
@@ -45,7 +43,7 @@ const HANDFUL_DESCRIPTOR = A_HANDFUL_OF_KEYBOARD_WARRIORS_ARE_ASSEMBLING_DESCRIP
 const SYMPHONY_DESCRIPTOR = A_SYMPHONY_OF_CLACKING_KEYS_IS_UNDERWAY_DESCRIPTOR;
 const FIESTA_DESCRIPTOR = IT_S_A_FULL_BLOWN_TYPING_FIESTA_IN_DESCRIPTOR;
 const APOCALYPSE_DESCRIPTOR = WHOA_IT_S_A_TYPING_APOCALYPSE_DESCRIPTOR;
-const getDisplayName = (user: User, guildId?: string | null) => NicknameUtils.getNickname(user, guildId ?? undefined);
+const getDisplayName = (user: User, guildId?: string | null) => NicknameUtils.getNickname(user, guildId ?? null);
 export const getTypingText = (i18n: I18n, typingUsers: ReadonlyArray<User>, channel: Channel) => {
 	const [a, b, c] = typingUsers.map((user) => {
 		const member = GuildMembers.getMember(channel.guildId ?? '', user.id);
@@ -111,26 +109,16 @@ const AVATAR_THRESHOLD = 5;
 export const TypingUsers = observer(
 	({channel, withText = true, showAvatars = true}: {channel: Channel; withText?: boolean; showAvatars?: boolean}) => {
 		const {i18n} = useLingui();
-		const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
-		useEffect(() => {
-			const unsubscribe = ComponentDispatch.subscribe('TEXTAREA_AUTOCOMPLETE_CHANGED', (payload?: unknown) => {
-				const {channelId, open} = (payload ?? {}) as {channelId?: string; open?: boolean};
-				if (channelId === channel.id) {
-					setIsAutocompleteOpen(!!open);
-				}
-			});
-			return unsubscribe;
-		}, [channel.id]);
 		const typingUsers = usePresentableTypingUsers(channel);
-		if (typingUsers.length === 0 || isAutocompleteOpen) {
+		if (typingUsers.length === 0) {
 			return null;
 		}
 		return (
 			<div
-				className={`${messageStyles.typingContainer} ${messageStyles.typingCluster}`}
+				className={`${messageStyles.typingContainer} ${messageStyles.typingCluster} ${messageStyles.typingClusterComposerStatus}`}
 				data-flx="channel.typing-users.div"
 			>
-				<div className={messageStyles.typingPill} data-flx="channel.typing-users.div--2">
+				<div className={styles.composerStatus} data-flx="channel.typing-users.div--2">
 					<div className={messageStyles.typingIndicator} data-flx="channel.typing-users.div--3">
 						<Typing
 							className={styles.typing}

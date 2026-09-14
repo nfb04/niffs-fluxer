@@ -1,5 +1,28 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import type {ChannelID, UserID} from '@app/api/BrandedTypes';
+import {createChannelID} from '@app/api/BrandedTypes';
+import type {IChannelRepository} from '@app/api/channel/IChannelRepository';
+import {
+	type DmSearchScope,
+	getDmChannelIdsForScope,
+	isDmScopeChannelForUser,
+} from '@app/api/channel/services/message/DmScopeUtils';
+import type {GuildService} from '@app/api/guild/services/GuildService';
+import type {UserCacheService} from '@app/api/infrastructure/UserCacheService';
+import type {RequestCache} from '@app/api/middleware/RequestCacheMiddleware';
+import type {Channel} from '@app/api/models/Channel';
+import {getMessageSearchService} from '@app/api/SearchFactory';
+import {buildMessageSearchFilters} from '@app/api/search/BuildMessageSearchFilters';
+import {channelNeedsReindexing} from '@app/api/search/ChannelIndexingUtils';
+import type {IMessageSearchService} from '@app/api/search/IMessageSearchService';
+import {MessageSearchResponseMapper} from '@app/api/search/MessageSearchResponseMapper';
+import {searchExistingMessages} from '@app/api/search/MessageSearchResultReconciler';
+import {channelRequiresAgeVerification} from '@app/api/search/SearchNsfwUtils';
+import type {IUserRepository} from '@app/api/user/IUserRepository';
+import {canUserAccessNsfwContent} from '@app/api/utils/AgeUtils';
+import {mapWithConcurrency} from '@app/api/utils/ConcurrencyUtils';
+import type {WorkerTaskName} from '@app/api/worker/WorkerLaneConfig';
 import {ChannelTypes} from '@fluxer/constants/src/ChannelConstants';
 import {GuildNSFWLevel} from '@fluxer/constants/src/GuildConstants';
 import {FeatureTemporarilyDisabledError} from '@fluxer/errors/src/domains/core/FeatureTemporarilyDisabledError';
@@ -8,27 +31,6 @@ import {UnknownUserError} from '@fluxer/errors/src/domains/user/UnknownUserError
 import type {MessageSearchRequest} from '@fluxer/schema/src/domains/message/MessageRequestSchemas';
 import type {MessageSearchResponse} from '@fluxer/schema/src/domains/message/MessageResponseSchemas';
 import type {IWorkerService} from '@pkgs/worker/src/contracts/IWorkerService';
-import type {ChannelID, UserID} from '../BrandedTypes';
-import {createChannelID} from '../BrandedTypes';
-import type {IChannelRepository} from '../channel/IChannelRepository';
-import {
-	type DmSearchScope,
-	getDmChannelIdsForScope,
-	isDmScopeChannelForUser,
-} from '../channel/services/message/DmScopeUtils';
-import type {GuildService} from '../guild/services/GuildService';
-import type {UserCacheService} from '../infrastructure/UserCacheService';
-import type {RequestCache} from '../middleware/RequestCacheMiddleware';
-import type {Channel} from '../models/Channel';
-import {getMessageSearchService} from '../SearchFactory';
-import type {IUserRepository} from '../user/IUserRepository';
-import {canUserAccessNsfwContent} from '../utils/AgeUtils';
-import type {WorkerTaskName} from '../worker/WorkerLaneConfig';
-import {buildMessageSearchFilters} from './BuildMessageSearchFilters';
-import {channelNeedsReindexing} from './ChannelIndexingUtils';
-import type {IMessageSearchService} from './IMessageSearchService';
-import {MessageSearchResponseMapper} from './MessageSearchResponseMapper';
-import {searchExistingMessages} from './MessageSearchResultReconciler';
 
 const CHANNEL_INDEX_CHECK_CONCURRENCY = 32;
 const CHANNEL_INDEX_JOB_ENQUEUE_CONCURRENCY = 16;
@@ -100,7 +102,7 @@ export class GlobalSearchService {
 			this.guildService.search.collectAccessibleGuildChannels(params.userId),
 			this.findDmScopeContextChannel(params.userId, params.includeChannelId),
 		]);
-		const {accessibleChannels, unindexedChannelIds, guildNsfwLevels} = guildAccess;
+		const {accessibleChannels, unindexedChannelIds, guildNsfwLevels, parentCategories} = guildAccess;
 		if (unindexedChannelIds.size > 0) {
 			await this.queueIndexingChannels(unindexedChannelIds);
 			return {indexing: true};
@@ -132,7 +134,7 @@ export class GlobalSearchService {
 			if (guildIsAgeRestricted) {
 				return canIncludeNsfw;
 			}
-			if (channel.isNsfw) {
+			if (channelRequiresAgeVerification(channel, parentCategories, false)) {
 				return canIncludeNsfw;
 			}
 			return true;
@@ -251,7 +253,7 @@ export class GlobalSearchService {
 			page,
 			cursor,
 		});
-		const mappedResponses = await this.responseMapper.mapSearchResultToResponses(result, userId, requestCache);
+		const mappedResponses = await this.responseMapper.mapSearchResultToResponses(result.messages, userId, requestCache);
 		return {
 			messages: mappedResponses.messages,
 			channels: mappedResponses.channels,
@@ -269,22 +271,4 @@ export class GlobalSearchService {
 		}
 		return canUserAccessNsfwContent(user);
 	}
-}
-
-async function mapWithConcurrency<T, TResult>(
-	items: ReadonlyArray<T>,
-	concurrency: number,
-	mapper: (item: T, index: number) => Promise<TResult>,
-): Promise<Array<TResult>> {
-	const results = new Array<TResult>(items.length);
-	let nextIndex = 0;
-	async function worker(): Promise<void> {
-		for (;;) {
-			const index = nextIndex++;
-			if (index >= items.length) return;
-			results[index] = await mapper(items[index]!, index);
-		}
-	}
-	await Promise.all(Array.from({length: Math.min(concurrency, items.length)}, () => worker()));
-	return results;
 }

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import {describe, expect, it} from 'vitest';
 import {
 	assertBoolean,
 	assertDisconnectReason,
@@ -14,9 +13,9 @@ import {
 	hasAnyTerminalTransport,
 	isMutedOrDeafened,
 	isPermissionDeniedError,
-	isPresenceConnectionReady,
 	isReadyToRepublishTrack,
-} from './VoiceEngineV2AppAdapterAssertions';
+} from '@app/features/voice/engine/v2/VoiceEngineV2AppAdapterAssertions';
+import {describe, expect, it} from 'vitest';
 
 describe('VoiceEngineV2AppAdapterAssertions', () => {
 	describe('assertNonEmptyString', () => {
@@ -185,26 +184,6 @@ describe('VoiceEngineV2AppAdapterAssertions', () => {
 		it('rejects unknown reasons', () => {
 			expect(() => assertDisconnectReason('unknown', 'r')).toThrow();
 			expect(() => assertDisconnectReason(null, 'r')).toThrow();
-		});
-	});
-
-	describe('isPresenceConnectionReady', () => {
-		it('returns true when connected and ids are present', () => {
-			expect(isPresenceConnectionReady(true, 'channel', 'connection')).toBe(true);
-		});
-
-		it('returns false when disconnected', () => {
-			expect(isPresenceConnectionReady(false, 'channel', 'connection')).toBe(false);
-		});
-
-		it('returns false on missing channelId', () => {
-			expect(isPresenceConnectionReady(true, null, 'connection')).toBe(false);
-			expect(isPresenceConnectionReady(true, '', 'connection')).toBe(false);
-		});
-
-		it('returns false on missing connectionId', () => {
-			expect(isPresenceConnectionReady(true, 'channel', null)).toBe(false);
-			expect(isPresenceConnectionReady(true, 'channel', '')).toBe(false);
 		});
 	});
 

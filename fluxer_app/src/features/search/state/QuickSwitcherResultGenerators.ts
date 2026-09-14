@@ -123,7 +123,7 @@ function generateUnreadResults(
 			if (excludedIds.has(channelId) || additionalExcludedChannelIds.has(channelId)) {
 				return false;
 			}
-			return ReadStates.hasUnreadOrMentions(channelId);
+			return ReadStates.isUnreadOrMentioned(channelId);
 		})
 		.map((channelId) => Channels.getChannel(channelId))
 		.filter((channel): channel is Channel => channel != null)
@@ -235,7 +235,9 @@ function buildUserCandidatesWithMemberSearch(
 }
 
 function createUserCandidateFromMember(member: GuildMember): UserCandidate {
-	const title = member.nick ?? NicknameUtils.getNickname(member.user);
+	const title = member.nick
+		? NicknameUtils.formatNicknameForStreamerMode(member.nick)
+		: NicknameUtils.getNickname(member.user, member.guildId);
 	const subtitle = NicknameUtils.formatUserTagForStreamerMode(member.user);
 	const searchValues = [title, subtitle, member.user.username, member.user.id, member.nick].filter(
 		Boolean,

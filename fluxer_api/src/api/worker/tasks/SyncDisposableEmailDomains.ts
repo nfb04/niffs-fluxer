@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {domainToASCII} from 'node:url';
+import {isAccountPolicyContactDomainReputationExempt} from '@app/api/risk/AccountPolicyService';
+import {EXTERNAL_RESPONSE_LIMITS} from '@app/api/utils/ExternalResponseLimits';
+import * as FetchUtils from '@app/api/utils/FetchUtils';
+import {getWorkerDependencies} from '@app/api/worker/WorkerContext';
 import {JobCancelledError, type WorkerTaskHandler, type WorkerTaskHelpers} from '@pkgs/worker/src/contracts/WorkerTask';
-import {isAccountPolicyContactDomainReputationExempt} from '../../risk/AccountPolicyService';
-import {EXTERNAL_RESPONSE_LIMITS} from '../../utils/ExternalResponseLimits';
-import * as FetchUtils from '../../utils/FetchUtils';
-import {getWorkerDependencies} from '../WorkerContext';
 
 const SOURCES = [
 	'https://raw.githubusercontent.com/doodad-labs/disposable-email-domains/main/data/domains.txt',
@@ -21,7 +21,6 @@ const SOURCES = [
 	'https://raw.githubusercontent.com/vrittech/disposable-email/main/disposable_domains.txt',
 	'https://raw.githubusercontent.com/martenson/disposable-email-domains/master/disposable_email_blocklist.conf',
 ];
-const CURRENT_DOMAIN_PAGE_SIZE = 10000;
 const WRITE_PROGRESS_INTERVAL = 500;
 const DOMAIN_REGEX = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
 
@@ -37,7 +36,10 @@ interface SourceCollectResult {
 
 async function fetchSource(url: string): Promise<SourceFetchResult> {
 	const res = await fetch(url, {signal: AbortSignal.timeout(60000)});
-	if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${url}`);
+	if (!res.ok) {
+		FetchUtils.discardResponseBody(res.body, res.status);
+		throw new Error(`HTTP ${res.status} fetching ${url}`);
+	}
 	const contentType = res.headers.get('content-type') ?? '';
 	const responseText = await FetchUtils.streamToStringWithLimit(res.body, {
 		maxBytes: EXTERNAL_RESPONSE_LIMITS.disposableEmailBytes,
@@ -63,7 +65,7 @@ function forEachTextLine(text: string, callback: (line: string) => void): number
 	for (let i = 0; i <= text.length; i++) {
 		const isEnd = i === text.length;
 		if (!isEnd && text.charCodeAt(i) !== 10) continue;
-		const line = text.slice(start, isEnd ? i : i).trim();
+		const line = text.slice(start, i).trim();
 		start = i + 1;
 		if (!line || line.startsWith('#')) continue;
 		raw++;
@@ -120,16 +122,7 @@ function normaliseDomain(raw: string): string | null {
 
 async function loadCurrentDisposableEmailDomains(): Promise<Set<string>> {
 	const {adminRepository} = getWorkerDependencies();
-	const currentSet = new Set<string>();
-	let pageState: string | null = null;
-	do {
-		const page = await adminRepository.listDisposableEmailDomainsPage(CURRENT_DOMAIN_PAGE_SIZE, pageState);
-		for (const domain of page.domains) {
-			currentSet.add(domain);
-		}
-		pageState = page.pageState;
-	} while (pageState !== null);
-	return currentSet;
+	return new Set(await adminRepository.listDisposableEmailDomains());
 }
 
 async function throwIfCancelled(helpers: WorkerTaskHelpers): Promise<void> {
@@ -186,20 +179,20 @@ const syncDisposableEmailDomains: WorkerTaskHandler = async (_payload, helpers) 
 	await helpers.reportProgress(0, totalOps, `Applying ${addCount} adds and ${removeCount} removes`);
 	for (const domain of freshSet) {
 		if (currentSet.has(domain)) continue;
-		await throwIfCancelled(helpers);
 		await adminRepository.addDisposableEmailDomain(domain);
 		added++;
 		if (added % WRITE_PROGRESS_INTERVAL === 0) {
 			await helpers.reportProgress(added + removed, totalOps, null);
+			await throwIfCancelled(helpers);
 		}
 	}
 	for (const domain of currentSet) {
 		if (freshSet.has(domain)) continue;
-		await throwIfCancelled(helpers);
 		await adminRepository.removeDisposableEmailDomain(domain);
 		removed++;
 		if (removed % WRITE_PROGRESS_INTERVAL === 0) {
 			await helpers.reportProgress(added + removed, totalOps, null);
+			await throwIfCancelled(helpers);
 		}
 	}
 	await helpers.reportProgress(totalOps, totalOps, `+${added} added, -${removed} removed`);

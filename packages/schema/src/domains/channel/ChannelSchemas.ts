@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {CONTENT_WARNING_TEXT_MAX_LENGTH} from '@fluxer/constants/src/GuildConstants';
-import {MAX_GROUP_DM_OTHER_RECIPIENTS} from '@fluxer/constants/src/LimitConstants';
+import {MAX_GROUP_DM_OTHER_RECIPIENTS, MAX_GROUP_DM_RECIPIENTS} from '@fluxer/constants/src/LimitConstants';
 import {type UserPartial, UserPartialResponse} from '@fluxer/schema/src/domains/user/UserResponseSchemas';
 import {ChannelOverwriteTypeSchema, ChannelTypeSchema} from '@fluxer/schema/src/primitives/ChannelValidators';
 import {ContentWarningLevelSchema} from '@fluxer/schema/src/primitives/GuildValidators';
@@ -12,8 +12,8 @@ import {z} from 'zod';
 export const ChannelOverwriteResponse = z.object({
 	id: SnowflakeStringType.describe('The unique identifier for the role or user this overwrite applies to'),
 	type: ChannelOverwriteTypeSchema.describe('The type of entity the overwrite applies to'),
-	allow: PermissionStringType.describe('fluxer:PermissionStringType The bitwise value of allowed permissions'),
-	deny: PermissionStringType.describe('fluxer:PermissionStringType The bitwise value of denied permissions'),
+	allow: PermissionStringType.describe('The bitwise value of allowed permissions'),
+	deny: PermissionStringType.describe('The bitwise value of denied permissions'),
 });
 
 export type ChannelOverwriteResponse = z.infer<typeof ChannelOverwriteResponse>;
@@ -47,46 +47,6 @@ export const CallEligibilityResponse = z.object({
 
 export type CallEligibilityResponse = z.infer<typeof CallEligibilityResponse>;
 
-export const VoiceDebugLoggingStatusResponse = z.object({
-	active: z.boolean().describe('Whether clients in this channel should currently send voice diagnostics'),
-	session_id: z.string().nullable().describe('Current debug logging session id, if active'),
-	activated_by_user_id: SnowflakeStringType.nullable().describe('Staff user that activated the session, if active'),
-	started_at_ms: z.number().int().nonnegative().nullable().describe('Session start Unix timestamp in milliseconds'),
-	expires_at_ms: z
-		.number()
-		.int()
-		.nonnegative()
-		.nullable()
-		.describe('Session expiration Unix timestamp in milliseconds'),
-	poll_interval_ms: Int32Type.describe('Recommended client polling interval in milliseconds'),
-	upload_interval_ms: Int32Type.describe('Recommended client telemetry batch upload interval in milliseconds'),
-});
-
-export type VoiceDebugLoggingStatusResponse = z.infer<typeof VoiceDebugLoggingStatusResponse>;
-
-export const VoiceDebugLoggingEventsResponse = z.object({
-	accepted: z.boolean().describe('Whether the telemetry batch was accepted for storage'),
-	active: z.boolean().describe('Whether the server still considers this logging session active'),
-	stored_event_count: Int32Type.describe('Number of events written to diagnostics storage'),
-});
-
-export type VoiceDebugLoggingEventsResponse = z.infer<typeof VoiceDebugLoggingEventsResponse>;
-
-export const VoicePresenceHeartbeatResponse = z.object({
-	ok: z.boolean().describe('Whether the heartbeat was accepted'),
-	heartbeat_interval_ms: Int32Type.describe('Recommended client heartbeat interval in milliseconds'),
-	heartbeat_ttl_ms: Int32Type.describe('Server-side heartbeat expiration window in milliseconds'),
-	expires_at_ms: z.number().int().nonnegative().describe('Unix timestamp in milliseconds when this heartbeat expires'),
-});
-
-export type VoicePresenceHeartbeatResponse = z.infer<typeof VoicePresenceHeartbeatResponse>;
-
-export const VoicePresenceHeartbeatEndResponse = z.object({
-	ok: z.boolean().describe('Whether the heartbeat was ended'),
-});
-
-export type VoicePresenceHeartbeatEndResponse = z.infer<typeof VoicePresenceHeartbeatEndResponse>;
-
 export const ChannelResponse = z.object({
 	id: SnowflakeStringType.describe('The unique identifier (snowflake) for this channel'),
 	guild_id: SnowflakeStringType.optional().describe('The ID of the guild this channel belongs to'),
@@ -111,7 +71,6 @@ export const ChannelResponse = z.object({
 		.describe('The ISO 8601 timestamp of when the last pinned message was pinned'),
 	permission_overwrites: z
 		.array(ChannelOverwriteResponse)
-		.max(500)
 		.optional()
 		.describe('The permission overwrites for this channel'),
 	recipients: z
@@ -165,7 +124,7 @@ export const ChannelPartialResponse = z.object({
 	type: ChannelTypeSchema.describe('The type of the channel'),
 	recipients: z
 		.array(ChannelPartialRecipientResponse)
-		.max(MAX_GROUP_DM_OTHER_RECIPIENTS)
+		.max(MAX_GROUP_DM_RECIPIENTS)
 		.optional()
 		.describe('The recipients of the DM channel'),
 });
@@ -205,3 +164,6 @@ export interface Channel {
 	readonly rate_limit_per_user?: number;
 	readonly nicks?: Readonly<Record<string, string>>;
 }
+
+export const ChannelListResponse = z.array(ChannelResponse);
+export const RtcRegionListResponse = z.array(RtcRegionResponse);

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type {UpdaterDownloadOption} from '@app/features/platform/types/Electron';
-import {assign, getInitialSnapshot, type SnapshotFrom, setup, transition} from 'xstate';
+import {assign, initialTransition, type SnapshotFrom, setup, transition} from 'xstate';
 
 export type UpdaterState = 'idle' | 'checking' | 'available';
 export type UpdateType = 'native' | 'web' | 'both' | null;
@@ -166,6 +166,13 @@ export const updaterStateMachine = setup({
 		}),
 		applyNativeAvailable: assign(({context, event}) => {
 			if (event.type !== 'native.available') return {};
+			const currentNative = context.updateInfo.native;
+			if (currentNative.downloaded && (event.version == null || event.version === currentNative.version)) {
+				return {
+					isChecking: false,
+					nativeUnsupported: null,
+				};
+			}
 			return {
 				updateInfo: {
 					...context.updateInfo,
@@ -382,7 +389,7 @@ export const updaterStateMachine = setup({
 export type UpdaterMachineSnapshot = SnapshotFrom<typeof updaterStateMachine>;
 
 export function createUpdaterMachineSnapshot(): UpdaterMachineSnapshot {
-	return getInitialSnapshot(updaterStateMachine);
+	return initialTransition(updaterStateMachine)[0];
 }
 
 export function transitionUpdaterMachineSnapshot(

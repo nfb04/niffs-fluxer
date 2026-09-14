@@ -32,20 +32,18 @@ function createDefaultGuildDimensions(guildId: string): GuildDimensions {
 class Dimension {
 	channelDimensions = observable.map(new Map<string, ChannelDimensions>());
 	guildDimensions = observable.map(new Map<string, GuildDimensions>());
-	guildListDimensions = observable.box({
-		scrollTop: 0,
-	});
+	guildListDimensions = observable.box<GuildListDimensions>({scrollTop: 0}, {deep: false});
 
 	constructor() {
 		makeObservable(this, {
-			updateChannelDimensions: action,
+			recordChannelDimensions: action,
 			updateGuildDimensions: action,
 			updateGuildListDimensions: action,
-			clearChannelDimensions: action,
+			forgetChannelDimensions: action,
 		});
 	}
 
-	percentageScrolled(channelId: string): number {
+	scrollProgressRatio(channelId: string): number {
 		const dimensions = this.channelDimensions.get(channelId);
 		if (dimensions != null) {
 			const {scrollTop, scrollHeight} = dimensions;
@@ -54,11 +52,11 @@ class Dimension {
 		return 1;
 	}
 
-	getChannelDimensions(channelId: string): ChannelDimensions | undefined {
+	channelDimensionsFor(channelId: string): ChannelDimensions | undefined {
 		return this.channelDimensions.get(channelId);
 	}
 
-	getGuildDimensions(guildId: string): GuildDimensions {
+	guildDimensionsFor(guildId: string): GuildDimensions {
 		const existing = this.guildDimensions.get(guildId);
 		if (existing != null) {
 			return existing;
@@ -66,11 +64,11 @@ class Dimension {
 		return createDefaultGuildDimensions(guildId);
 	}
 
-	getGuildListDimensions(): GuildListDimensions {
+	currentGuildListDimensions(): GuildListDimensions {
 		return this.guildListDimensions.get();
 	}
 
-	isAtBottom(channelId: string): boolean {
+	channelPinnedToEnd(channelId: string): boolean {
 		const dimensions = this.channelDimensions.get(channelId);
 		if (dimensions == null) {
 			return true;
@@ -79,7 +77,7 @@ class Dimension {
 		return scrollTop >= scrollHeight - offsetHeight - BOTTOM_TOLERANCE;
 	}
 
-	updateChannelDimensions(
+	recordChannelDimensions(
 		channelId: string,
 		scrollTop: number | null,
 		scrollHeight: number | null,
@@ -125,10 +123,13 @@ class Dimension {
 	}
 
 	updateGuildListDimensions(scrollTop: number): void {
+		if (this.guildListDimensions.get().scrollTop === scrollTop) {
+			return;
+		}
 		this.guildListDimensions.set({scrollTop});
 	}
 
-	clearChannelDimensions(channelId: string): void {
+	forgetChannelDimensions(channelId: string): void {
 		this.channelDimensions.delete(channelId);
 	}
 
@@ -141,7 +142,7 @@ class Dimension {
 	}
 
 	handleCallCreate(channelId: string): void {
-		this.clearChannelDimensions(channelId);
+		this.forgetChannelDimensions(channelId);
 	}
 }
 

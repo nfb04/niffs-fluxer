@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import {assign, getInitialSnapshot, type SnapshotFrom, setup, transition} from 'xstate';
-import {compareMessageIds, compareReadStateVersions} from './shared';
+import {compareMessageIds, compareReadStateVersions} from '@app/features/read_state/state/read_states/shared';
+import {assign, initialTransition, type SnapshotFrom, setup, transition} from 'xstate';
 
 export interface ReadStateServerAckInput {
 	messageId: string;
@@ -68,7 +68,7 @@ export const readStateServerAckMachine = setup({
 	},
 	guards: {
 		hasStaleVersion: ({context}) => hasStaleVersion(context),
-		isManualAck: ({context}) => context.manual,
+		ackedManually: ({context}) => context.manual,
 		isOlderThanCurrentAck: ({context}) => isOlderThanCurrentAck(context),
 		isCurrentAck: ({context}) => isCurrentAck(context),
 	},
@@ -80,7 +80,7 @@ export const readStateServerAckMachine = setup({
 		routing: {
 			always: [
 				{guard: 'hasStaleVersion', target: 'staleVersion'},
-				{guard: 'isManualAck', target: 'manualAck'},
+				{guard: 'ackedManually', target: 'manualAck'},
 				{guard: 'isOlderThanCurrentAck', target: 'olderMessage'},
 				{guard: 'isCurrentAck', target: 'currentAck'},
 				{target: 'newerAck'},
@@ -107,7 +107,7 @@ export const readStateServerAckMachine = setup({
 export type ReadStateServerAckSnapshot = SnapshotFrom<typeof readStateServerAckMachine>;
 
 export function createReadStateServerAckSnapshot(input: ReadStateServerAckInput): ReadStateServerAckSnapshot {
-	return getInitialSnapshot(readStateServerAckMachine, input);
+	return initialTransition(readStateServerAckMachine, input)[0];
 }
 
 export function transitionReadStateServerAckSnapshot(

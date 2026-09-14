@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import type {RouteRateLimitConfig} from '@app/api/middleware/RateLimitMiddleware';
 import {ms} from 'itty-time';
-import type {RouteRateLimitConfig} from '../middleware/RateLimitMiddleware';
 
 export const ChannelRateLimitConfigs = {
 	CHANNEL_GET: {
@@ -94,22 +94,6 @@ export const ChannelRateLimitConfigs = {
 	} as RouteRateLimitConfig,
 	CHANNEL_CALL_STOP_RINGING: {
 		bucket: 'channel:call:stop_ringing::channel_id',
-		config: {limit: 20, windowMs: ms('10 seconds')},
-	} as RouteRateLimitConfig,
-	CHANNEL_VOICE_DEBUG_LOGGING_STATUS: {
-		bucket: 'channel:voice_debug_logging:status::channel_id',
-		config: {limit: 60, windowMs: ms('10 seconds')},
-	} as RouteRateLimitConfig,
-	CHANNEL_VOICE_DEBUG_LOGGING_TOGGLE: {
-		bucket: 'channel:voice_debug_logging:toggle::channel_id',
-		config: {limit: 10, windowMs: ms('1 minute')},
-	} as RouteRateLimitConfig,
-	CHANNEL_VOICE_DEBUG_LOGGING_EVENTS: {
-		bucket: 'channel:voice_debug_logging:events::channel_id::user_id',
-		config: {limit: 60, windowMs: ms('10 seconds')},
-	} as RouteRateLimitConfig,
-	CHANNEL_VOICE_PRESENCE_HEARTBEAT: {
-		bucket: 'channel:voice_presence:heartbeat::channel_id::user_id',
 		config: {limit: 20, windowMs: ms('10 seconds')},
 	} as RouteRateLimitConfig,
 	CHANNEL_STREAM_UPDATE: {

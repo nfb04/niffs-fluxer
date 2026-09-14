@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import {createUserID, type UserID} from '@app/api/BrandedTypes';
+import {BatchBuilder, deleteOneOrMany, fetchMany, fetchOne} from '@app/api/database/CassandraQueryExecution';
+import {Db, nextVersion} from '@app/api/database/CassandraTypes';
+import {executeVersionedUpdate} from '@app/api/database/CassandraVersionedUpdate';
+import type {NoteRow, RelationshipRow} from '@app/api/database/types/UserTypes';
+import {Relationship} from '@app/api/models/Relationship';
+import {UserNote} from '@app/api/models/UserNote';
+import {Notes, Relationships, RelationshipsByTarget} from '@app/api/Tables';
+import type {IUserRelationshipRepository} from '@app/api/user/repositories/IUserRelationshipRepository';
 import {RelationshipTypes} from '@fluxer/constants/src/UserConstants';
-import {createUserID, type UserID} from '../../BrandedTypes';
-import {BatchBuilder, deleteOneOrMany, fetchMany, fetchOne} from '../../database/CassandraQueryExecution';
-import {Db, nextVersion} from '../../database/CassandraTypes';
-import {executeVersionedUpdate} from '../../database/CassandraVersionedUpdate';
-import type {NoteRow, RelationshipRow} from '../../database/types/UserTypes';
-import {Relationship} from '../../models/Relationship';
-import {UserNote} from '../../models/UserNote';
-import {Notes, Relationships, RelationshipsByTarget} from '../../Tables';
-import type {IUserRelationshipRepository} from './IUserRelationshipRepository';
 
 const FETCH_ALL_NOTES_CQL = Notes.selectCql({
 	where: Notes.where.eq('source_user_id'),
@@ -19,6 +19,10 @@ const FETCH_NOTE_CQL = Notes.selectCql({
 	limit: 1,
 });
 const FETCH_RELATIONSHIPS_CQL = Relationships.selectCql({
+	where: Relationships.where.eq('source_user_id'),
+});
+const FETCH_RELATIONSHIP_TARGET_TYPES_CQL = Relationships.selectCql({
+	columns: ['target_user_id', 'type'],
 	where: Relationships.where.eq('source_user_id'),
 });
 const FETCH_RELATIONSHIPS_BY_TARGET_CQL = RelationshipsByTarget.selectCql({
@@ -165,6 +169,14 @@ export class UserRelationshipRepository implements IUserRelationshipRepository {
 			source_user_id: sourceUserId,
 		});
 		return relationships.map((rel) => new Relationship(rel));
+	}
+
+	async listBlockedUserIds(sourceUserId: UserID): Promise<Array<UserID>> {
+		const rows = await fetchMany<Pick<RelationshipRow, 'target_user_id' | 'type'>>(
+			FETCH_RELATIONSHIP_TARGET_TYPES_CQL,
+			{source_user_id: sourceUserId},
+		);
+		return rows.filter((row) => row.type === RelationshipTypes.BLOCKED).map((row) => row.target_user_id);
 	}
 
 	async listIncomingRequests(userId: UserID): Promise<Array<Relationship>> {

@@ -10,7 +10,7 @@ import {createChildLogger} from '@electron/common/Logger';
 import {TASK_ARG_PREFIX} from '@electron/main/JumpList';
 import {getStableLinuxLaunchPath} from '@electron/main/LinuxLaunchPath';
 import {isFlatpakRuntime} from '@electron/main/LinuxSandbox';
-import {t} from '@electron/main/MainI18n';
+import {getNativeLocale, t} from '@electron/main/MainI18n';
 import {app} from 'electron';
 
 const logger = createChildLogger('LinuxDesktopEntry');
@@ -18,6 +18,8 @@ const APP_NAME = DESKTOP_APP_NAME;
 const APP_ID = LINUX_DESKTOP_ENTRY_ID;
 export const WM_CLASS = APP_ID;
 const DESKTOP_FILE_BASENAME = `${APP_ID}.desktop`;
+const GENERIC_NAME_DEFAULT = 'Instant Messenger';
+const COMMENT_DEFAULT = 'Instant messaging and VoIP';
 const GENERATED_MARKER = '# X-Generated-By=fluxer-desktop';
 const DESKTOP_ACTIONS = [
 	{
@@ -56,6 +58,24 @@ function findSystemDesktopEntry(): string | null {
 		const candidate = path.join(dataDir, 'applications', DESKTOP_FILE_BASENAME);
 		try {
 			if (fs.existsSync(candidate)) return candidate;
+		} catch {}
+	}
+	return null;
+}
+
+function findThirdPartyDesktopEntry(execPath: string): string | null {
+	const applicationsDir = getUserApplicationsDir();
+	let entries: Array<string>;
+	try {
+		entries = fs.readdirSync(applicationsDir);
+	} catch {
+		return null;
+	}
+	for (const entry of entries) {
+		if (!entry.endsWith('.desktop') || entry === DESKTOP_FILE_BASENAME) continue;
+		const candidate = path.join(applicationsDir, entry);
+		try {
+			if (fs.readFileSync(candidate, 'utf8').includes(execPath)) return candidate;
 		} catch {}
 	}
 	return null;
@@ -105,7 +125,16 @@ function buildDesktopActionEntries(execPath: string): Array<string> {
 	return entries;
 }
 
-function buildDesktopFileContents(execPath: string): string {
+function buildLocalizedEntryLines(key: string, defaultValue: string, localizedValue: string): Array<string> {
+	const lines = [`${key}=${escapeDesktopValue(defaultValue)}`];
+	if (localizedValue !== defaultValue) {
+		const entryLocale = getNativeLocale().replace(/-/g, '_');
+		lines.push(`${key}[${entryLocale}]=${escapeDesktopValue(localizedValue)}`);
+	}
+	return lines;
+}
+
+function buildDesktopFileContents(execPath: string, hidden: boolean): string {
 	const execLine = `${quoteExecArg(execPath)} %U`;
 	return [
 		'[Desktop Entry]',
@@ -113,8 +142,8 @@ function buildDesktopFileContents(execPath: string): string {
 		'Type=Application',
 		'Version=1.5',
 		`Name=${escapeDesktopValue(APP_NAME)}`,
-		'GenericName=Instant Messenger',
-		'Comment=Instant messaging and VoIP',
+		...buildLocalizedEntryLines('GenericName', GENERIC_NAME_DEFAULT, t('desktop.linuxEntry.genericName')),
+		...buildLocalizedEntryLines('Comment', COMMENT_DEFAULT, t('desktop.linuxEntry.comment')),
 		`Exec=${escapeDesktopValue(execLine)}`,
 		`TryExec=${escapeDesktopValue(execPath)}`,
 		`Icon=${escapeDesktopValue(resolveIconHint())}`,
@@ -124,9 +153,35 @@ function buildDesktopFileContents(execPath: string): string {
 		`StartupWMClass=${WM_CLASS}`,
 		'SingleMainWindow=true',
 		'StartupNotify=true',
+		...(hidden ? ['NoDisplay=true'] : []),
 		...buildDesktopActionEntries(execPath),
 		'',
 	].join('\n');
+}
+
+function readDesktopEntryValue(contents: string, key: string): string | null {
+	for (const line of contents.split('\n')) {
+		const trimmed = line.trim();
+		if (trimmed.startsWith('[Desktop Action ')) break;
+		if (trimmed.startsWith(`${key}=`)) return trimmed.slice(key.length + 1).trim();
+	}
+	return null;
+}
+
+function isExecutableFile(candidate: string): boolean {
+	try {
+		if (!fs.statSync(candidate).isFile()) return false;
+		fs.accessSync(candidate, fs.constants.X_OK);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+function isStaleDesktopFile(contents: string): boolean {
+	const tryExec = readDesktopEntryValue(contents, 'TryExec');
+	if (tryExec === null || !tryExec.startsWith('/')) return false;
+	return !isExecutableFile(tryExec);
 }
 
 function readExistingDesktopFile(filePath: string): string | null {
@@ -171,9 +226,15 @@ export function ensureLinuxProtocolDesktopEntry(): void {
 	const applicationsDir = getUserApplicationsDir();
 	const filePath = getDesktopFilePath();
 	installHicolorIcons();
-	const desired = buildDesktopFileContents(execPath);
-	let needsWrite = true;
 	const existing = readExistingDesktopFile(filePath);
+	const thirdPartyEntry = findThirdPartyDesktopEntry(execPath);
+	if (thirdPartyEntry) {
+		logger.debug('Third-party .desktop entry manages the app menu entry; keeping ours hidden', {
+			thirdPartyEntry,
+		});
+	}
+	const desired = buildDesktopFileContents(execPath, thirdPartyEntry !== null);
+	let needsWrite = true;
 	if (existing === null) {
 		const systemEntry = findSystemDesktopEntry();
 		if (systemEntry) {
@@ -188,10 +249,29 @@ export function ensureLinuxProtocolDesktopEntry(): void {
 	}
 	if (existing !== null) {
 		if (!existing.includes(GENERATED_MARKER)) {
-			logger.debug('Linux .desktop entry was hand-edited; leaving untouched', {filePath});
-			return;
+			if (!isStaleDesktopFile(existing)) {
+				logger.debug('Linux .desktop entry was hand-edited; leaving untouched', {filePath});
+				return;
+			}
+			const systemEntry = findSystemDesktopEntry();
+			if (systemEntry) {
+				try {
+					fs.unlinkSync(filePath);
+					logger.info('Removed stale .desktop entry shadowing the system entry', {filePath, systemEntry});
+				} catch (error) {
+					logger.warn('Failed to remove stale .desktop entry', {filePath, error});
+				}
+				try {
+					app.setAsDefaultProtocolClient(APP_PROTOCOL);
+				} catch (error) {
+					logger.warn('Failed to register protocol client', {error});
+				}
+				return;
+			}
+			logger.info('Rewriting stale .desktop entry whose TryExec no longer resolves', {filePath});
+		} else {
+			needsWrite = existing !== desired;
 		}
-		needsWrite = existing !== desired;
 	}
 	if (!needsWrite) {
 		logger.debug('Linux .desktop entry already up to date', {filePath});

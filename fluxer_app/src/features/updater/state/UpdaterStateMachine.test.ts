@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type {UpdaterDownloadOption} from '@app/features/platform/types/Electron';
-import {describe, expect, it} from 'vitest';
 import {
 	createUpdaterMachineSnapshot,
 	getUpdaterDisplayVersion,
@@ -11,7 +10,8 @@ import {
 	transitionUpdaterMachineSnapshot,
 	type UpdaterMachineEvent,
 	type UpdaterMachineSnapshot,
-} from './UpdaterStateMachine';
+} from '@app/features/updater/state/UpdaterStateMachine';
+import {describe, expect, it} from 'vitest';
 
 const NOW = 1_700_000_000_000;
 
@@ -43,6 +43,36 @@ describe('updaterStateMachine', () => {
 		expect(hasManualNativeDownload(snapshot)).toBe(false);
 		expect(snapshot.context.updateInfo.native.available).toBe(false);
 		expect(snapshot.context.updateInfo.web.available).toBe(false);
+	});
+
+	it('keeps a downloaded native update pending restart when checks re-emit available or not-available', () => {
+		let snapshot = createUpdaterMachineSnapshot();
+		snapshot = transition(snapshot, {
+			type: 'native.available',
+			version: '2.0.0',
+			downloadSize: 1000,
+			downloadStarted: true,
+			downloadUrl: null,
+			downloadOptions: [],
+		});
+		snapshot = transition(snapshot, {type: 'native.downloaded', version: '2.0.0'});
+		expect(snapshot.context.updateInfo.native.downloaded).toBe(true);
+
+		snapshot = transition(snapshot, {type: 'native.notAvailable', now: NOW});
+		expect(snapshot.context.updateInfo.native.downloaded).toBe(true);
+		expect(snapshot.context.updateInfo.native.available).toBe(true);
+
+		snapshot = transition(snapshot, {
+			type: 'native.available',
+			version: null,
+			downloadSize: null,
+			downloadStarted: true,
+			downloadUrl: null,
+			downloadOptions: [],
+		});
+		expect(snapshot.context.updateInfo.native.downloaded).toBe(true);
+		expect(snapshot.context.updateInfo.native.downloading).toBe(false);
+		expect(snapshot.context.updateInfo.native.version).toBe('2.0.0');
 	});
 
 	it('tracks check start and finish separately from available updates', () => {

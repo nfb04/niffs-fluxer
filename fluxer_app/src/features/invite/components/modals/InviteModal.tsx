@@ -33,6 +33,7 @@ import * as InviteUtils from '@app/features/invite/utils/InviteUtils';
 import * as MessageCommands from '@app/features/messaging/commands/MessageCommands';
 import {Logger} from '@app/features/platform/utils/AppLogger';
 import StreamerMode from '@app/features/streamer_mode/state/StreamerMode';
+import {remFromPx} from '@app/features/theme/layout/RemFromPx';
 import {Button} from '@app/features/ui/button/Button';
 import {Combobox} from '@app/features/ui/components/form/FormCombobox';
 import {Input} from '@app/features/ui/components/form/FormInput';
@@ -103,7 +104,7 @@ const EXPIRE_AFTER_DESCRIPTOR = msg({
 	comment: 'Label above the expiration duration dropdown in the invite link settings.',
 });
 const CUSTOM_EXPIRY_SECONDS_DESCRIPTOR = msg({
-	message: 'Custom expiry (seconds)',
+	message: 'Custom expiration (seconds)',
 	comment:
 		'Label of the numeric input shown after choosing "Custom..." in the invite expiration dropdown. The unit is seconds.',
 });
@@ -146,6 +147,24 @@ const INVITE_LINK_HIDDEN_LABEL_DESCRIPTOR = msg({
 	message: 'Invite link is hidden while sharing:',
 	comment: 'Label above a masked invite link while streaming privacy is active.',
 });
+const YOUR_INVITE_LINK_EXPIRES_IN_SECONDS_DESCRIPTOR = msg({
+	message:
+		'{seconds, plural, one {Your invite link expires in # second.} other {Your invite link expires in # seconds.}}',
+	comment: 'Text under a generated invite link. {seconds} is how long the link stays valid, in whole seconds.',
+});
+const YOUR_INVITE_LINK_EXPIRES_IN_MINUTES_DESCRIPTOR = msg({
+	message:
+		'{minutes, plural, one {Your invite link expires in # minute.} other {Your invite link expires in # minutes.}}',
+	comment: 'Text under a generated invite link. {minutes} is how long the link stays valid, in whole minutes.',
+});
+const YOUR_INVITE_LINK_EXPIRES_IN_HOURS_DESCRIPTOR = msg({
+	message: '{hours, plural, one {Your invite link expires in # hour.} other {Your invite link expires in # hours.}}',
+	comment: 'Text under a generated invite link. {hours} is how long the link stays valid, in whole hours.',
+});
+const YOUR_INVITE_LINK_EXPIRES_IN_DAYS_DESCRIPTOR = msg({
+	message: '{days, plural, one {Your invite link expires in # day.} other {Your invite link expires in # days.}}',
+	comment: 'Text under a generated invite link. {days} is how long the link stays valid, in whole days.',
+});
 const logger = new Logger('InviteModal');
 
 type InviteModalView = 'recipients' | 'advanced';
@@ -166,7 +185,7 @@ const InviteModalUnavailable = observer(function InviteModalUnavailable() {
 			<Modal.Header title={i18n._(INVITE_FRIENDS_DESCRIPTOR)} data-flx="invite.invite-modal.modal-header" />
 			<Modal.Content className={styles.noChannelContent} data-flx="invite.invite-modal.no-channel-content">
 				<WarningIcon
-					size={48}
+					size={remFromPx(48)}
 					weight="fill"
 					className={styles.noChannelIcon}
 					data-flx="invite.invite-modal.no-channel-icon"
@@ -306,11 +325,20 @@ const InviteModalContent = observer(function InviteModalContent({
 		setShowAdvanced(false);
 	};
 	const getExpirationText = () => {
-		const option = maxAgeOptions.find((opt) => opt.value === maxAge);
-		if (option) {
-			return option.label;
+		const seconds = Number.parseInt(maxAge, 10);
+		const minutes = seconds / 60;
+		const hours = minutes / 60;
+		const days = hours / 24;
+		if (days >= 1 && days % 1 === 0) {
+			return i18n._(YOUR_INVITE_LINK_EXPIRES_IN_DAYS_DESCRIPTOR, {days});
 		}
-		return maxAge;
+		if (hours >= 1 && hours % 1 === 0) {
+			return i18n._(YOUR_INVITE_LINK_EXPIRES_IN_HOURS_DESCRIPTOR, {hours});
+		}
+		if (minutes >= 1 && minutes % 1 === 0) {
+			return i18n._(YOUR_INVITE_LINK_EXPIRES_IN_MINUTES_DESCRIPTOR, {minutes});
+		}
+		return i18n._(YOUR_INVITE_LINK_EXPIRES_IN_SECONDS_DESCRIPTOR, {seconds});
 	};
 	return (
 		<Modal.Root size="small" centered data-flx="invite.invite-modal.modal-root--2">
@@ -353,7 +381,7 @@ const InviteModalContent = observer(function InviteModalContent({
 								placeholder={i18n._(SEARCH_FRIENDS_DESCRIPTOR)}
 								leftIcon={
 									<MagnifyingGlassIcon
-										size={20}
+										size={remFromPx(20)}
 										weight="bold"
 										className={selectorStyles.searchIcon}
 										data-flx="invite.invite-modal.magnifying-glass-icon"
@@ -393,7 +421,7 @@ const InviteModalContent = observer(function InviteModalContent({
 								data-flx="invite.invite-modal.recipient-list"
 							/>
 						) : (
-							<div className={styles.advancedView} data-flx="invite.invite-modal.advanced-view">
+							<div className={styles.detailedView} data-flx="invite.invite-modal.advanced-view">
 								<Combobox
 									label={i18n._(EXPIRE_AFTER_DESCRIPTOR)}
 									options={maxAgeOptions}
@@ -499,7 +527,7 @@ const InviteModalContent = observer(function InviteModalContent({
 							</p>
 						) : (
 							<p className={styles.expirationText} data-flx="invite.invite-modal.expiration-text--2">
-								<Trans>Your invite link expires in {getExpirationText()}.</Trans>{' '}
+								{getExpirationText()}{' '}
 								<FocusRing offset={-2} data-flx="invite.invite-modal.focus-ring--2">
 									<button
 										type="button"

@@ -1,5 +1,24 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import type {GuildID, RoleID, UserID} from '@app/api/BrandedTypes';
+import {createRoleID, guildIdToRoleId} from '@app/api/BrandedTypes';
+import type {GuildAuditLogService} from '@app/api/guild/GuildAuditLogService';
+import type {GuildAuditLogChange} from '@app/api/guild/GuildAuditLogTypes';
+import {mapGuildRoleToResponse} from '@app/api/guild/GuildModel';
+import type {IGuildMemberRepository} from '@app/api/guild/repositories/IGuildMemberRepository';
+import type {IGuildRoleRepository} from '@app/api/guild/repositories/IGuildRoleRepository';
+import {createGuildMfaEnforcer} from '@app/api/guild/services/GuildMfaEnforcement';
+import {computeMovedIds, getMemberListRoleOrderIds} from '@app/api/guild/services/role/RoleOrderAuditUtils';
+import type {IGatewayService} from '@app/api/infrastructure/IGatewayService';
+import type {ISnowflakeService} from '@app/api/infrastructure/ISnowflakeService';
+import {Logger} from '@app/api/Logger';
+import type {LimitConfigService} from '@app/api/limits/LimitConfigService';
+import {resolveLimitSafe} from '@app/api/limits/LimitConfigUtils';
+import {createLimitMatchContext} from '@app/api/limits/LimitMatchContextBuilder';
+import {GuildRole} from '@app/api/models/GuildRole';
+import type {IUserRepository} from '@app/api/user/IUserRepository';
+import {applyProtectedRolePermissions} from '@app/api/utils/featureUtils';
+import {computePermissionsDiff} from '@app/api/utils/PermissionUtils';
 import {AuditLogActionType} from '@fluxer/constants/src/AuditLogActionType';
 import {ALL_PERMISSIONS, DEFAULT_PERMISSIONS, Permissions} from '@fluxer/constants/src/ChannelConstants';
 import type {LimitKey} from '@fluxer/constants/src/LimitConfigMetadata';
@@ -17,22 +36,6 @@ import type {
 import type {GuildResponse} from '@fluxer/schema/src/domains/guild/GuildResponseSchemas';
 import type {GuildRoleResponse} from '@fluxer/schema/src/domains/guild/GuildRoleSchemas';
 import type {ICacheService} from '@pkgs/cache/src/ICacheService';
-import type {GuildID, RoleID, UserID} from '../../BrandedTypes';
-import {createRoleID, guildIdToRoleId} from '../../BrandedTypes';
-import type {IGatewayService} from '../../infrastructure/IGatewayService';
-import type {ISnowflakeService} from '../../infrastructure/ISnowflakeService';
-import {Logger} from '../../Logger';
-import type {LimitConfigService} from '../../limits/LimitConfigService';
-import {resolveLimitSafe} from '../../limits/LimitConfigUtils';
-import {createLimitMatchContext} from '../../limits/LimitMatchContextBuilder';
-import {GuildRole} from '../../models/GuildRole';
-import {applyProtectedRolePermissions} from '../../utils/featureUtils';
-import {computePermissionsDiff} from '../../utils/PermissionUtils';
-import type {GuildAuditLogService} from '../GuildAuditLogService';
-import type {GuildAuditLogChange} from '../GuildAuditLogTypes';
-import {mapGuildRoleToResponse} from '../GuildModel';
-import type {IGuildMemberRepository} from '../repositories/IGuildMemberRepository';
-import type {IGuildRoleRepository} from '../repositories/IGuildRoleRepository';
 
 interface GuildRoleRepository extends IGuildRoleRepository, IGuildMemberRepository {}
 
@@ -62,6 +65,7 @@ export class GuildRoleService {
 		private readonly gatewayService: IGatewayService,
 		private readonly guildAuditLogService: GuildAuditLogService,
 		private readonly limitConfigService: LimitConfigService,
+		private readonly userRepository: IUserRepository,
 	) {}
 
 	async systemCreateRole(params: {
@@ -242,6 +246,7 @@ export class GuildRoleService {
 			action: AuditLogActionType.ROLE_UPDATE,
 			targetId: roleId,
 			auditLogReason: auditLogReason ?? null,
+			metadata: {role_name: updatedRole.name},
 			changes,
 		});
 		return mapGuildRoleToResponse(updatedRole);
@@ -305,7 +310,7 @@ export class GuildRoleService {
 				position?: number;
 			}>;
 		},
-		_auditLogReason?: string | null,
+		auditLogReason?: string | null,
 	): Promise<void> {
 		const {userId, guildId, updates} = params;
 		const {checkPermission} = await this.getGuildAuthenticated({userId, guildId});
@@ -316,7 +321,7 @@ export class GuildRoleService {
 			throw new ResourceLockedError();
 		}
 		try {
-			await this.updateRolePositionsByList({userId, guildId, updates});
+			await this.updateRolePositionsByList({userId, guildId, updates, auditLogReason: auditLogReason ?? null});
 		} finally {
 			await this.cacheService.releaseLock(lockKey, lockToken);
 		}
@@ -342,7 +347,7 @@ export class GuildRoleService {
 				hoistPosition: number;
 			}>;
 		},
-		_auditLogReason?: string | null,
+		auditLogReason?: string | null,
 	): Promise<void> {
 		const {userId, guildId, updates} = params;
 		const {checkPermission, guildData} = await this.getGuildAuthenticated({userId, guildId});
@@ -400,6 +405,15 @@ export class GuildRoleService {
 			}
 			if (changedRoles.length > 0) {
 				await this.dispatchGuildRoleUpdateBulk({guildId, roles: changedRoles});
+				await this.recordRolePositionAuditLogs({
+					guildId,
+					userId,
+					roleMap,
+					changedRoles,
+					movedRoleIds: this.computeMovedHoistRoleIds({allRoles, changedRoles, everyoneRoleId}),
+					auditLogReason,
+					key: 'hoist_position',
+				});
 			}
 		} finally {
 			await this.cacheService.releaseLock(lockKey, lockToken);
@@ -411,7 +425,7 @@ export class GuildRoleService {
 			userId: UserID;
 			guildId: GuildID;
 		},
-		_auditLogReason?: string | null,
+		auditLogReason?: string | null,
 	): Promise<void> {
 		const {userId, guildId} = params;
 		const {checkPermission} = await this.getGuildAuthenticated({userId, guildId});
@@ -423,6 +437,7 @@ export class GuildRoleService {
 		}
 		try {
 			const allRoles = await this.guildRepository.listRoles(guildId);
+			const roleMap = new Map(allRoles.map((r) => [r.id, r]));
 			const changedRoles: Array<GuildRole> = [];
 			for (const role of allRoles) {
 				if (role.hoistPosition === null) continue;
@@ -438,6 +453,19 @@ export class GuildRoleService {
 			}
 			if (changedRoles.length > 0) {
 				await this.dispatchGuildRoleUpdateBulk({guildId, roles: changedRoles});
+				await this.recordRolePositionAuditLogs({
+					guildId,
+					userId,
+					roleMap,
+					changedRoles,
+					movedRoleIds: this.computeMovedHoistRoleIds({
+						allRoles,
+						changedRoles,
+						everyoneRoleId: guildIdToRoleId(guildId),
+					}),
+					auditLogReason,
+					key: 'hoist_position',
+				});
 			}
 		} finally {
 			await this.cacheService.releaseLock(lockKey, lockToken);
@@ -446,9 +474,11 @@ export class GuildRoleService {
 
 	private async getGuildAuthenticated({userId, guildId}: {userId: UserID; guildId: GuildID}): Promise<GuildAuth> {
 		const guildData = await this.gatewayService.getGuildData({guildId, userId});
+		const enforceGuildMfa = await createGuildMfaEnforcer({userRepository: this.userRepository, guildData, userId});
 		const checkPermission = async (permission: bigint) => {
 			const hasPermission = await this.gatewayService.checkPermission({guildId, userId, permission});
 			if (!hasPermission) throw new MissingPermissionsError();
+			enforceGuildMfa(permission);
 		};
 		const getMyPermissions = async () => this.gatewayService.getUserPermissions({guildId, userId});
 		return {
@@ -554,8 +584,9 @@ export class GuildRoleService {
 			roleId: RoleID;
 			position?: number;
 		}>;
+		auditLogReason?: string | null;
 	}): Promise<void> {
-		const {userId, guildId, updates} = params;
+		const {userId, guildId, updates, auditLogReason} = params;
 		const {guildData} = await this.getGuildAuthenticated({userId, guildId});
 		const allRoles = await this.guildRepository.listRoles(guildId);
 		const roleMap = new Map(allRoles.map((r) => [r.id, r]));
@@ -620,7 +651,38 @@ export class GuildRoleService {
 		});
 		if (changedRoles.length > 0) {
 			await this.dispatchGuildRoleUpdateBulk({guildId, roles: changedRoles});
+			await this.recordRolePositionAuditLogs({
+				guildId,
+				userId,
+				roleMap,
+				changedRoles,
+				movedRoleIds: computeMovedIds(
+					currentOrder.map((role) => role.id),
+					this.getCurrentRoleOrder(updatedRoles, everyoneRoleId).map((role) => role.id),
+				),
+				auditLogReason,
+				key: 'position',
+			});
 		}
+	}
+
+	private computeMovedHoistRoleIds(params: {
+		allRoles: Array<GuildRole>;
+		changedRoles: Array<GuildRole>;
+		everyoneRoleId: RoleID;
+	}): Set<RoleID> {
+		const {allRoles, changedRoles, everyoneRoleId} = params;
+		const changedRoleMap = new Map(changedRoles.map((role) => [role.id, role]));
+		const updatedRoles = allRoles.map((role) => changedRoleMap.get(role.id) ?? role);
+		const afterOrderIds = getMemberListRoleOrderIds(updatedRoles, everyoneRoleId);
+		const movedRoleIds = computeMovedIds(getMemberListRoleOrderIds(allRoles, everyoneRoleId), afterOrderIds);
+		const memberListRoleIds = new Set(afterOrderIds);
+		for (const role of changedRoles) {
+			if (!memberListRoleIds.has(role.id)) {
+				movedRoleIds.add(role.id);
+			}
+		}
+		return movedRoleIds;
 	}
 
 	private getCurrentRoleOrder(allRoles: Array<GuildRole>, everyoneRoleId: RoleID): Array<GuildRole> {
@@ -692,6 +754,35 @@ export class GuildRoleService {
 			currentPosition--;
 		}
 		return newRoles;
+	}
+
+	private async recordRolePositionAuditLogs(params: {
+		guildId: GuildID;
+		userId: UserID;
+		roleMap: Map<RoleID, GuildRole>;
+		changedRoles: Array<GuildRole>;
+		movedRoleIds: ReadonlySet<RoleID>;
+		auditLogReason?: string | null;
+		key: 'position' | 'hoist_position';
+	}): Promise<void> {
+		const {guildId, userId, roleMap, changedRoles, movedRoleIds, auditLogReason, key} = params;
+		for (const role of changedRoles) {
+			if (!movedRoleIds.has(role.id)) {
+				continue;
+			}
+			const oldRole = roleMap.get(role.id);
+			await this.recordAuditLog({
+				guildId,
+				userId,
+				action: AuditLogActionType.ROLE_UPDATE,
+				targetId: role.id,
+				auditLogReason: auditLogReason ?? null,
+				metadata: {role_name: role.name},
+				changes: this.guildAuditLogService
+					.computeChanges(oldRole ? this.serializeRoleForAudit(oldRole) : null, this.serializeRoleForAudit(role))
+					.filter((change) => change.key === key),
+			});
+		}
 	}
 
 	private serializeRoleForAudit(role: GuildRole): Record<string, unknown> {

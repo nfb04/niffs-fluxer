@@ -3,7 +3,13 @@
 import {existsSync, mkdirSync, readdirSync, writeFileSync} from 'node:fs';
 import path, {dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {CopyRspackPlugin, DefinePlugin, HtmlRspackPlugin, SwcJsMinimizerRspackPlugin} from '@rspack/core';
+import {
+	CopyRspackPlugin,
+	DefinePlugin,
+	HtmlRspackPlugin,
+	LightningCssMinimizerRspackPlugin,
+	SwcJsMinimizerRspackPlugin,
+} from '@rspack/core';
 import {createPoFileRule, getLinguiSwcPluginConfig} from './scripts/build/rspack/lingui.mjs';
 import {staticFilesPlugin} from './scripts/build/rspack/static-files.mjs';
 
@@ -280,6 +286,14 @@ export default () => {
 					},
 				},
 				{
+					test: /[\\/]@sapphi-red[\\/]web-noise-suppressor[\\/]dist[\\/][^\\/]+[\\/]workletProcessor\.js$/,
+					type: 'asset/resource',
+					use: [{loader: path.join(ROOT_DIR, 'scripts/build/rspack/noise-suppressor-worklet-loader.cjs')}],
+					generator: {
+						filename: isProduction ? 'assets/[contenthash:16].worklet.js' : 'assets/[name].[hash].worklet.js',
+					},
+				},
+				{
 					test: /\.(tsx|ts|jsx|js)$/,
 					exclude: /node_modules/,
 					type: 'javascript/auto',
@@ -370,6 +384,13 @@ export default () => {
 					generator: {
 						filename: isProduction ? 'assets/[contenthash:16][ext]' : 'assets/[name].[hash][ext]',
 						...(workerWasmPublicPath ? {publicPath: workerWasmPublicPath} : {}),
+					},
+				},
+				{
+					test: /\.onnx$/,
+					type: 'asset/resource',
+					generator: {
+						filename: isProduction ? 'assets/[contenthash:16][ext]' : 'assets/[name].[hash][ext]',
 					},
 				},
 				{
@@ -466,7 +487,7 @@ export default () => {
 								priority: 55,
 								reuseExistingChunk: true,
 								enforce: true,
-								chunks: 'async',
+								chunks: (chunk) => !chunk.canBeInitial() && !isWorkerPath({chunk}),
 							},
 							livekit: {
 								test: /[\\/]node_modules[\\/](livekit-client|@livekit)[\\/]/,
@@ -583,7 +604,9 @@ export default () => {
 					compress: true,
 					mangle: true,
 					format: {comments: false},
+					exclude: /\.worklet\.js$/,
 				}),
+				new LightningCssMinimizerRspackPlugin(),
 			],
 		},
 		devServer: {

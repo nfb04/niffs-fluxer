@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import * as RouterUtils from '@app/features/navigation/utils/RouterUtils';
+import ExperimentAssignments from '@app/features/experiment/state/ExperimentAssignments';
 import SessionManager from '@app/features/platform/state/AuthSession';
 import type {ValueOf} from '@fluxer/constants/src/ValueOf';
 import type {UserPrivate} from '@fluxer/schema/src/domains/user/UserResponseSchemas';
@@ -73,7 +73,7 @@ class Authentication {
 	}
 
 	@action
-	handleConnectionOpen({user}: {user: UserPrivate}): void {
+	handleGatewayReady({user}: {user: UserPrivate}): void {
 		SessionManager.setUserId(user.id);
 		SessionManager.handleConnectionReady();
 	}
@@ -124,11 +124,14 @@ class Authentication {
 
 	@action
 	handleLogout(options?: {skipRedirect?: boolean}): void {
+		ExperimentAssignments.reset();
 		this.loginState = LoginState.Default;
 		this.mfaTicket = null;
 		this.mfaMethods = null;
 		if (!options?.skipRedirect) {
-			RouterUtils.replaceWith('/login');
+			void import('@app/features/navigation/utils/RouterUtils').then((module) => {
+				module.replaceWith('/login');
+			});
 		}
 	}
 

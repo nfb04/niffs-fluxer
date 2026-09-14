@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import {MEMBER_LIST_RANGE_MAX_SPAN} from '@fluxer/constants/src/GatewayConstants';
-import {describe, expect, it} from 'vitest';
 import {
 	areMemberListRangesCovered,
 	areMemberListRangesEqual,
@@ -10,7 +8,9 @@ import {
 	buildMemberListRangeWindow,
 	buildMemberListRenderWindow,
 	normalizeMemberListRanges,
-} from './MemberListRangeUtils';
+} from '@app/features/member/utils/MemberListRangeUtils';
+import {MEMBER_LIST_RANGE_MAX_SPAN} from '@fluxer/constants/src/GatewayConstants';
+import {describe, expect, it} from 'vitest';
 
 describe('MemberListRangeUtils', () => {
 	it('compares ranges after normalization and page splitting', () => {
@@ -42,7 +42,7 @@ describe('MemberListRangeUtils', () => {
 		expect(areNormalizedMemberListRangesCovered(requested, subscribed)).toBe(true);
 	});
 
-	it('builds a bounded, overscanned page window from scroll metrics', () => {
+	it('builds a bounded, overscanned page window from scroll metrics and keeps the head page subscribed', () => {
 		expect(
 			buildMemberListRangeWindow({
 				scrollTop: 44 * 250,
@@ -52,13 +52,14 @@ describe('MemberListRangeUtils', () => {
 				totalRows: 500,
 			}),
 		).toEqual([
+			[0, 99],
 			[100, 199],
 			[200, 299],
 			[300, 399],
 		]);
 	});
 
-	it('keeps scrollbar-dragged bottom windows clamped to the known row count', () => {
+	it('keeps scrollbar-dragged bottom windows clamped to the last known page', () => {
 		expect(
 			buildMemberListRangeWindow({
 				scrollTop: 44 * 490,
@@ -68,6 +69,7 @@ describe('MemberListRangeUtils', () => {
 				totalRows: 500,
 			}),
 		).toEqual([
+			[0, 99],
 			[300, 399],
 			[400, 499],
 		]);
@@ -83,7 +85,41 @@ describe('MemberListRangeUtils', () => {
 				overscanPages: 0,
 				totalRows: 500,
 			}),
-		).toEqual([[200, 299]]);
+		).toEqual([
+			[0, 99],
+			[200, 299],
+		]);
+	});
+
+	it('omits a duplicate head page when the window already starts at the top of the list', () => {
+		expect(
+			buildMemberListRangeWindow({
+				scrollTop: 0,
+				clientHeight: 44 * 10,
+				rowHeight: 44,
+				bufferRows: 12,
+				overscanPages: 0,
+				totalRows: 500,
+			}),
+		).toEqual([[0, 99]]);
+	});
+
+	it('keeps page ends aligned so a changing member count does not resubscribe', () => {
+		const options = {
+			scrollTop: 44 * 250,
+			clientHeight: 44 * 10,
+			rowHeight: 44,
+			bufferRows: 12,
+			overscanPages: 0,
+		};
+		expect(buildMemberListRangeWindow({...options, totalRows: 450})).toEqual([
+			[0, 99],
+			[200, 299],
+		]);
+		expect(buildMemberListRangeWindow({...options, totalRows: 451})).toEqual([
+			[0, 99],
+			[200, 299],
+		]);
 	});
 
 	it('builds a tight render window instead of rendering whole subscription pages', () => {

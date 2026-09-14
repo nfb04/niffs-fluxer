@@ -16,10 +16,10 @@ import type {
 	NativeScreenCaptureStartResult,
 	WindowsHagsState,
 } from '@electron/common/Types';
+import {getTccStatus} from '@electron/main/MacTcc';
+import {isValidStartOptions, normalizeScreenCaptureDimension} from '@electron/main/NativeScreenCaptureValidation';
+import {requirePrivilegedRendererDocumentSender} from '@electron/main/PrivilegedRendererDocuments';
 import {ipcMain} from 'electron';
-import {getTccStatus} from './MacTcc';
-import {isValidStartOptions, normalizeScreenCaptureDimension} from './NativeScreenCaptureValidation';
-import {createNativeVoiceEngineScreenFrameSinkHandle} from './NativeVoiceEngine';
 
 const logger = createChildLogger('NativeScreenCapture');
 const requireModule = createRequire(import.meta.url);
@@ -822,24 +822,18 @@ async function startNativeScreenCapture(
 	if (activeSessions.has(captureId)) {
 		throw new Error('Native screen capture id is already active');
 	}
-	const frameSinkHandle = createNativeVoiceEngineScreenFrameSinkHandle(captureId);
-	if (!frameSinkHandle) {
-		throw new Error('Native screen capture requires a native frame sink handle, but none is active');
-	}
 	const capture = new loadResult.addon.ScreenCapture({
 		sourceId: options.sourceId,
 		sourceKind: options.sourceKind,
 		width: requestedWidth,
 		height: requestedHeight,
 		frameRate: options.frameRate ?? 30,
-		injectionMethod: options.sourceKind === 'game' ? options.injectionMethod : undefined,
 		captureId,
 		colorRange: options.colorRange,
 		colorSpace: options.colorSpace,
 		showCursorClicks: options.showCursorClicks === true,
 		captureRect: options.captureRect,
 		nativeFrameSinkRequired: true,
-		frameSinkHandle,
 	});
 	const session: ActiveNativeScreenSession = {
 		captureId,
@@ -951,14 +945,16 @@ export function registerNativeScreenCaptureHandlers(): void {
 		'native-screen-capture:get-availability',
 		(): Promise<NativeScreenCaptureAvailability> => getNativeScreenCaptureAvailability(),
 	);
-	ipcMain.handle(
-		'native-screen-capture:list-sources',
-		(): Promise<Array<NativeScreenCaptureSource>> => listNativeScreenCaptureSources(),
-	);
+	ipcMain.handle('native-screen-capture:list-sources', (event): Promise<Array<NativeScreenCaptureSource>> => {
+		requirePrivilegedRendererDocumentSender(event, 'native-screen-capture:list-sources');
+		return listNativeScreenCaptureSources();
+	});
 	ipcMain.handle(
 		'native-screen-capture:start',
-		(event, options: NativeScreenCaptureStartOptions): Promise<NativeScreenCaptureStartResult> =>
-			startNativeScreenCapture(event.sender, options),
+		(event, options: NativeScreenCaptureStartOptions): Promise<NativeScreenCaptureStartResult> => {
+			requirePrivilegedRendererDocumentSender(event, 'native-screen-capture:start');
+			return startNativeScreenCapture(event.sender, options);
+		},
 	);
 	ipcMain.handle(
 		'native-screen-capture:get-diagnostics',

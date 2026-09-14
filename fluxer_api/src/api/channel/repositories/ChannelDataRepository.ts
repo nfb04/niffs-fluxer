@@ -1,20 +1,27 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type {ChannelID, GuildID, MessageID, UserID} from '../../BrandedTypes';
-import {BatchBuilder, fetchMany, fetchManyInChunks, fetchOne, upsertOne} from '../../database/CassandraQueryExecution';
-import {Db} from '../../database/CassandraTypes';
-import {buildPatchFromData, executeVersionedUpdate} from '../../database/CassandraVersionedUpdate';
-import type {ChannelRow} from '../../database/types/ChannelTypes';
-import {CHANNEL_COLUMNS} from '../../database/types/ChannelTypes';
-import {Logger} from '../../Logger';
-import {Channel} from '../../models/Channel';
-import {Channels, ChannelsByGuild, PrivateChannels} from '../../Tables';
+import type {ChannelID, GuildID, MessageID, UserID} from '@app/api/BrandedTypes';
 import {
 	privateChannelFanOutTargets,
 	privateChannelLastMessageIdPatch,
 	privateChannelMetadataPatch,
-} from '../PrivateChannelSnapshot';
-import {IChannelDataRepository} from './IChannelDataRepository';
+} from '@app/api/channel/PrivateChannelSnapshot';
+import {IChannelDataRepository} from '@app/api/channel/repositories/IChannelDataRepository';
+import {
+	BatchBuilder,
+	fetchMany,
+	fetchManyInChunks,
+	fetchOne,
+	upsertOne,
+} from '@app/api/database/CassandraQueryExecution';
+import {Db} from '@app/api/database/CassandraTypes';
+import {buildPatchFromData, executeVersionedUpdate} from '@app/api/database/CassandraVersionedUpdate';
+import type {ChannelRow} from '@app/api/database/types/ChannelTypes';
+import {CHANNEL_COLUMNS} from '@app/api/database/types/ChannelTypes';
+import {Logger} from '@app/api/Logger';
+import type {RequestCache} from '@app/api/middleware/RequestCacheMiddleware';
+import {Channel} from '@app/api/models/Channel';
+import {Channels, ChannelsByGuild, PrivateChannels} from '@app/api/Tables';
 
 const FETCH_CHANNEL_BY_ID = Channels.select({
 	where: [Channels.where.eq('channel_id'), Channels.where.eq('soft_deleted')],
@@ -33,7 +40,15 @@ const FETCH_OPEN_PRIVATE_CHANNEL_TARGET = PrivateChannels.selectCql({
 });
 
 export class ChannelDataRepository extends IChannelDataRepository {
+	constructor(private readonly requestCache?: RequestCache) {
+		super();
+	}
+
 	async findUnique(channelId: ChannelID): Promise<Channel | null> {
+		const prefetched = this.requestCache?.takeChannel(channelId);
+		if (prefetched !== undefined) {
+			return prefetched;
+		}
 		const channel = await fetchOne<ChannelRow>(
 			FETCH_CHANNEL_BY_ID.bind({
 				channel_id: channelId,
@@ -45,6 +60,7 @@ export class ChannelDataRepository extends IChannelDataRepository {
 
 	async upsert(data: ChannelRow, oldData?: ChannelRow | null): Promise<Channel> {
 		const channelId = data.channel_id;
+		this.requestCache?.channels.delete(channelId);
 		const result = await executeVersionedUpdate<ChannelRow, 'channel_id' | 'soft_deleted'>(
 			async () => fetchOne<ChannelRow>(FETCH_CHANNEL_BY_ID.bind({channel_id: channelId, soft_deleted: false})),
 			(current) => ({
@@ -68,6 +84,7 @@ export class ChannelDataRepository extends IChannelDataRepository {
 	}
 
 	async updateLastMessageId(channelId: ChannelID, messageId: MessageID): Promise<void> {
+		this.requestCache?.channels.delete(channelId);
 		const existing = await fetchOne<ChannelRow>(
 			FETCH_CHANNEL_BY_ID.bind({
 				channel_id: channelId,
@@ -159,6 +176,7 @@ export class ChannelDataRepository extends IChannelDataRepository {
 	}
 
 	async delete(channelId: ChannelID, guildId?: GuildID): Promise<void> {
+		this.requestCache?.channels.delete(channelId);
 		const batch = new BatchBuilder();
 		batch.addPrepared(
 			Channels.deleteByPk({

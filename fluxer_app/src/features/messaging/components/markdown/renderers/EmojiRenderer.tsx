@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import {MatureEmojiWrapper} from '@app/features/app/components/shared/MatureEmojiWrapper';
+import {useShouldAnimate} from '@app/features/app/hooks/useShouldAnimate';
 import {requestDeleteMessage} from '@app/features/channel/components/MessageActionUtils';
+import {useMaybeMessageViewContext} from '@app/features/channel/components/MessageViewContext';
 import {EmojiInfoBottomSheet} from '@app/features/emoji/components/bottomsheets/EmojiInfoBottomSheet';
 import {EmojiInfoContent} from '@app/features/emoji/components/emojis/EmojiInfoContent';
 import type {FlatEmoji} from '@app/features/emoji/types/EmojiTypes';
 import {isKeyboardActivationKey} from '@app/features/input/utils/KeyboardUtils';
 import type {RendererProps} from '@app/features/messaging/components/markdown/renderers/RendererTypes';
 import Messages from '@app/features/messaging/state/MessagingMessages';
-import {setUrlQueryParams} from '@app/features/messaging/utils/MessagingUrlUtils';
-import {getEmojiRenderData} from '@app/features/messaging/utils/markdown/EmojiDetector';
+import {getEmojiRenderData, getEmojiRenderUrl} from '@app/features/messaging/utils/markdown/EmojiDetector';
 import {EmojiKind} from '@app/features/messaging/utils/markdown/parser/Enums';
 import type {EmojiNode} from '@app/features/messaging/utils/markdown/parser/Nodes';
 import {EmojiContextMenuItems, EmojiInlineMenuItems} from '@app/features/ui/action_menu/items/EmojiContextMenuItems';
@@ -26,10 +26,12 @@ import {observer} from 'mobx-react-lite';
 import type React from 'react';
 import {useCallback, useMemo, useState} from 'react';
 
-const FAILED_TO_LOAD_DESCRIPTOR = msg({
-	message: '(failed to load)',
+const EMOJI_FAILED_TO_LOAD_DESCRIPTOR = msg({
+	message: '{emojiName} (failed to load)',
 	comment: 'Error message in the messaging emoji renderer.',
 });
+
+const FAILED_EMOJI_STYLE: React.CSSProperties = {opacity: 0.5};
 
 interface EmojiBottomSheetState {
 	isOpen: boolean;
@@ -88,19 +90,25 @@ const EmojiRendererInner = observer(function EmojiRendererInner({
 		isOpen: false,
 		emoji: null,
 	});
+	const [failedUrl, setFailedUrl] = useState<string | null>(null);
+	const messageView = useMaybeMessageViewContext();
+	const isAnimatable = emojiData.isAnimatable;
+	const shouldAnimate = useShouldAnimate({
+		kind: 'emoji',
+		isHovering: isAnimatable && messageView?.isHovering === true,
+	});
+	const animated = isAnimatable && shouldAnimate;
 	const className = clsx('emoji', shouldJumboEmojis && 'jumboable');
-	const size = shouldJumboEmojis ? 240 : 96;
-	const renderedEmojiUrl = useMemo(
+	const emojiUrl = useMemo(
 		() =>
-			emojiData.id && emojiData.url ? setUrlQueryParams(emojiData.url, {size, quality: 'lossless'}) : emojiData.url,
-		[emojiData.id, emojiData.url, size],
-	);
-	const tooltipEmojiUrl = useMemo(
-		() =>
-			emojiData.id && emojiData.url
-				? setUrlQueryParams(emojiData.url, {size: 240, quality: 'lossless'})
-				: emojiData.url,
-		[emojiData.id, emojiData.url],
+			getEmojiRenderUrl({
+				id: emojiData.id,
+				surrogateUrl: emojiData.surrogateUrl,
+				isAnimatable: emojiData.isAnimatable,
+				animated,
+				jumbo: shouldJumboEmojis,
+			}),
+		[emojiData.id, emojiData.surrogateUrl, emojiData.isAnimatable, animated, shouldJumboEmojis],
 	);
 	const isCustomEmoji = node.kind.kind === EmojiKind.Custom;
 	const standardEmojiSurrogate = node.kind.kind === EmojiKind.Standard ? node.kind.raw : undefined;
@@ -147,11 +155,11 @@ const EmojiRendererInner = observer(function EmojiRendererInner({
 			allNamesString: `:${node.kind.name}:`,
 			uniqueName: node.kind.name,
 			surrogates: standardEmojiSurrogate,
-			url: standardEmojiSurrogate ? (emojiData.url ?? undefined) : undefined,
+			url: standardEmojiSurrogate ? (emojiData.surrogateUrl ?? undefined) : undefined,
 		};
 	}, [
 		emojiData.id,
-		emojiData.url,
+		emojiData.surrogateUrl,
 		emojiRecord,
 		fallbackAnimated,
 		fallbackGuildId,
@@ -160,13 +168,11 @@ const EmojiRendererInner = observer(function EmojiRendererInner({
 	]);
 	const getTooltipData = useCallback(() => {
 		const emojiForSubtext = buildEmojiForSubtext();
-		return {emojiUrl: tooltipEmojiUrl, emojiForSubtext};
-	}, [buildEmojiForSubtext, tooltipEmojiUrl]);
-	const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
-		const target = e.target as HTMLImageElement;
-		target.style.opacity = '0.5';
-		target.alt = `${emojiData.name} ${i18n._(FAILED_TO_LOAD_DESCRIPTOR)}`;
-	};
+		return {emojiUrl, emojiForSubtext};
+	}, [buildEmojiForSubtext, emojiUrl]);
+	const handleImageError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+		setFailedUrl((e.target as HTMLImageElement).getAttribute('src'));
+	}, []);
 	const handleContextMenu = useCallback(
 		(e: React.MouseEvent) => {
 			if (!isCustomEmoji || !emojiData.id) return;
@@ -204,36 +210,22 @@ const EmojiRendererInner = observer(function EmojiRendererInner({
 		},
 		[buildEmojiForSubtext, emojiData.id, emojiRecord, isCustomEmoji, channelId, messageId, i18n],
 	);
-	const messageMatureContentEmojis =
-		messageId && channelId ? Messages.getMessage(channelId, messageId)?.nsfwEmojis : null;
-	const isMature =
-		isCustomEmoji && (!!emojiRecord?.nsfw || (emojiData.id != null && !!messageMatureContentEmojis?.has(emojiData.id)));
-	const wrapWithMatureContent = (element: React.ReactElement<{className?: string}>) =>
-		isMature ? (
-			<MatureEmojiWrapper
-				mature={true}
-				channelId={channelId}
-				data-flx="messaging.markdown.renderers.emoji-renderer.wrap-with-mature-content.mature-emoji-wrapper"
-			>
-				{element}
-			</MatureEmojiWrapper>
-		) : (
-			element
-		);
+	const hasFailed = emojiUrl != null && failedUrl === emojiUrl;
 	const renderEmojiElement = (contextMenu: boolean, dataFlx: string) =>
-		renderedEmojiUrl ? (
+		emojiUrl ? (
 			<img
 				draggable={false}
 				className={className}
-				alt={emojiData.name}
-				src={renderedEmojiUrl}
+				alt={hasFailed ? i18n._(EMOJI_FAILED_TO_LOAD_DESCRIPTOR, {emojiName: emojiData.name}) : emojiData.name}
+				src={emojiUrl}
+				style={hasFailed ? FAILED_EMOJI_STYLE : undefined}
 				data-message-id={messageId}
 				data-message-emoji="true"
 				data-emoji-id={emojiData.id}
 				data-animated={emojiData.isAnimated}
 				onError={handleImageError}
 				onContextMenu={contextMenu ? handleContextMenu : undefined}
-				loading="lazy"
+				loading="eager"
 				data-flx={dataFlx}
 			/>
 		) : (
@@ -262,9 +254,7 @@ const EmojiRendererInner = observer(function EmojiRendererInner({
 					tabIndex={0}
 					data-flx="messaging.markdown.renderers.emoji-renderer.emoji-renderer-inner.button.open-bottom-sheet--2"
 				>
-					{wrapWithMatureContent(
-						renderEmojiElement(false, 'messaging.markdown.renderers.emoji-renderer.emoji-renderer-inner.emoji'),
-					)}
+					{renderEmojiElement(false, 'messaging.markdown.renderers.emoji-renderer.emoji-renderer-inner.emoji')}
 				</span>
 				<EmojiInfoBottomSheet
 					isOpen={bottomSheetState.isOpen}
@@ -284,9 +274,7 @@ const EmojiRendererInner = observer(function EmojiRendererInner({
 			emojiForSubtext={tooltipData.emojiForSubtext}
 			data-flx="messaging.markdown.renderers.emoji-renderer.emoji-renderer-inner.emoji-with-tooltip--2"
 		>
-			{wrapWithMatureContent(
-				renderEmojiElement(true, 'messaging.markdown.renderers.emoji-renderer.emoji-renderer-inner.emoji.context-menu'),
-			)}
+			{renderEmojiElement(true, 'messaging.markdown.renderers.emoji-renderer.emoji-renderer-inner.emoji.context-menu')}
 		</EmojiWithTooltip>
 	);
 });

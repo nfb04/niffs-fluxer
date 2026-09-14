@@ -1,6 +1,23 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import type {MessageID, UserID} from '@app/api/BrandedTypes';
+import {createMessageID} from '@app/api/BrandedTypes';
+import type {IChannelRepositoryAggregate} from '@app/api/channel/repositories/IChannelRepositoryAggregate';
+import type {AuthenticatedChannel} from '@app/api/channel/services/AuthenticatedChannel';
 import {dispatchChannelEvent} from '@app/api/channel/services/ChannelGatewayDispatch';
+import {MessageInteractionBase} from '@app/api/channel/services/interaction/MessageInteractionBase';
+import {
+	dispatchMessageCreateBroadcast,
+	dispatchMessageUpdateBroadcast,
+} from '@app/api/channel/services/message/MessageGatewayDispatch';
+import type {MessagePersistenceService} from '@app/api/channel/services/message/MessagePersistenceService';
+import {createMessageResponseDataService} from '@app/api/channel/services/message/MessageResponseDataService';
+import type {GuildAuditLogService} from '@app/api/guild/GuildAuditLogService';
+import type {IGatewayService} from '@app/api/infrastructure/IGatewayService';
+import type {ISnowflakeService} from '@app/api/infrastructure/ISnowflakeService';
+import type {RequestCache} from '@app/api/middleware/RequestCacheMiddleware';
+import type {Channel} from '@app/api/models/Channel';
+import type {Message} from '@app/api/models/Message';
 import {AuditLogActionType} from '@fluxer/constants/src/AuditLogActionType';
 import {MessageTypes, Permissions} from '@fluxer/constants/src/ChannelConstants';
 import {GuildOperations} from '@fluxer/constants/src/GuildConstants';
@@ -9,20 +26,8 @@ import {UnknownMessageError} from '@fluxer/errors/src/domains/channel/UnknownMes
 import {FeatureTemporarilyDisabledError} from '@fluxer/errors/src/domains/core/FeatureTemporarilyDisabledError';
 import type {ChannelPinResponse} from '@fluxer/schema/src/domains/message/MessageResponseSchemas';
 import {snowflakeToDate} from '@fluxer/snowflake/src/Snowflake';
-import type {MessageID, UserID} from '../../../BrandedTypes';
-import {createMessageID} from '../../../BrandedTypes';
-import type {GuildAuditLogService} from '../../../guild/GuildAuditLogService';
-import type {IGatewayService} from '../../../infrastructure/IGatewayService';
-import type {ISnowflakeService} from '../../../infrastructure/ISnowflakeService';
-import type {RequestCache} from '../../../middleware/RequestCacheMiddleware';
-import type {Channel} from '../../../models/Channel';
-import type {Message} from '../../../models/Message';
-import type {IChannelRepositoryAggregate} from '../../repositories/IChannelRepositoryAggregate';
-import type {AuthenticatedChannel} from '../AuthenticatedChannel';
-import {dispatchMessageCreateBroadcast, dispatchMessageUpdateBroadcast} from '../message/MessageGatewayDispatch';
-import type {MessagePersistenceService} from '../message/MessagePersistenceService';
-import {createMessageResponseDataService} from '../message/MessageResponseDataService';
-import {MessageInteractionBase} from './MessageInteractionBase';
+
+const PIN_LIST_UNBOUNDED_TIMESTAMP = new Date('9999-12-31T23:59:59.999Z');
 
 export class MessagePinService extends MessageInteractionBase {
 	constructor(
@@ -79,43 +84,50 @@ export class MessagePinService extends MessageInteractionBase {
 			}
 		}
 		const pageSize = Math.min(limit ?? 50, 50);
-		const effectiveBefore = beforeTimestamp ?? new Date();
-		const messages = await this.channelRepository.messageInteractions.listChannelPins(
-			channel.id,
-			effectiveBefore,
-			pageSize + 1,
-		);
-		const sorted = messages.sort((a, b) => (b.pinnedTimestamp?.getTime() ?? 0) - (a.pinnedTimestamp?.getTime() ?? 0));
-		let filtered = sorted;
-		if (!hasReadHistory) {
-			const cutoff = authChannel.guild!.message_history_cutoff!;
-			const cutoffTimestamp = new Date(cutoff).getTime();
-			filtered = sorted.filter((message) => snowflakeToDate(message.id).getTime() >= cutoffTimestamp);
+		const cutoffTimestamp = hasReadHistory ? null : new Date(authChannel.guild!.message_history_cutoff!).getTime();
+		const filtered: Array<Message> = [];
+		let before = beforeTimestamp ?? PIN_LIST_UNBOUNDED_TIMESTAMP;
+		let exhausted = false;
+		while (filtered.length <= pageSize && !exhausted) {
+			const messages = await this.channelRepository.messageInteractions.listChannelPins(
+				channel.id,
+				before,
+				pageSize + 1,
+			);
+			const sorted = messages.sort((a, b) => (b.pinnedTimestamp?.getTime() ?? 0) - (a.pinnedTimestamp?.getTime() ?? 0));
+			exhausted = messages.length <= pageSize;
+			for (const message of sorted) {
+				if (cutoffTimestamp === null || snowflakeToDate(message.id).getTime() >= cutoffTimestamp) {
+					filtered.push(message);
+				}
+			}
+			const last = sorted[sorted.length - 1];
+			if (!last?.pinnedTimestamp) {
+				break;
+			}
+			before = last.pinnedTimestamp;
 		}
 		const hasMore = filtered.length > pageSize;
-		const trimmed = hasMore ? filtered.slice(0, pageSize) : filtered;
+		const trimmed = filtered.slice(0, pageSize);
 		const access = {
 			sourceGuildId: channel.guildId,
 			messageHistoryCutoff: hasReadHistory ? null : (authChannel.guild?.message_history_cutoff ?? null),
 			canReadMessageHistory: hasReadHistory,
 		};
 		const responseDataService = createMessageResponseDataService();
-		const messageResponses = await Promise.all(
-			trimmed.map((message) =>
-				responseDataService.getMessage({
-					userId,
-					channelId: channel.id,
-					messageId: message.id,
-					access,
-				}),
-			),
-		);
-		const items = trimmed.flatMap((message: Message, index) => {
-			const messageResponse = messageResponses[index];
+		const messageResponses = await responseDataService.buildMessages({
+			userId,
+			messages: trimmed,
+			access,
+		});
+		const responseByMessageId = new Map(messageResponses.map((response) => [response.id, response]));
+		const items = trimmed.flatMap((message: Message) => {
+			const messageResponse = responseByMessageId.get(message.id.toString());
 			if (!messageResponse || !message.pinnedTimestamp) return [];
+			const {referenced_message: _referencedMessage, reactions: _reactions, ...pinnedMessage} = messageResponse;
 			return [
 				{
-					message: messageResponse,
+					message: pinnedMessage,
 					pinned_at: message.pinnedTimestamp.toISOString(),
 				},
 			];
@@ -130,11 +142,13 @@ export class MessagePinService extends MessageInteractionBase {
 		authChannel,
 		messageId,
 		userId,
+		auditLogReason,
 	}: {
 		authChannel: AuthenticatedChannel;
 		messageId: MessageID;
 		userId: UserID;
 		requestCache: RequestCache;
+		auditLogReason?: string | null;
 	}): Promise<void> {
 		const {channel, guild, checkPermission} = authChannel;
 		if (guild) {
@@ -170,7 +184,7 @@ export class MessagePinService extends MessageInteractionBase {
 					channel_id: channel.id.toString(),
 					message_id: messageId.toString(),
 				})
-				.withReason(null)
+				.withReason(auditLogReason ?? null)
 				.commit();
 		}
 	}
@@ -179,11 +193,13 @@ export class MessagePinService extends MessageInteractionBase {
 		authChannel,
 		messageId,
 		userId,
+		auditLogReason,
 	}: {
 		authChannel: AuthenticatedChannel;
 		messageId: MessageID;
 		userId: UserID;
 		requestCache: RequestCache;
+		auditLogReason?: string | null;
 	}): Promise<void> {
 		const {channel, guild, checkPermission} = authChannel;
 		if (guild) {
@@ -215,7 +231,7 @@ export class MessagePinService extends MessageInteractionBase {
 					channel_id: channel.id.toString(),
 					message_id: messageId.toString(),
 				})
-				.withReason(null)
+				.withReason(auditLogReason ?? null)
 				.commit();
 		}
 	}

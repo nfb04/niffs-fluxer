@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-use base64::prelude::*;
-use hmac::{Hmac, KeyInit, Mac};
-use sha2::Sha256;
 use url::Url;
-
-const V2_PATH_PREFIX: &str = "v2/";
 
 #[derive(Clone)]
 pub struct MediaProxyUrlBuilder {
@@ -44,7 +39,9 @@ impl MediaProxyUrlBuilder {
             anyhow::bail!("gifs shard requires FLUXER_MEDIA_PROXY_SECRET_KEY");
         }
 
-        let endpoint = endpoint.trim_end_matches('/').to_owned();
+        let endpoint = fluxer_common::config::normalize_public_endpoint_from_env(
+            endpoint.trim_end_matches('/'),
+        );
         let endpoint_host = Url::parse(&endpoint)
             .ok()
             .and_then(|parsed| parsed.host_str().map(ToOwned::to_owned));
@@ -66,26 +63,12 @@ impl MediaProxyUrlBuilder {
             return Some(input_url.to_owned());
         }
 
-        let proxy_path = build_external_media_proxy_path(parsed.as_str());
-        let signature = create_signature(&proxy_path, &self.secret_key);
-        Some(format!(
-            "{}/external/{signature}/{proxy_path}",
-            self.endpoint
-        ))
+        fluxer_common::external_media_path::build_external_media_proxy_url(
+            &self.endpoint,
+            parsed.as_str(),
+            self.secret_key.as_bytes(),
+        )
     }
-}
-
-fn build_external_media_proxy_path(input_url: &str) -> String {
-    format!(
-        "{V2_PATH_PREFIX}{}",
-        BASE64_URL_SAFE_NO_PAD.encode(input_url)
-    )
-}
-
-fn create_signature(input: &str, secret: &str) -> String {
-    let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes()).expect("HMAC accepts any key");
-    mac.update(input.as_bytes());
-    BASE64_URL_SAFE_NO_PAD.encode(mac.finalize().into_bytes())
 }
 
 #[cfg(test)]
@@ -105,6 +88,9 @@ mod tests {
             "FLUXER_MEDIA_ENDPOINT",
             "FLUXER_MEDIA_PROXY_ENDPOINT",
             "FLUXER_MEDIA_PROXY_SECRET_KEY",
+            "FLUXER_BASE_DOMAIN",
+            "FLUXER_PUBLIC_PORT",
+            "FLUXER_PUBLIC_ORIGIN",
         ];
         let saved = keys
             .iter()
@@ -153,7 +139,7 @@ mod tests {
             .expect("proxy url");
 
         assert!(url.starts_with("https://media.example.test/external/"));
-        assert!(url.contains("/v2/"));
+        assert!(url.contains("/https/"));
         assert_eq!(
             builder.external_proxy_url("https://media.example.test/external/existing"),
             Some("https://media.example.test/external/existing".to_owned())
@@ -201,6 +187,55 @@ mod tests {
                 let builder = MediaProxyUrlBuilder::from_env()?;
 
                 assert_eq!(builder.endpoint, "https://media.example.test/media");
+                Ok(())
+            },
+        )
+    }
+
+    #[test]
+    fn from_env_inserts_a_non_default_public_port() -> anyhow::Result<()> {
+        with_media_proxy_env(
+            &[
+                (
+                    "FLUXER_MEDIA_PROXY_PUBLIC_ENDPOINT",
+                    Some("http://fluxer.example/media"),
+                ),
+                ("FLUXER_MEDIA_PROXY_SECRET_KEY", Some("secret")),
+                ("FLUXER_BASE_DOMAIN", Some("fluxer.example")),
+                ("FLUXER_PUBLIC_PORT", Some("19080")),
+            ],
+            || {
+                let builder = MediaProxyUrlBuilder::from_env()?;
+
+                assert_eq!(builder.endpoint, "http://fluxer.example:19080/media");
+                assert_eq!(builder.endpoint_host.as_deref(), Some("fluxer.example"));
+                assert!(
+                    builder
+                        .external_proxy_url("https://img.example.net/a.webp")
+                        .expect("proxy url")
+                        .starts_with("http://fluxer.example:19080/media/external/")
+                );
+                Ok(())
+            },
+        )
+    }
+
+    #[test]
+    fn from_env_leaves_a_default_public_port_alone() -> anyhow::Result<()> {
+        with_media_proxy_env(
+            &[
+                (
+                    "FLUXER_MEDIA_PROXY_PUBLIC_ENDPOINT",
+                    Some("https://fluxer.example/media"),
+                ),
+                ("FLUXER_MEDIA_PROXY_SECRET_KEY", Some("secret")),
+                ("FLUXER_BASE_DOMAIN", Some("fluxer.example")),
+                ("FLUXER_PUBLIC_PORT", Some("443")),
+            ],
+            || {
+                let builder = MediaProxyUrlBuilder::from_env()?;
+
+                assert_eq!(builder.endpoint, "https://fluxer.example/media");
                 Ok(())
             },
         )

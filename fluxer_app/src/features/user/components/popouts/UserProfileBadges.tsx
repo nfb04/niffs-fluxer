@@ -19,13 +19,12 @@ import {observer} from 'mobx-react-lite';
 import type React from 'react';
 import {useMemo} from 'react';
 
+const BADGE_ASSET_VERSION = '2';
+
+const badgeAssetUrl = (fileName: string) => cdnUrl(`badges/${fileName}?v=${BADGE_ASSET_VERSION}`);
+
 const STAFF_DESCRIPTOR = msg({
 	message: '{productName} Staff',
-	comment:
-		'Short badge title in the user profile badges popout. Preserve {productName}; it is inserted by code. English locales use Title Case for official badge titles; other locales should use natural local capitalization.',
-});
-const COMMUNITY_TEAM_DESCRIPTOR = msg({
-	message: '{productName} Community Team',
 	comment:
 		'Short badge title in the user profile badges popout. Preserve {productName}; it is inserted by code. English locales use Title Case for official badge titles; other locales should use natural local capitalization.',
 });
@@ -95,24 +94,16 @@ export const UserProfileBadges: React.FC<UserProfileBadgesProps> = observer(
 				result.push({
 					type: 'icon',
 					key: 'staff',
-					iconUrl: cdnUrl('badges/staff.svg?v=2'),
+					iconUrl: badgeAssetUrl('staff.svg'),
 					tooltip: i18n._(STAFF_DESCRIPTOR, {productName: PRODUCT_NAME}),
 					url: Routes.careers(),
-				});
-			}
-			if (!selfHosted && user.flags & PublicUserFlags.CTP_MEMBER) {
-				result.push({
-					type: 'icon',
-					key: 'ctp_member',
-					iconUrl: cdnUrl('badges/ctp.svg'),
-					tooltip: i18n._(COMMUNITY_TEAM_DESCRIPTOR, {productName: PRODUCT_NAME}),
 				});
 			}
 			if (!selfHosted && user.flags & PublicUserFlags.PARTNER) {
 				result.push({
 					type: 'icon',
 					key: 'partner',
-					iconUrl: cdnUrl('badges/partner.svg'),
+					iconUrl: badgeAssetUrl('partner.svg'),
 					tooltip: i18n._(PARTNER_DESCRIPTOR, {productName: PRODUCT_NAME}),
 					url: Routes.partners(),
 				});
@@ -121,7 +112,7 @@ export const UserProfileBadges: React.FC<UserProfileBadgesProps> = observer(
 				result.push({
 					type: 'icon',
 					key: 'bug_hunter',
-					iconUrl: cdnUrl('badges/bug-hunter.svg'),
+					iconUrl: badgeAssetUrl('bug-hunter.svg'),
 					tooltip: i18n._(BUG_HUNTER_DESCRIPTOR, {productName: PRODUCT_NAME}),
 					url: Routes.bugs(),
 				});
@@ -147,7 +138,7 @@ export const UserProfileBadges: React.FC<UserProfileBadgesProps> = observer(
 				result.push({
 					type: 'icon',
 					key: 'premium',
-					iconUrl: cdnUrl('badges/plutonium.svg'),
+					iconUrl: badgeAssetUrl('plutonium.svg'),
 					tooltip: tooltipText,
 					url: badgeUrl,
 				});

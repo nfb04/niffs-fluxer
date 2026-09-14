@@ -5,6 +5,8 @@
 /.direnv/
 /.fluxer/
 /.git/
+**/.git
+**/.git/**
 /.github/
 /.pnpm-store/
 
@@ -26,7 +28,8 @@
 **/node_modules/
 **/target/
 **/test-results.json
-/fluxer_docs/site/
+/fluxer_docs/dist/
+/fluxer_docs/.astro/
 /fluxer_app/.devserver-cache.json
 /fluxer_app/pkgs/libfluxcore/
 /fluxer_app/src/features/i18n/locales/*/messages.mjs
@@ -46,13 +49,9 @@
 
 /app-dist-output/
 /artifacts/
-/release-input/
-/release-out/
 /s3_payload/
 /upload_staging/
 
-/deploy/helm/**/Chart.lock
-/deploy/helm/**/charts/
 
 /fluxer_desktop/
 

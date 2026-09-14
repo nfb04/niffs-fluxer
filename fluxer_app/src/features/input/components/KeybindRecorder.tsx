@@ -13,6 +13,7 @@ import {isKeybindModifierKey} from '@app/features/input/utils/KeybindComboUtils'
 import {formatKeyCombo} from '@app/features/input/utils/KeybindUtils';
 import {isKeyboardActivationKey} from '@app/features/input/utils/KeyboardUtils';
 import type {GlobalKeyEvent} from '@app/features/platform/types/Electron';
+import {remFromPx} from '@app/features/theme/layout/RemFromPx';
 import {Button} from '@app/features/ui/button/Button';
 import FocusRing from '@app/features/ui/focus_ring/FocusRing';
 import {Popout} from '@app/features/ui/popover/PopoverPopout';
@@ -154,8 +155,8 @@ const KeybindEditorPopout: React.FC<KeybindEditorPopoutProps> = ({
 	const [recording, setRecording] = useState(true);
 	const [previewCombo, setPreviewCombo] = useState<KeyCombo | null>(null);
 	const currentCombo = previewCombo ?? value;
-	const displayValue = formatKeyCombo(currentCombo);
-	const defaultDisplayValue = defaultValue ? formatKeyCombo(defaultValue) : null;
+	const displayValue = formatKeyCombo(i18n, currentCombo);
+	const defaultDisplayValue = defaultValue ? formatKeyCombo(i18n, defaultValue) : null;
 	const currentHasValue = !!(
 		currentCombo?.key ||
 		currentCombo?.code ||
@@ -403,7 +404,7 @@ const KeybindEditorPopout: React.FC<KeybindEditorPopoutProps> = ({
 					data-flx="input.keybind-recorder.keybind-editor-popout.recorder-box.start-recording"
 				>
 					<KeyboardIcon
-						size={20}
+						size={remFromPx(20)}
 						weight="bold"
 						className={styles.recorderIcon}
 						data-flx="input.keybind-recorder.keybind-editor-popout.recorder-icon"
@@ -440,7 +441,9 @@ const KeybindEditorPopout: React.FC<KeybindEditorPopoutProps> = ({
 							small
 							type="button"
 							onClick={handleClear}
-							leftIcon={<TrashIcon size={16} data-flx="input.keybind-recorder.keybind-editor-popout.trash-icon" />}
+							leftIcon={
+								<TrashIcon size={remFromPx(16)} data-flx="input.keybind-recorder.keybind-editor-popout.trash-icon" />
+							}
 							data-flx="input.keybind-recorder.keybind-editor-popout.button.clear"
 						>
 							<Trans>Clear</Trans>
@@ -454,7 +457,7 @@ const KeybindEditorPopout: React.FC<KeybindEditorPopoutProps> = ({
 							onClick={handleReset}
 							leftIcon={
 								<ArrowCounterClockwiseIcon
-									size={16}
+									size={remFromPx(16)}
 									data-flx="input.keybind-recorder.keybind-editor-popout.arrow-counter-clockwise-icon"
 								/>
 							}
@@ -494,7 +497,7 @@ export const KeybindRecorder: React.FC<KeybindRecorderProps> = ({
 	const triggerRef = useRef<HTMLButtonElement | null>(null);
 	const isEmpty = !value?.key && !value?.code && value?.mouseButton === undefined && value?.gamepadButton === undefined;
 	const hasValue = !isEmpty;
-	const displayValue = formatKeyCombo(value);
+	const displayValue = formatKeyCombo(i18n, value);
 	return (
 		<div
 			className={clsx(styles.field, labelPlacement === 'inline' && styles.fieldInline)}
@@ -533,7 +536,11 @@ export const KeybindRecorder: React.FC<KeybindRecorderProps> = ({
 				>
 					<div className={styles.layout} data-flx="input.keybind-recorder.layout">
 						<div className={styles.editIconLeft} aria-hidden data-flx="input.keybind-recorder.edit-icon-left">
-							<PencilSimpleIcon size={12} weight="bold" data-flx="input.keybind-recorder.pencil-simple-icon" />
+							<PencilSimpleIcon
+								size={remFromPx(12)}
+								weight="bold"
+								data-flx="input.keybind-recorder.pencil-simple-icon"
+							/>
 						</div>
 						<div className={styles.inputWrapper} data-flx="input.keybind-recorder.input-wrapper">
 							<span className={styles.input} data-flx="input.keybind-recorder.input">

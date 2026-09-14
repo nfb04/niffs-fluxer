@@ -1,98 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export type {
-	VoiceEngineV2BridgeApi,
-	VoiceEngineV2BridgeAudioDeviceRole,
-	VoiceEngineV2BridgeAudioInputDevice,
-	VoiceEngineV2BridgeAudioOutputDevice,
-	VoiceEngineV2BridgeCameraDevice,
-	VoiceEngineV2BridgeCapabilities,
-	VoiceEngineV2BridgeConnectionQuality,
-	VoiceEngineV2BridgeConnectOptions,
-	VoiceEngineV2BridgeDroppedEventCounts,
-	VoiceEngineV2BridgeEvent,
-	VoiceEngineV2BridgeEventPayloads,
-	VoiceEngineV2BridgeEventType,
-	VoiceEngineV2BridgeFloatPcmFrame,
-	VoiceEngineV2BridgeHardwareEncoderBackend,
-	VoiceEngineV2BridgeHardwareEncoderCapabilities,
-	VoiceEngineV2BridgeInboundStat,
-	VoiceEngineV2BridgeIpcMethods,
-	VoiceEngineV2BridgeKnownEvent,
-	VoiceEngineV2BridgeKnownEventType,
-	VoiceEngineV2BridgeLocalTrackRepublishedEventPayload,
-	VoiceEngineV2BridgeMethodName,
-	VoiceEngineV2BridgeOperationError,
-	VoiceEngineV2BridgeOperationErrorCode,
-	VoiceEngineV2BridgeOperationFailure,
-	VoiceEngineV2BridgeOperationResult,
-	VoiceEngineV2BridgeOperationSuccess,
-	VoiceEngineV2BridgeOutboundStat,
-	VoiceEngineV2BridgeParticipantEventPayload,
-	VoiceEngineV2BridgeParticipantVolumeOptions,
-	VoiceEngineV2BridgePcmFrame,
-	VoiceEngineV2BridgePublishCameraOptions,
-	VoiceEngineV2BridgePublishDataOptions,
-	VoiceEngineV2BridgePublishDeviceScreenShareOptions,
-	VoiceEngineV2BridgePublishMicrophoneOptions,
-	VoiceEngineV2BridgePublishScreenAudioOptions,
-	VoiceEngineV2BridgePublishSoundboardAudioOptions,
-	VoiceEngineV2BridgePublishScreenOptions,
-	VoiceEngineV2BridgePushedEvents,
-	VoiceEngineV2BridgeRemoteTrackSubscriptionOptions,
-	VoiceEngineV2BridgeRemoteTrackSubscriptionQuality,
-	VoiceEngineV2BridgeScreenPacing,
-	VoiceEngineV2BridgeSendStats,
-	VoiceEngineV2BridgeStats,
-	VoiceEngineV2BridgeSubscribedTrackEventPayload,
-	VoiceEngineV2BridgeSubscriptionStatus,
-	VoiceEngineV2BridgeTrackEventPayload,
-	VoiceEngineV2BridgeTrackKind,
-	VoiceEngineV2BridgeTrackSource,
-	VoiceEngineV2BridgeTrackSubscriptionFailedEventPayload,
-	VoiceEngineV2BridgeUpdateScreenShareEncodingOptions,
-	VoiceEngineV2BridgeVideoFrame,
-	VoiceEngineV2BridgeVideoFrameMeta,
-	VoiceEngineV2InvokeMethodName,
-} from './bridge';
-export {
-	assertVoiceEngineV2BridgeAudioOptionsInvariants,
-	assertVoiceEngineV2BridgeVideoOptionsInvariants,
-	clampVoiceEngineV2ParticipantVolume,
-	coerceVoiceEngineV2BridgeStats,
-	createVoiceEngineV2OperationFailure,
-	getVoiceEngineV2BridgeDroppedEventCounts,
-	isVoiceEngineV2BridgeBinaryPayload,
-	isVoiceEngineV2BridgeConnectOptions,
-	isVoiceEngineV2BridgeFloatPcmFrame,
-	isVoiceEngineV2BridgeKnownEventType,
-	isVoiceEngineV2BridgePcmFrame,
-	isVoiceEngineV2BridgePublishCameraOptions,
-	isVoiceEngineV2BridgePublishDataOptions,
-	isVoiceEngineV2BridgePublishDeviceScreenShareOptions,
-	isVoiceEngineV2BridgePublishMicrophoneOptions,
-	isVoiceEngineV2BridgePublishScreenAudioOptions,
-	isVoiceEngineV2BridgePublishSoundboardAudioOptions,
-	isVoiceEngineV2BridgePublishScreenOptions,
-	isVoiceEngineV2BridgeRemoteTrackSubscriptionOptions,
-	isVoiceEngineV2BridgeRemoteTrackSubscriptionQuality,
-	isVoiceEngineV2BridgeUpdateScreenShareEncodingOptions,
-	isVoiceEngineV2ParticipantVolumeOptions,
-	normalizeVoiceEngineV2BridgeCapabilities,
-	normalizeVoiceEngineV2BridgeHardwareEncoderCapabilities,
-	resetVoiceEngineV2BridgeDroppedEventCounts,
-	translateVoiceEngineV2BridgeEventToEvents,
-	translateVoiceEngineV2BridgeVideoFrameToEvent,
-	unavailableVoiceEngineV2BridgeCapabilities,
-	unavailableVoiceEngineV2BridgeHardwareEncoderCapabilities,
-	VOICE_ENGINE_V2_BRIDGE_DROPPED_EVENTS_COUNT_MAX,
-	VOICE_ENGINE_V2_BRIDGE_METHODS,
-	VOICE_ENGINE_V2_BRIDGE_VERSION,
-	VOICE_ENGINE_V2_EVENT_CHANNELS,
-	VOICE_ENGINE_V2_IPC_CHANNELS,
-	VOICE_ENGINE_V2_OPERATION_SUCCESS,
-} from './bridge';
-export type {
 	VoiceEngineV2CapabilitiesProjection,
 	VoiceEngineV2ConnectionState,
 	VoiceEngineV2DeviceProjection,
@@ -120,7 +28,7 @@ export type {
 	VoiceEngineV2StatsPresentationProjection,
 	VoiceEngineV2StatsProjection,
 	VoiceEngineV2Transition,
-} from './core';
+} from '@fluxer/voice_engine_v2/src/core';
 export {
 	availableVoiceEngineV2Capabilities,
 	createVoiceEngineV2InitialSnapshot,
@@ -138,12 +46,11 @@ export {
 	selectVoiceEngineV2StatsPresentationProjection,
 	selectVoiceEngineV2StatsProjection,
 	selectVoiceEngineV2StatsSummary,
-	selectVoiceEngineV2StreamNegotiation,
 	selectVoiceEngineV2WatchedStreams,
 	shouldApplyGatewayVoiceStateEcho,
 	transitionVoiceEngineV2,
 	unavailableVoiceEngineV2Capabilities,
-} from './core';
+} from '@fluxer/voice_engine_v2/src/core';
 export type {
 	VoiceEngineV2CommandFailure,
 	VoiceEngineV2CommandResult,
@@ -151,29 +58,22 @@ export type {
 	VoiceEngineV2Driver,
 	VoiceEngineV2ExternalEventListener,
 	VoiceEngineV2Implementation,
-} from './implementations';
+} from '@fluxer/voice_engine_v2/src/implementations';
 export {
 	errorToVoiceEngineV2Error,
 	VoiceEngineV2HostPortDriver,
 	VoiceEngineV2HostPortImplementation,
 	VoiceEngineV2ImplementationBase,
-} from './implementations';
+} from '@fluxer/voice_engine_v2/src/implementations';
 export type {
 	VoiceEngineV2CameraEncodingPlan,
 	VoiceEngineV2CameraEncodingPlanAction,
 	VoiceEngineV2CameraEncodingPlanInput,
 	VoiceEngineV2CameraEncodingPlanReason,
-	VoiceEngineV2LocalTrackReconnectState,
 	VoiceEngineV2MicrophoneFailureContext,
 	VoiceEngineV2MicrophoneOperationFailureAction,
-	VoiceEngineV2NativeConnectRetryPolicyInput,
-	VoiceEngineV2NativeParticipantVolumeInput,
 	VoiceEngineV2OperationFailureLike,
 	VoiceEngineV2OperationResultLike,
-	VoiceEngineV2ParticipantE2eeState,
-	VoiceEngineV2ReconnectTrackSource,
-	VoiceEngineV2RetryConnectionState,
-	VoiceEngineV2RetryVoiceState,
 	VoiceEngineV2ScreenEncodingPlan,
 	VoiceEngineV2ScreenEncodingPlanAction,
 	VoiceEngineV2ScreenEncodingPlanInput,
@@ -192,39 +92,25 @@ export type {
 	VoiceStatsTrackRoleCandidate,
 	VoiceStatsTrackRoleSelection,
 	VoiceStatsTrackSummary,
-} from './policies';
+} from '@fluxer/voice_engine_v2/src/policies';
 export {
 	applyVoiceEngineV2CameraEncodingOptions,
 	applyVoiceEngineV2ScreenEncodingOptions,
 	asVoiceEngineV2StatsTrackSource,
-	boostedVoiceEngineV2VolumePercentToTrackVolume,
-	clampVoiceEngineV2VolumePercent,
 	classifyVoiceEngineV2TrackStats,
 	coalesceVoiceEngineV2OutboundStats,
 	coerceVoiceEngineV2Stats,
-	computeVoiceEngineV2NativeParticipantVolume,
 	getVoiceEngineV2MicrophoneOperationFailureAction,
 	hasVoiceEngineV2NativeHardwareEncoder,
 	hasVoiceEngineV2NativeNvencEncoder,
 	hasVoiceEngineV2ZeroCopyNativeInput,
-	isMoreEfficientVoiceEngineV2VideoCodec,
-	maxDecodableVoiceEngineV2VideoCodec,
 	normalizeVoiceEngineV2HardwareEncoderCapabilities,
-	normalizeVoiceEngineV2ParticipantE2eeState,
 	planVoiceEngineV2CameraEncodingChange,
-	planVoiceEngineV2NegotiatedVideoCodec,
 	planVoiceEngineV2ScreenEncodingChange,
-	shouldRetryVoiceEngineV2NativeConnectTimeout,
-	shouldSuppressVoiceEngineV2LocalTrackStateDuringReconnect,
 	summarizeVoiceEngineV2Stats,
 	unavailableVoiceEngineV2HardwareEncoderCapabilities,
-	VOICE_ENGINE_V2_VIDEO_CODEC_FLOOR,
-	VOICE_ENGINE_V2_VIDEO_CODEC_PREFERENCE,
-	VOICE_ENGINE_V2_VOLUME_MAX_PERCENT,
 	VoiceEngineV2StatsTrackSource,
-	voiceEngineV2VideoCodecRank,
-	worseVoiceEngineV2VideoCodec,
-} from './policies';
+} from '@fluxer/voice_engine_v2/src/policies';
 export type {
 	CapabilitiesPort,
 	DevicePort,
@@ -242,8 +128,8 @@ export type {
 	VoiceEngineV2HostEventListener,
 	VoiceEngineV2HostPorts,
 	VoiceStateIngestionPort,
-} from './ports';
-export {unsupportedPortError} from './ports';
+} from '@fluxer/voice_engine_v2/src/ports';
+export {unsupportedPortError} from '@fluxer/voice_engine_v2/src/ports';
 export type {
 	VoiceEngineV2AudioControls,
 	VoiceEngineV2AudioControlsPatch,
@@ -255,9 +141,6 @@ export type {
 	VoiceEngineV2CameraEncodingOptions,
 	VoiceEngineV2CameraOptions,
 	VoiceEngineV2Capabilities,
-	VoiceEngineV2CodecGossipMessage,
-	VoiceEngineV2CodecNegotiationState,
-	VoiceEngineV2CodecStreamNegotiation,
 	VoiceEngineV2Command,
 	VoiceEngineV2CommandType,
 	VoiceEngineV2ConnectionModel,
@@ -294,8 +177,6 @@ export type {
 	VoiceEngineV2MediaStatus,
 	VoiceEngineV2MicrophoneOptions,
 	VoiceEngineV2Model,
-	VoiceEngineV2NativeAudioDeviceModuleState,
-	VoiceEngineV2NativeAudioDeviceModuleStatus,
 	VoiceEngineV2NativeAudioTapOptions,
 	VoiceEngineV2NativeCaptureFrame,
 	VoiceEngineV2NativeCaptureKind,
@@ -320,11 +201,11 @@ export type {
 	VoiceEngineV2ScreenOptions,
 	VoiceEngineV2ScreenPacing,
 	VoiceEngineV2SendStats,
+	VoiceEngineV2SourceLifecycleRemovedEvent,
 	VoiceEngineV2SourceLifecycleTransitionedEvent,
 	VoiceEngineV2SourceLifecycleTransitionKind,
 	VoiceEngineV2Stats,
 	VoiceEngineV2StatsSample,
-	VoiceEngineV2StreamNegotiationProjection,
 	VoiceEngineV2TimerOptions,
 	VoiceEngineV2Track,
 	VoiceEngineV2TrackKind,
@@ -335,33 +216,26 @@ export type {
 	VoiceEngineV2VoiceStats,
 	VoiceEngineV2WatchedStream,
 	VoiceEngineV2WatchedStreamKey,
-} from './protocol';
+} from '@fluxer/voice_engine_v2/src/protocol';
 export {
-	decodeVoiceEngineV2CodecGossip,
-	encodeVoiceEngineV2CodecGossip,
 	getVoiceEngineV2CommandResourceKey,
 	getVoiceEngineV2CommandTypeResourceKey,
-	VOICE_ENGINE_V2_CODEC_GOSSIP_TOPIC,
-} from './protocol';
+} from '@fluxer/voice_engine_v2/src/protocol';
 export type {
 	VoiceEngineV2EventLogEntry,
 	VoiceEngineV2EventLogSpillSink,
-	VoiceEngineV2FrameStatsEvent,
 	VoiceEngineV2MemoryEventLogSpillSink,
 	VoiceEngineV2RuntimeClock,
 	VoiceEngineV2RuntimeListener,
 	VoiceEngineV2RuntimeListenerPayload,
 	VoiceEngineV2RuntimeOptions,
-} from './runtime';
+} from '@fluxer/voice_engine_v2/src/runtime';
 export {
 	commandResultToEvent,
 	createVoiceEngineV2MemoryEventLogSpillSink,
-	VOICE_ENGINE_V2_FRAME_STATS_FLUSH_INTERVAL_MS,
-	VOICE_ENGINE_V2_FRAME_STATS_TRACKS_CAP,
 	VoiceEngineV2Controller,
-	VoiceEngineV2FrameStatsAccumulator,
 	VoiceEngineV2Runtime,
-} from './runtime';
+} from '@fluxer/voice_engine_v2/src/runtime';
 export type {
 	SourceFault,
 	SourceLifecycleAction,
@@ -371,7 +245,7 @@ export type {
 	SourceLifecycleSnapshotEntry,
 	SourceLifecycleState,
 	SourceLifecycleTransitionResult,
-} from './source_isolation';
+} from '@fluxer/voice_engine_v2/src/source_isolation';
 export {
 	computeReconnectBackoffMs,
 	createInitialActiveState,
@@ -382,4 +256,4 @@ export {
 	SourceLifecycleError,
 	SourceLifecycleRegistry,
 	transitionSourceLifecycle,
-} from './source_isolation';
+} from '@fluxer/voice_engine_v2/src/source_isolation';

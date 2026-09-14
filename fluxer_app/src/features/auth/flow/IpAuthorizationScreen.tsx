@@ -4,7 +4,9 @@ import * as AuthenticationCommands from '@app/features/auth/commands/Authenticat
 import styles from '@app/features/auth/flow/IpAuthorizationScreen.module.css';
 import type {IpAuthorizationChallenge, LoginSuccessPayload} from '@app/features/auth/state/AuthFlow';
 import {TRY_AGAIN_DESCRIPTOR} from '@app/features/i18n/utils/CommonMessageDescriptors';
+import {getCachedNumberFormat} from '@app/features/i18n/utils/IntlCache';
 import {Logger} from '@app/features/platform/utils/AppLogger';
+import {remFromPx} from '@app/features/theme/layout/RemFromPx';
 import {Button} from '@app/features/ui/button/Button';
 import {msg} from '@lingui/core/macro';
 import {Trans, useLingui} from '@lingui/react/macro';
@@ -101,10 +103,14 @@ const IpAuthorizationScreen = ({challenge, onAuthorized, onBack}: IpAuthorizatio
 		<div className={styles.container} data-flx="auth.flow.ip-authorization-screen.container">
 			<div className={styles.icon} data-flx="auth.flow.ip-authorization-screen.icon">
 				{pollingState === 'error' ? (
-					<WarningCircleIcon size={48} weight="fill" data-flx="auth.flow.ip-authorization-screen.warning-circle-icon" />
+					<WarningCircleIcon
+						size={remFromPx(48)}
+						weight="fill"
+						data-flx="auth.flow.ip-authorization-screen.warning-circle-icon"
+					/>
 				) : (
 					<EnvelopeSimpleIcon
-						size={48}
+						size={remFromPx(48)}
 						weight="fill"
 						data-flx="auth.flow.ip-authorization-screen.envelope-simple-icon"
 					/>
@@ -137,7 +143,11 @@ const IpAuthorizationScreen = ({challenge, onAuthorized, onBack}: IpAuthorizatio
 						data-flx="auth.flow.ip-authorization-screen.button.resend"
 					>
 						{resendUsed ? <Trans>Resent</Trans> : <Trans>Resend email</Trans>}
-						{resendIn > 0 ? ` (${resendIn}s)` : ''}
+						<flx-i18n data-flx="auth.flow.ip-authorization-screen.flx-i18n">
+							{resendIn > 0
+								? ` (${getCachedNumberFormat(i18n.locale, {style: 'unit', unit: 'second', unitDisplay: 'narrow', maximumFractionDigits: 0}).format(resendIn)})`
+								: ''}
+						</flx-i18n>
 					</Button>
 				)}
 				{onBack ? (

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import type {ILogger} from '@app/api/ILogger';
+import {TrustedClientIpHeaderMiddleware} from '@app/api/middleware/TrustedClientIpHeaderMiddleware';
+import type {HonoEnv} from '@app/api/types/HonoEnv';
 import {Hono} from 'hono';
 import {describe, expect, it} from 'vitest';
-import type {ILogger} from '../../ILogger';
-import type {HonoEnv} from '../../types/HonoEnv';
-import {TrustedClientIpHeaderMiddleware} from '../TrustedClientIpHeaderMiddleware';
 
 class MockLogger implements ILogger {
 	trace(_msgOrObject: string | object, _msg?: string): void {}
@@ -56,6 +56,20 @@ describe('TrustedClientIpHeaderMiddleware', () => {
 		const app = createApp();
 		const response = await app.request('http://localhost/v1/messages', {
 			headers: {'x-real-ip': 'not-an-ip'},
+		});
+		expect(response.status).toBe(403);
+	});
+	it('accepts requests when the IP header holds only whitespace (passthrough)', async () => {
+		const app = createApp();
+		const response = await app.request('http://localhost/v1/messages', {
+			headers: {'x-real-ip': '   '},
+		});
+		expect(response.status).toBe(200);
+	});
+	it('rejects x-forwarded-for with an empty first hop', async () => {
+		const app = createApp('x-forwarded-for');
+		const response = await app.request('http://localhost/v1/messages', {
+			headers: {'x-forwarded-for': ', 10.0.0.1'},
 		});
 		expect(response.status).toBe(403);
 	});

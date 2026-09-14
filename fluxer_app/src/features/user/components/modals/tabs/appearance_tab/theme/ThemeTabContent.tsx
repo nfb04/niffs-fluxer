@@ -2,12 +2,14 @@
 
 import {isKeyboardActivationKey} from '@app/features/input/utils/KeyboardUtils';
 import * as ThemePreferenceCommands from '@app/features/theme/commands/ThemePreferenceCommands';
+import {remFromPx} from '@app/features/theme/layout/RemFromPx';
 import Theme from '@app/features/theme/state/Theme';
 import * as ThemeStudioCommands from '@app/features/theme_studio/commands/ThemeStudioCommands';
 import {Button} from '@app/features/ui/button/Button';
 import {Switch} from '@app/features/ui/components/form/FormSwitch';
 import {Tooltip} from '@app/features/ui/tooltip/Tooltip';
 import styles from '@app/features/user/components/modals/tabs/appearance_tab/ThemeTab.module.css';
+import {ThemeButton} from '@app/features/user/components/modals/tabs/appearance_tab/theme/ThemeButton';
 import type {ThemeType} from '@fluxer/constants/src/UserConstants';
 import {ThemeTypes} from '@fluxer/constants/src/UserConstants';
 import {msg} from '@lingui/core/macro';
@@ -16,7 +18,6 @@ import {ArrowsCounterClockwiseIcon, PaintBrushBroadIcon} from '@phosphor-icons/r
 import {observer} from 'mobx-react-lite';
 import type React from 'react';
 import {useCallback, useEffect, useMemo, useRef} from 'react';
-import {ThemeButton} from './ThemeButton';
 
 const DARK_THEME_DESCRIPTOR = msg({
 	message: 'Dark theme',
@@ -146,7 +147,7 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = observer(
 						isLight: !systemPrefersDark,
 						icon: (
 							<ArrowsCounterClockwiseIcon
-								size={12}
+								size={remFromPx(12)}
 								data-flx="user.appearance-tab.theme.theme-tab-content.theme-options.arrows-counter-clockwise-icon"
 							/>
 						),
@@ -250,7 +251,11 @@ export const ThemeTabContent: React.FC = observer(() => {
 	}, []);
 	return (
 		<>
-			<ThemeSelector value={currentSelectedTheme} onChange={handleThemeChange} />
+			<ThemeSelector
+				value={currentSelectedTheme}
+				onChange={handleThemeChange}
+				data-flx="user.appearance-tab.theme.theme-tab-content.theme-selector.theme-change"
+			/>
 			<Switch
 				label={i18n._(SYNC_THEME_ACROSS_DEVICES_DESCRIPTOR)}
 				description={i18n._(WHEN_ENABLED_THEME_CHANGES_WILL_SYNC_TO_ALL_DESCRIPTOR)}

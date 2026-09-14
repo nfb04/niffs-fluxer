@@ -1,5 +1,23 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import type {ChannelID, MessageID, UserID} from '@app/api/BrandedTypes';
+import type {MessageUpdateRequest} from '@app/api/channel/MessageTypes';
+import type {IChannelRepositoryAggregate} from '@app/api/channel/repositories/IChannelRepositoryAggregate';
+import type {AuthenticatedChannel} from '@app/api/channel/services/AuthenticatedChannel';
+import type {MessageChannelAuthService} from '@app/api/channel/services/message/MessageChannelAuthService';
+import type {MessageDispatchService} from '@app/api/channel/services/message/MessageDispatchService';
+import type {MessageEmbedAttachmentResolver} from '@app/api/channel/services/message/MessageEmbedAttachmentResolver';
+import {isOperationDisabled} from '@app/api/channel/services/message/MessageHelpers';
+import type {MessageMentionService} from '@app/api/channel/services/message/MessageMentionService';
+import type {MessagePersistenceService} from '@app/api/channel/services/message/MessagePersistenceService';
+import type {MessageProcessingService} from '@app/api/channel/services/message/MessageProcessingService';
+import type {MessageSearchService} from '@app/api/channel/services/message/MessageSearchService';
+import type {MessageValidationService} from '@app/api/channel/services/message/MessageValidationService';
+import {Logger} from '@app/api/Logger';
+import type {RequestCache} from '@app/api/middleware/RequestCacheMiddleware';
+import type {Message} from '@app/api/models/Message';
+import type {IUserRepository} from '@app/api/user/IUserRepository';
+import {assertGuildMemberCanCommunicate} from '@app/api/utils/GuildCommunicationUtils';
 import {APIErrorCodes} from '@fluxer/constants/src/ApiErrorCodes';
 import {Permissions} from '@fluxer/constants/src/ChannelConstants';
 import {GuildOperations} from '@fluxer/constants/src/GuildConstants';
@@ -10,27 +28,15 @@ import {MissingPermissionsError} from '@fluxer/errors/src/domains/core/MissingPe
 import {ThrottledError} from '@fluxer/errors/src/domains/core/ThrottledError';
 import type {AllowedMentionsRequest} from '@fluxer/schema/src/domains/message/SharedMessageSchemas';
 import type {ICacheService} from '@pkgs/cache/src/ICacheService';
-import type {ChannelID, MessageID, UserID} from '../../../BrandedTypes';
-import {Logger} from '../../../Logger';
-import type {RequestCache} from '../../../middleware/RequestCacheMiddleware';
-import type {Message} from '../../../models/Message';
-import type {IUserRepository} from '../../../user/IUserRepository';
-import {assertGuildMemberCanCommunicate} from '../../../utils/GuildCommunicationUtils';
-import type {MessageUpdateRequest} from '../../MessageTypes';
-import type {IChannelRepositoryAggregate} from '../../repositories/IChannelRepositoryAggregate';
-import type {MessageChannelAuthService} from './MessageChannelAuthService';
-import type {MessageDispatchService} from './MessageDispatchService';
-import type {MessageEmbedAttachmentResolver} from './MessageEmbedAttachmentResolver';
-import {isOperationDisabled} from './MessageHelpers';
-import type {MessageMentionService} from './MessageMentionService';
-import type {MessagePersistenceService} from './MessagePersistenceService';
-import type {MessageProcessingService} from './MessageProcessingService';
-import type {MessageSearchService} from './MessageSearchService';
-import type {MessageValidationService} from './MessageValidationService';
 
 const MESSAGE_LOCK_TTL_SECONDS = 5;
 const MESSAGE_LOCK_ACQUIRE_ATTEMPTS = 6;
 const MESSAGE_LOCK_RETRY_DELAY_MS = 50;
+
+interface EditMessageResult {
+	message: Message;
+	authChannel: AuthenticatedChannel;
+}
 
 interface MessageEditServiceDeps {
 	channelRepository: IChannelRepositoryAggregate;
@@ -61,16 +67,28 @@ export class MessageEditService {
 		messageId: MessageID;
 		data: MessageUpdateRequest;
 		requestCache: RequestCache;
-	}): Promise<Message> {
-		const {channel, guild, hasPermission, member} = await this.deps.channelAuthService.getChannelAuthenticated({
+	}): Promise<EditMessageResult> {
+		const authChannel = await this.deps.channelAuthService.getChannelAuthenticated({
 			userId,
 			channelId,
 		});
-		const [canEmbedLinks, canMentionEveryone] = await Promise.all([
+		const {channel, guild, hasPermission, member} = authChannel;
+		const hasNewAttachments =
+			data.attachments?.some(
+				(attachment) =>
+					'upload_filename' in attachment &&
+					typeof attachment.upload_filename === 'string' &&
+					attachment.upload_filename.length > 0,
+			) ?? false;
+		const [canEmbedLinks, canMentionEveryone, canAttachFiles] = await Promise.all([
 			hasPermission(Permissions.EMBED_LINKS),
 			hasPermission(Permissions.MENTION_EVERYONE),
+			hasPermission(Permissions.ATTACH_FILES),
 		]);
 		if (data.embeds && data.embeds.length > 0 && !canEmbedLinks) {
+			throw new MissingPermissionsError();
+		}
+		if (hasNewAttachments && !canAttachFiles) {
 			throw new MissingPermissionsError();
 		}
 		if (isOperationDisabled(guild, GuildOperations.SEND_MESSAGE)) {
@@ -82,19 +100,7 @@ export class MessageEditService {
 			assertGuildMemberCanCommunicate(member);
 		}
 		if (data.message_snapshots !== undefined) {
-			const isAuthor = message.authorId === userId;
-			const canManage = isAuthor ? true : await hasPermission(Permissions.MANAGE_MESSAGES);
-			if (!isAuthor && !canManage) {
-				throw new MissingPermissionsError();
-			}
-			const updatedMessage = await this.withMessageLock(channelId, messageId, () =>
-				this.deps.persistenceService.updateSnapshotAttachments({
-					message,
-					snapshotEdits: data.message_snapshots ?? [],
-				}),
-			);
-			await this.deps.dispatchService.dispatchMessageUpdate({channel, message: updatedMessage, requestCache});
-			return updatedMessage;
+			throw new MissingPermissionsError();
 		}
 		const user = await this.deps.userRepository.findUnique(userId);
 		this.deps.validationService.validateMessageEditable(message);
@@ -132,7 +138,7 @@ export class MessageEditService {
 			});
 		}
 		if (message.authorId !== userId) {
-			return await this.withMessageLock(channelId, messageId, () =>
+			const editedMessage = await this.withMessageLock(channelId, messageId, () =>
 				this.deps.processingService.handleNonAuthorEdit({
 					message,
 					messageId,
@@ -145,6 +151,7 @@ export class MessageEditService {
 					dispatchService: this.deps.dispatchService,
 				}),
 			);
+			return {message: editedMessage, authChannel};
 		}
 		const isBugHunterBot = !!user?.isBot && (user.flags & UserFlags.BUG_HUNTER) !== 0n;
 		const updateResult = await this.withMessageLock(channelId, messageId, () =>
@@ -155,6 +162,7 @@ export class MessageEditService {
 				channel,
 				guild,
 				member,
+				attachmentUploadUserId: userId,
 				allowEmbeds: canEmbedLinks,
 				isBot: user?.isBot,
 				isBugHunterBot,
@@ -184,7 +192,7 @@ export class MessageEditService {
 		if (channel.indexedAt != null) {
 			void this.deps.searchService.updateMessageIndex(updatedMessage);
 		}
-		return updatedMessage;
+		return {message: updatedMessage, authChannel};
 	}
 
 	private getEffectiveAllowedMentionsForEdit({
@@ -222,7 +230,7 @@ export class MessageEditService {
 		if (!lockToken) {
 			throw new ThrottledError({
 				code: APIErrorCodes.RESOURCE_LOCKED,
-				headers: {'Retry-After': '1'},
+				retryAfterSeconds: 1,
 				data: {retry_after: 1},
 			});
 		}

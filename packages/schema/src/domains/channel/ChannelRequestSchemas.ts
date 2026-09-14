@@ -11,6 +11,7 @@ import {
 	RTC_REGION_ID_MAX_LENGTH,
 	RTC_REGION_ID_MIN_LENGTH,
 	VOICE_CHANNEL_BITRATE_MAX,
+	VOICE_CHANNEL_BITRATE_MAX_STANDARD,
 	VOICE_CHANNEL_BITRATE_MIN,
 	VOICE_CHANNEL_CONNECTION_LIMIT_MAX,
 	VOICE_CHANNEL_CONNECTION_LIMIT_MIN,
@@ -20,11 +21,10 @@ import {
 import {ChannelNicknameOverrides} from '@fluxer/schema/src/domains/channel/ChannelSchemas';
 import {ReadStateResponse} from '@fluxer/schema/src/domains/gateway/GatewaySchemas';
 import {ChannelOverwriteTypeSchema, GeneralChannelNameType} from '@fluxer/schema/src/primitives/ChannelValidators';
-import {createBase64StringType} from '@fluxer/schema/src/primitives/FileValidators';
+import {base64LengthForBytes, createBase64StringType} from '@fluxer/schema/src/primitives/FileValidators';
 import {ContentWarningLevelSchema} from '@fluxer/schema/src/primitives/GuildValidators';
 import {QueryBooleanType} from '@fluxer/schema/src/primitives/QueryValidators';
 import {
-	coerceNumberFromString,
 	createNamedLiteral,
 	createNamedLiteralUnion,
 	createStringType,
@@ -44,8 +44,8 @@ const ChannelOverwriteRequest = z.object({
 		],
 		'The type of overwrite (0 = role, 1 = member)',
 	),
-	allow: UnsignedInt64Type.optional().describe('fluxer:UnsignedInt64Type Bitwise value of allowed permissions'),
-	deny: UnsignedInt64Type.optional().describe('fluxer:UnsignedInt64Type Bitwise value of denied permissions'),
+	allow: UnsignedInt64Type.optional().describe('Bitwise value of allowed permissions'),
+	deny: UnsignedInt64Type.optional().describe('Bitwise value of denied permissions'),
 });
 
 const ChannelCommonBase = z.object({
@@ -60,7 +60,9 @@ const ChannelCommonBase = z.object({
 		.min(VOICE_CHANNEL_BITRATE_MIN)
 		.max(VOICE_CHANNEL_BITRATE_MAX)
 		.nullish()
-		.describe(`Voice channel bitrate in bits per second (${VOICE_CHANNEL_BITRATE_MIN}-${VOICE_CHANNEL_BITRATE_MAX})`),
+		.describe(
+			`Voice channel bitrate in bits per second (${VOICE_CHANNEL_BITRATE_MIN}-${VOICE_CHANNEL_BITRATE_MAX}), clamped to ${VOICE_CHANNEL_BITRATE_MAX_STANDARD} unless the guild holds an AUDIO_BITRATE feature`,
+		),
 	user_limit: z
 		.number()
 		.int()
@@ -119,7 +121,7 @@ const ChannelUpdateCommon = ChannelCommonBase.extend({
 			'Legacy: setting true maps to nsfw_override=true; setting false maps to nsfw_override=null (inherit). Prefer nsfw_override.',
 		),
 	...ChannelContentWarningFields,
-	icon: createBase64StringType(1, Math.ceil(AVATAR_MAX_SIZE * (4 / 3)))
+	icon: createBase64StringType(1, base64LengthForBytes(AVATAR_MAX_SIZE))
 		.nullish()
 		.describe('Base64-encoded icon image for group DM channels'),
 	owner_id: SnowflakeType.nullish().describe('ID of the new owner for group DM channels'),
@@ -182,7 +184,7 @@ const ChannelUpdateLinkRequest = ChannelUpdateCommon.extend({
 const ChannelUpdateGroupDmRequest = z.object({
 	type: createNamedLiteral(ChannelTypes.GROUP_DM, 'GROUP_DM', 'Channel type (group DM)'),
 	name: GeneralChannelNameType.nullish().describe('The name of the group DM'),
-	icon: createBase64StringType(1, Math.ceil(AVATAR_MAX_SIZE * (4 / 3)))
+	icon: createBase64StringType(1, base64LengthForBytes(AVATAR_MAX_SIZE))
 		.nullish()
 		.describe('Base64-encoded icon image for the group DM'),
 	owner_id: SnowflakeType.nullish().describe('ID of the new owner of the group DM'),
@@ -199,10 +201,14 @@ export const ChannelUpdateRequest = z.discriminatedUnion('type', [
 
 export type ChannelUpdateRequest = z.infer<typeof ChannelUpdateRequest>;
 
+export const ChannelUpdateRequestBody = z.union(
+	ChannelUpdateRequest.options.map(({shape: {type, ...shape}}) => z.object(shape)),
+);
+
 export const PermissionOverwriteCreateRequest = z.object({
 	type: ChannelOverwriteTypeSchema.describe('The type of overwrite (0 = role, 1 = member)'),
-	allow: UnsignedInt64Type.nullish().describe('fluxer:UnsignedInt64Type Bitwise value of allowed permissions'),
-	deny: UnsignedInt64Type.nullish().describe('fluxer:UnsignedInt64Type Bitwise value of denied permissions'),
+	allow: UnsignedInt64Type.nullish().describe('Bitwise value of allowed permissions'),
+	deny: UnsignedInt64Type.nullish().describe('Bitwise value of denied permissions'),
 });
 
 export type PermissionOverwriteCreateRequest = z.infer<typeof PermissionOverwriteCreateRequest>;
@@ -250,9 +256,6 @@ export type ReadStateAckRequest = z.infer<typeof ReadStateAckRequest>;
 
 export const ReadStateAckResponse = z.object({
 	read_states: z.array(ReadStateResponse).describe('Authoritative read states after applying the acknowledgement'),
-	read_state_proto: z
-		.string()
-		.describe('Authoritative read states after applying the acknowledgement, encoded as a base64 protobuf bundle'),
 });
 
 export type ReadStateAckResponse = z.infer<typeof ReadStateAckResponse>;
@@ -292,46 +295,6 @@ export const CallRingBodySchema = z.object({
 
 export type CallRingBodySchema = z.infer<typeof CallRingBodySchema>;
 
-export const VoiceDebugLoggingToggleBodySchema = z.object({
-	enabled: z.boolean().describe('Whether voice debug logging should be active for this channel'),
-	duration_ms: coerceNumberFromString(z.number().int().min(60000).max(14400000))
-		.optional()
-		.describe('Optional activation duration in milliseconds. Defaults to one hour and is capped at four hours.'),
-});
-
-export type VoiceDebugLoggingToggleBodySchema = z.infer<typeof VoiceDebugLoggingToggleBodySchema>;
-
-const VoiceDebugLoggingTimestampNs = z
-	.string()
-	.regex(/^[0-9]{1,32}$/)
-	.describe('Nanosecond timestamp encoded as an unsigned decimal string');
-
-export const VoiceDebugLoggingEventSchema = z
-	.object({
-		type: createStringType(1, 128).describe('Client-side diagnostic event type'),
-		timestamp_ns: VoiceDebugLoggingTimestampNs.describe('Client wall-clock Unix timestamp in nanoseconds'),
-		monotonic_ns: VoiceDebugLoggingTimestampNs.optional().describe('Client monotonic timestamp in nanoseconds'),
-		data: z.record(z.string(), z.unknown()).optional().describe('Event-specific diagnostic payload'),
-	})
-	.passthrough();
-
-export type VoiceDebugLoggingEventSchema = z.infer<typeof VoiceDebugLoggingEventSchema>;
-
-export const VoiceDebugLoggingEventsBodySchema = z.object({
-	session_id: createStringType(1, 128).describe('Active voice debug logging session id'),
-	connection_id: createStringType(1, 128).optional().describe('Client voice connection id'),
-	participant_identity: createStringType(1, 256).optional().describe('LiveKit participant identity'),
-	events: z.array(VoiceDebugLoggingEventSchema).min(1).max(200).describe('NDJSON batch events to store'),
-});
-
-export type VoiceDebugLoggingEventsBodySchema = z.infer<typeof VoiceDebugLoggingEventsBodySchema>;
-
-export const VoicePresenceHeartbeatBodySchema = z.object({
-	connection_id: createStringType(1, 128).describe('Client voice connection id'),
-});
-
-export type VoicePresenceHeartbeatBodySchema = z.infer<typeof VoicePresenceHeartbeatBodySchema>;
-
 export const StreamUpdateBodySchema = z.object({
 	region: createStringType(RTC_REGION_ID_MIN_LENGTH, RTC_REGION_ID_MAX_LENGTH)
 		.optional()
@@ -357,11 +320,13 @@ export const StreamPreviewUploadUrlBodySchema = z.object({
 
 export type StreamPreviewUploadUrlBodySchema = z.infer<typeof StreamPreviewUploadUrlBodySchema>;
 
+export const StreamPreviewResponse = z.file().describe('The current stream preview image');
+
 export const StreamPreviewUploadUrlResponseSchema = z.object({
 	upload_url: URLType.describe('URL used to upload the stream preview with a PUT request'),
 	method: z.literal('PUT').describe('HTTP method to use for the upload URL'),
 	content_type: createStringType(1, 64).describe('MIME type that must be sent with the upload request'),
-	expires_at: z.string().datetime().describe('ISO timestamp when the upload URL expires'),
+	expires_at: z.iso.datetime().describe('ISO timestamp when the upload URL expires'),
 	expires_in: Int32Type.describe('Number of seconds the upload URL remains valid'),
 	max_bytes: Int32Type.describe('Maximum supported preview image size in bytes'),
 });

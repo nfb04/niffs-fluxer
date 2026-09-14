@@ -6,6 +6,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {PassThrough, pipeline, Readable} from 'node:stream';
 import {promisify} from 'node:util';
+import {Config} from '@app/api/Config';
+import {
+	type IStorageService,
+	type ProcessedStorageObjectMetadata,
+	StorageObjectListingOverflowError,
+	StorageObjectRangeNotSatisfiableError,
+} from '@app/api/infrastructure/IStorageService';
+import {processMediaFile} from '@app/api/infrastructure/StorageObjectHelpers';
+import {Logger} from '@app/api/Logger';
 import {
 	AbortMultipartUploadCommand,
 	CompleteMultipartUploadCommand,
@@ -26,13 +35,10 @@ import {
 } from '@aws-sdk/client-s3';
 import {Upload} from '@aws-sdk/lib-storage';
 import {getSignedUrl} from '@aws-sdk/s3-request-presigner';
+import type {S3ProviderSettings} from '@fluxer/config/src/S3DownloadsProvider';
 import {isSupportedMediaContentType} from '@pkgs/mime_utils/src/ContentTypeUtils';
 import {seconds} from 'itty-time';
 import {temporaryFile} from 'tempy';
-import {Config} from '../Config';
-import {Logger} from '../Logger';
-import type {IStorageService, ProcessedStorageObjectMetadata} from './IStorageService';
-import {processMediaFile} from './StorageObjectHelpers';
 
 const STREAM_UPLOAD_PART_BYTES = 8 * 1024 * 1024;
 const STREAM_UPLOAD_CONCURRENCY = 4;
@@ -72,18 +78,13 @@ async function streamToUint8Array(body: Readable, maxBytes?: number): Promise<Ui
 	for await (const chunk of body) {
 		const buf = chunk instanceof Buffer ? chunk : Buffer.from(chunk as Uint8Array);
 		if (maxBytes !== undefined && total + buf.length > maxBytes) {
-			const remaining = maxBytes - total;
-			if (remaining > 0) {
-				chunks.push(buf.subarray(0, remaining));
-				total += remaining;
-			}
-			break;
+			body.destroy();
+			throw new Error(
+				`Stream exceeds maximum buffer size of ${maxBytes} bytes (got at least ${total + buf.length} bytes)`,
+			);
 		}
 		chunks.push(buf);
 		total += buf.length;
-		if (maxBytes !== undefined && total >= maxBytes) {
-			break;
-		}
 	}
 	const out = new Uint8Array(total);
 	let offset = 0;
@@ -96,36 +97,59 @@ async function streamToUint8Array(body: Readable, maxBytes?: number): Promise<Ui
 
 function extractStreamFromGet(out: GetObjectCommandOutput): Readable {
 	const body = out.Body;
-	if (body instanceof Readable) {
-		return body instanceof PassThrough ? body : body.pipe(new PassThrough());
+	if (!(body instanceof Readable)) {
+		throw new Error('Unexpected S3 response body type (not a Node Readable)');
 	}
-	throw new Error('Unexpected S3 response body type (not a Node Readable)');
+	if (body instanceof PassThrough) {
+		return body;
+	}
+	const wrapped = new PassThrough();
+	pipeline(body, wrapped, () => undefined);
+	return wrapped;
 }
 
 export class StorageService implements IStorageService {
 	private readonly client: S3Client;
 	private readonly presignClient: S3Client;
+	private readonly provider: S3ProviderSettings;
 
-	constructor() {
-		this.client = buildPooledS3Client({
+	constructor(provider?: S3ProviderSettings) {
+		this.provider = provider ?? {
 			endpoint: Config.s3.endpoint,
+			presignedUrlBase: Config.s3.presignedUrlBase,
+			forcePathStyle: Config.s3.forcePathStyle,
 			region: Config.s3.region,
 			accessKeyId: Config.s3.accessKeyId,
 			secretAccessKey: Config.s3.secretAccessKey,
-			forcePathStyle: true,
+		};
+		this.client = buildPooledS3Client({
+			endpoint: this.provider.endpoint,
+			region: this.provider.region,
+			accessKeyId: this.provider.accessKeyId,
+			secretAccessKey: this.provider.secretAccessKey,
+			forcePathStyle: this.provider.forcePathStyle,
 		});
 		this.presignClient = buildPooledS3Client({
 			endpoint: this.resolvePresignEndpoint(),
-			region: Config.s3.region,
-			accessKeyId: Config.s3.accessKeyId,
-			secretAccessKey: Config.s3.secretAccessKey,
-			forcePathStyle: Config.s3.forcePathStyle,
+			region: this.provider.region,
+			accessKeyId: this.provider.accessKeyId,
+			secretAccessKey: this.provider.secretAccessKey,
+			forcePathStyle: this.provider.forcePathStyle,
 		});
+		Logger.info(
+			{
+				endpoint: this.provider.endpoint,
+				presignEndpoint: this.resolvePresignEndpoint(),
+				region: this.provider.region,
+				addressing: this.provider.forcePathStyle ? 'path' : 'virtual-host',
+			},
+			'Object storage client ready',
+		);
 	}
 
 	private resolvePresignEndpoint(): string {
-		const fallbackEndpoint = Config.s3.endpoint;
-		const configuredEndpoint = Config.s3.presignedUrlBase;
+		const fallbackEndpoint = this.provider.endpoint;
+		const configuredEndpoint = this.provider.presignedUrlBase;
 		if (!configuredEndpoint) {
 			return fallbackEndpoint;
 		}
@@ -216,6 +240,12 @@ export class StorageService implements IStorageService {
 			return;
 		}
 		const stream = fs.createReadStream(filePath, {highWaterMark: 1024 * 1024});
+		const errors = new Set<unknown>();
+		const onSourceError = (error: Error) => {
+			errors.add(error);
+		};
+		stream.on('error', onSourceError);
+		const closed = new Promise<void>((resolve) => stream.once('close', resolve));
 		try {
 			const upload = new Upload({
 				client: this.client,
@@ -231,24 +261,38 @@ export class StorageService implements IStorageService {
 				leavePartsOnError: false,
 			});
 			await upload.done();
+			if (!stream.readableEnded) {
+				throw new Error('File upload completed before its source stream ended');
+			}
 		} catch (error) {
+			errors.add(error);
+		} finally {
 			stream.destroy();
-			throw error;
+			await closed;
+			stream.off('error', onSourceError);
 		}
+		if (errors.size === 1) throw errors.values().next().value;
+		if (errors.size > 1) throw new AggregateError(errors, 'File upload and source stream failed');
 	}
 
 	async getPresignedDownloadURL({
 		bucket,
 		key,
 		expiresIn = seconds('5 minutes'),
+		responseContentType,
+		responseContentDisposition,
 	}: {
 		bucket: string;
 		key: string;
 		expiresIn?: number;
+		responseContentType?: string;
+		responseContentDisposition?: string;
 	}): Promise<string> {
 		const command = new GetObjectCommand({
 			Bucket: bucket,
 			Key: key,
+			ResponseContentType: responseContentType,
+			ResponseContentDisposition: responseContentDisposition,
 		});
 		return getSignedUrl(this.presignClient, command, {expiresIn});
 	}
@@ -280,12 +324,14 @@ export class StorageService implements IStorageService {
 		key,
 		uploadId,
 		partNumber,
+		contentLength,
 		expiresIn = seconds('1 hour'),
 	}: {
 		bucket: string;
 		key: string;
 		uploadId: string;
 		partNumber: number;
+		contentLength?: number;
 		expiresIn?: number;
 	}): Promise<string> {
 		const command = new UploadPartCommand({
@@ -293,6 +339,7 @@ export class StorageService implements IStorageService {
 			Key: key,
 			UploadId: uploadId,
 			PartNumber: partNumber,
+			ContentLength: contentLength,
 		});
 		return getSignedUrl(this.presignClient, command, {expiresIn});
 	}
@@ -343,7 +390,12 @@ export class StorageService implements IStorageService {
 
 	async readObject(bucket: string, key: string, maxBytes?: number): Promise<Uint8Array> {
 		const out = await this.client.send(new GetObjectCommand({Bucket: bucket, Key: key}));
-		return streamToUint8Array(extractStreamFromGet(out), maxBytes);
+		const body = extractStreamFromGet(out);
+		if (maxBytes !== undefined && out.ContentLength !== undefined && out.ContentLength > maxBytes) {
+			body.destroy();
+			throw new Error(`Stream exceeds maximum buffer size of ${maxBytes} bytes (got ${out.ContentLength} bytes)`);
+		}
+		return streamToUint8Array(body, maxBytes);
 	}
 
 	async streamObject(params: {bucket: string; key: string; range?: string}): Promise<{
@@ -375,6 +427,13 @@ export class StorageService implements IStorageService {
 		} catch (error) {
 			if (error instanceof S3ServiceException && (error.name === 'NoSuchKey' || error.name === 'NotFound')) {
 				return null;
+			}
+			if (
+				params.range !== undefined &&
+				error instanceof S3ServiceException &&
+				(error.name === 'InvalidRange' || error.$metadata?.httpStatusCode === 416)
+			) {
+				throw new StorageObjectRangeNotSatisfiableError(params.bucket, params.key, params.range);
 			}
 			throw error;
 		}
@@ -544,30 +603,48 @@ export class StorageService implements IStorageService {
 		return this.client.send(new HeadObjectCommand({Bucket: params.bucket, Key: params.key}));
 	}
 
-	async listObjects(params: {bucket: string; prefix: string}): Promise<
+	async listObjects(params: {bucket: string; prefix: string; maxObjects?: number}): Promise<
 		ReadonlyArray<{
 			key: string;
 			lastModified?: Date;
 		}>
 	> {
+		if (params.maxObjects !== undefined && (!Number.isSafeInteger(params.maxObjects) || params.maxObjects <= 0)) {
+			throw new RangeError('maxObjects must be a positive safe integer');
+		}
 		const result: Array<{
 			key: string;
 			lastModified?: Date;
 		}> = [];
+		let listedObjects = 0;
 		let continuationToken: string | undefined;
 		do {
+			const remaining = params.maxObjects === undefined ? undefined : params.maxObjects - listedObjects;
 			const command = new ListObjectsV2Command({
 				Bucket: params.bucket,
 				Prefix: params.prefix,
 				ContinuationToken: continuationToken,
+				MaxKeys: remaining === undefined ? undefined : Math.min(remaining, 1000),
 			});
 			const response = await this.client.send(command);
 			if (response.Contents) {
 				for (const obj of response.Contents) {
+					listedObjects += 1;
 					if (obj.Key) {
 						result.push({key: obj.Key, lastModified: obj.LastModified});
 					}
 				}
+			}
+			if (
+				params.maxObjects !== undefined &&
+				(listedObjects > params.maxObjects || (listedObjects === params.maxObjects && response.IsTruncated))
+			) {
+				throw new StorageObjectListingOverflowError(params.bucket, params.prefix, params.maxObjects);
+			}
+			if (response.IsTruncated && !response.NextContinuationToken) {
+				throw new Error(
+					`Truncated object listing omitted its continuation token for ${params.bucket}/${params.prefix}`,
+				);
 			}
 			continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
 		} while (continuationToken);

@@ -7,6 +7,8 @@ import {
 	MEMBER_LIST_RANGE_WINDOW_OVERSCAN_PAGES,
 } from '@fluxer/constants/src/GatewayConstants';
 
+const MEMBER_LIST_RANGE_MAX_RANGES = 10;
+
 declare const normalizedMemberListRangesBrand: unique symbol;
 
 export type MemberListRange = [number, number];
@@ -186,13 +188,14 @@ export function buildMemberListRangeWindow(options: MemberListRangeWindowOptions
 		lastPage = Math.min(lastPage, maxPage);
 	}
 	const ranges: MemberListRanges = [];
+	if (firstPage > 0) {
+		ranges.push([0, MEMBER_LIST_RANGE_MAX_SPAN]);
+	}
 	for (let page = firstPage; page <= lastPage; page += 1) {
 		const pageStart = page * MEMBER_LIST_RANGE_PAGE_SIZE;
-		const maxPageEnd = pageStart + MEMBER_LIST_RANGE_MAX_SPAN;
-		const pageEnd = safeTotalRows != null ? Math.min(maxPageEnd, safeTotalRows - 1) : maxPageEnd;
-		ranges.push([pageStart, pageEnd]);
+		ranges.push([pageStart, pageStart + MEMBER_LIST_RANGE_MAX_SPAN]);
 	}
-	return asNormalizedMemberListRanges(ranges);
+	return normalizeMemberListRanges(ranges);
 }
 
 export function buildMemberListRenderWindow(options: MemberListRangeWindowOptions): NormalizedMemberListRanges {
@@ -228,7 +231,7 @@ function splitMemberListRangeBySpan(range: MemberListRange): NormalizedMemberLis
 
 function pushMemberListRangeBySpan(chunks: MemberListRanges, start: number, end: number): void {
 	let chunkStart = start;
-	while (chunkStart <= end) {
+	while (chunkStart <= end && chunks.length < MEMBER_LIST_RANGE_MAX_RANGES) {
 		const chunkEnd = Math.min(end, chunkStart + MEMBER_LIST_RANGE_MAX_SPAN);
 		chunks.push([chunkStart, chunkEnd]);
 		chunkStart = chunkEnd + 1;

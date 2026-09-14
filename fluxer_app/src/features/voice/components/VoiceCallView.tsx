@@ -15,6 +15,7 @@ import {
 } from '@app/features/i18n/utils/CommonMessageDescriptors';
 import Favorites from '@app/features/messaging/state/Favorites';
 import {goBackOr} from '@app/features/platform/components/router/NavigationAdapter';
+import {STREAM_VOLUME_DESCRIPTOR} from '@app/features/ui/action_menu/items/voice_participant_menu_data/shared';
 import {BottomSheet} from '@app/features/ui/bottom_sheet/BottomSheet';
 import * as ToastCommands from '@app/features/ui/commands/ToastCommands';
 import FocusRing from '@app/features/ui/focus_ring/FocusRing';
@@ -58,7 +59,11 @@ import {
 	asVoiceEngineConnectionState,
 	VoiceEngineConnectionState,
 } from '@app/features/voice/engine/VoiceConnectionStateMachine';
-import {asVoiceTrackSource, VoiceTrackSource} from '@app/features/voice/engine/VoiceTrackSource';
+import {
+	asVoiceTrackSource,
+	isScreenShareAudioPublicationLike,
+	VoiceTrackSource,
+} from '@app/features/voice/engine/VoiceTrackSource';
 import PopoutWindowManager, {
 	getVoiceCallPopoutKey,
 	isVoicePopoutSupported,
@@ -68,6 +73,7 @@ import VoiceCallLayout from '@app/features/voice/state/VoiceCallLayout';
 import {hasValidRoomForVoiceCallContext} from '@app/features/voice/utils/VoiceCallContext';
 import {VOICE_CALL_DESCRIPTOR} from '@app/features/voice/utils/VoiceMessageDescriptors';
 import {parseVoiceParticipantIdentity} from '@app/features/voice/utils/VoiceParticipantIdentity';
+import {VOICE_VOLUME_MAX_SLIDER_VOLUME} from '@app/features/voice/utils/VoiceVolumeUtils';
 import {ME} from '@fluxer/constants/src/AppConstants';
 import {msg, plural} from '@lingui/core/macro';
 import {useLingui} from '@lingui/react/macro';
@@ -273,6 +279,13 @@ const VoiceCallViewInner = observer(
 			return getStreamKey(channel.guildId, channel.id, focusedStreamInfo.connectionId);
 		}, [focusedStreamInfo, channel.guildId, channel.id]);
 		const focusedStreamTrackInfo = useStreamTrackInfo(isFocusedOnScreenShare ? effectiveFocusMainTrack : null);
+		const hasFocusedStreamAudio = Boolean(
+			effectiveFocusMainTrack &&
+				[...effectiveFocusMainTrack.participant.audioTrackPublications.values()].some((publication) =>
+					isScreenShareAudioPublicationLike(publication),
+				),
+		);
+		const canControlFocusedStreamVolume = focusedStreamInfo !== null && !effectiveFocusMainTrack?.participant.isLocal;
 		const focusedStreamerDisplayName = useMemo(() => {
 			if (!focusedStreamerUser) return '';
 			return NicknameUtils.getNickname(focusedStreamerUser, channel.guildId, channel.id);
@@ -381,16 +394,14 @@ const VoiceCallViewInner = observer(
 			void toggleVoiceCallAppFullscreen();
 		}, [toggleVoiceCallAppFullscreen]);
 		const handlePopOutCall = useCallback(() => {
-			void (async () => {
-				if (isVoiceCallAppFullscreen) {
-					await exitVoiceCallAppFullscreen();
-				}
-				PopoutWindowManager.openCallPopout({
-					channelId: channel.id,
-					guildId: channel.guildId ?? null,
-					title: channel.name ?? i18n._(VOICE_CALL_DESCRIPTOR),
-				});
-			})();
+			const didOpen = PopoutWindowManager.openCallPopout({
+				channelId: channel.id,
+				guildId: channel.guildId ?? null,
+				title: channel.name ?? i18n._(VOICE_CALL_DESCRIPTOR),
+			});
+			if (didOpen && isVoiceCallAppFullscreen) {
+				void exitVoiceCallAppFullscreen();
+			}
 		}, [channel.guildId, channel.id, channel.name, exitVoiceCallAppFullscreen, i18n, isVoiceCallAppFullscreen]);
 		const fullscreenButtonLabel = isVoiceCallAppFullscreen
 			? i18n._(EXIT_FULLSCREEN_DESCRIPTOR)
@@ -616,15 +627,17 @@ const VoiceCallViewInner = observer(
 									{connectionStateText}
 								</div>
 							)}
-							{isFocusedOnScreenShare && focusedStreamKey && (
+							{isFocusedOnScreenShare && focusedStreamKey && hasFocusedStreamAudio && canControlFocusedStreamVolume && (
 								<MediaVerticalVolumeControl
 									volume={focusedStreamVolume / 100}
 									isMuted={isFocusedStreamMuted}
+									maxVolume={VOICE_VOLUME_MAX_SLIDER_VOLUME}
 									onVolumeChange={handleFocusedStreamVolumeChange}
 									onToggleMute={handleFocusedStreamToggleMute}
 									iconSize={18}
 									className={styles.voiceHeaderIconButton}
 									position="below"
+									ariaLabel={i18n._(STREAM_VOLUME_DESCRIPTOR)}
 									data-flx="voice.voice-call-view.voice-call-view-inner.hud-stream-volume-control"
 								/>
 							)}

@@ -42,12 +42,10 @@ import {
 	buildEmojiReactionOptions,
 	filterDMUsers,
 	filterGuildMembers,
-	getMemberDisplayName,
 	MEMBER_SEARCH_LIMIT,
 	MENTION_RESULT_LIMIT,
 	parseMentionQuery,
 	SPECIAL_MENTIONS,
-	unionMembers,
 } from '@app/features/messaging/hooks/use_textarea_autocomplete/builders';
 import Messages from '@app/features/messaging/state/MessagingMessages';
 import {toReactionEmoji} from '@app/features/messaging/utils/ReactionUtils';
@@ -63,8 +61,9 @@ import {
 import {type MentionSegment, TextareaSegmentManager} from '@app/features/messaging/utils/TextareaSegmentManager';
 import MentionFrecency from '@app/features/notification/state/MentionFrecency';
 import Permission from '@app/features/permissions/state/Permission';
+import * as PermissionUtils from '@app/features/permissions/utils/PermissionUtils';
 import {Logger} from '@app/features/platform/utils/AppLogger';
-import {ComponentDispatch} from '@app/features/platform/utils/ComponentBus';
+import {ComponentBus} from '@app/features/platform/utils/ComponentBus';
 import Users from '@app/features/user/state/Users';
 import * as NicknameUtils from '@app/features/user/utils/NicknameUtils';
 import {Permissions} from '@fluxer/constants/src/ChannelConstants';
@@ -104,8 +103,8 @@ interface UseTextareaAutocompleteParams {
 	value: string;
 	setValue: React.Dispatch<React.SetStateAction<string>>;
 	textareaRef: React.RefObject<HTMLTextAreaElement | null>;
-	segmentManagerRef: React.MutableRefObject<TextareaSegmentManager>;
-	previousValueRef: React.MutableRefObject<string>;
+	segmentManagerRef: React.RefObject<TextareaSegmentManager>;
+	previousValueRef: React.RefObject<string>;
 	prepareTextChange: PrepareTextareaTextChange;
 	allowedTriggers?: Array<TriggerType>;
 	maxActualLength?: number;
@@ -183,8 +182,8 @@ export function useTextareaAutocomplete({
 		function handleExpressionDataUpdated(): void {
 			setExpressionDataVersion((version) => version + 1);
 		}
-		const unsubscribeEmoji = ComponentDispatch.subscribe('EMOJI_PICKER_RERENDER', handleExpressionDataUpdated);
-		const unsubscribeSticker = ComponentDispatch.subscribe('STICKER_PICKER_RERENDER', handleExpressionDataUpdated);
+		const unsubscribeEmoji = ComponentBus.subscribe('EMOJI_PICKER_RERENDER', handleExpressionDataUpdated);
+		const unsubscribeSticker = ComponentBus.subscribe('STICKER_PICKER_RERENDER', handleExpressionDataUpdated);
 		return () => {
 			unsubscribeEmoji();
 			unsubscribeSticker();
@@ -292,7 +291,7 @@ export function useTextareaAutocomplete({
 			autocompleteTriggerType === 'commandArg';
 		if (!isMentionTrigger || !channel?.guildId) {
 			currentGuildIdRef.current = null;
-			context.clearQuery();
+			context.cancelSearch();
 			setMemberSearchResults([]);
 			setIsMemberSearchLoading(false);
 			if (memberFetchDebounceTimerRef.current) {
@@ -303,33 +302,14 @@ export function useTextareaAutocomplete({
 		}
 		const searchQuery = autocompleteTriggerMatchedText;
 		const guildId = channel.guildId;
-		const isGuildFullyLoaded = GuildMembers.isGuildFullyLoaded(guildId);
 		currentGuildIdRef.current = guildId;
 		const sessionKey = `${guildId}:${searchQuery}`;
 		if (mentionSessionRef.current.key !== sessionKey) {
 			mentionSessionRef.current = {key: sessionKey, order: new Map(), nextRank: 0};
 		}
-		const cachedMembers = GuildMembers.getMembers(guildId);
-		if (cachedMembers.length > 0) {
-			const cachedMatches = matchSorter(cachedMembers, searchQuery, {
-				keys: [(member) => getMemberDisplayName(member), 'nick', 'user.globalName', 'user.username', 'user.tag'],
-			}).slice(0, MEMBER_SEARCH_LIMIT);
-			setMemberSearchResults(cachedMatches);
-		} else {
-			setMemberSearchResults([]);
-		}
-		if (isGuildFullyLoaded) {
-			context.clearQuery();
-			setIsMemberSearchLoading(false);
-			if (memberFetchDebounceTimerRef.current) {
-				clearTimeout(memberFetchDebounceTimerRef.current);
-				memberFetchDebounceTimerRef.current = null;
-			}
-			return;
-		}
 		setIsMemberSearchLoading(true);
 		const boosters = MentionFrecency.getBoosters(guildId);
-		context.setQuery(searchQuery, {}, new Set(), new Set(), boosters);
+		context.beginSearch(searchQuery, {guild: guildId}, new Set(), new Set(), boosters);
 		if (memberFetchDebounceTimerRef.current) {
 			clearTimeout(memberFetchDebounceTimerRef.current);
 		}
@@ -470,7 +450,15 @@ export function useTextareaAutocomplete({
 		},
 		[channel],
 	);
-	const canViewChannel = useCallback((_userId: string): boolean => true, []);
+	const canViewChannel = useCallback(
+		(userId: string): boolean => {
+			if (!channel || !channel.guildId) {
+				return true;
+			}
+			return PermissionUtils.can(Permissions.VIEW_CHANNEL, userId as UserId, channel.toJSON());
+		},
+		[channel],
+	);
 	useEffect(() => {
 		let options: Array<AutocompleteOption> = [];
 		if (!autocompleteTrigger) {
@@ -515,11 +503,10 @@ export function useTextareaAutocomplete({
 					const userOptions = filterDMUsers(users, parsedQuery);
 					options = channel.isPersonalNotes() ? userOptions : [...userOptions, ...SPECIAL_MENTIONS];
 				} else {
-					const membersToUse = unionMembers(memberSearchResults, GuildMembers.getMembers(channel.guildId ?? ''));
 					const parsedQuery = parseMentionQuery(matchedText ?? '');
 					const queryForMatching = parsedQuery.usernameQuery.trim();
 					const members = filterGuildMembers(
-						membersToUse,
+						memberSearchResults,
 						parsedQuery,
 						true,
 						canViewChannel,
@@ -535,7 +522,7 @@ export function useTextareaAutocomplete({
 								threshold: matchSorter.rankings.CONTAINS,
 							})
 						: mentionableRoles;
-					const roles = matchedRoles
+					const roles = [...matchedRoles]
 						.sort((a, b) => b.position - a.position)
 						.slice(0, MENTION_RESULT_LIMIT)
 						.map((role) => ({
@@ -719,19 +706,19 @@ export function useTextareaAutocomplete({
 				return;
 			}
 			if (isMeme(option)) {
-				ComponentDispatch.dispatch('FAVORITE_MEME_SELECT', {meme: option.meme, autoSend: true});
+				ComponentBus.dispatch('FAVORITE_MEME_SELECT', {meme: option.meme, autoSend: true});
 				applyAutocompleteValue('', [], 0);
 				setSelectedIndex(0);
 				return;
 			}
 			if (isGif(option)) {
-				ComponentDispatch.dispatch('GIF_SELECT', {gif: option.gif, autoSend: true});
+				ComponentBus.dispatch('GIF_SELECT', {gif: option.gif, autoSend: true});
 				applyAutocompleteValue('', [], 0);
 				setSelectedIndex(0);
 				return;
 			}
 			if (isSticker(option)) {
-				ComponentDispatch.dispatch('STICKER_SELECT', {sticker: option.sticker});
+				ComponentBus.dispatch('STICKER_SELECT', {sticker: option.sticker});
 				applyAutocompleteValue('', [], 0);
 				setSelectedIndex(0);
 				return;

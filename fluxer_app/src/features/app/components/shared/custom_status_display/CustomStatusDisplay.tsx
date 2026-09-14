@@ -7,11 +7,12 @@ import {
 	getEmojiAttribution,
 } from '@app/features/emoji/components/emojis/EmojiAttributionSubtext';
 import Emoji from '@app/features/emoji/state/Emoji';
+import {buildCustomEmojiURL} from '@app/features/expressions/utils/CustomEmojiImageUrl';
 import {getEmojiURL} from '@app/features/expressions/utils/EmojiUtils';
 import UnicodeEmojis from '@app/features/expressions/utils/UnicodeEmojis';
 import Guilds from '@app/features/guild/state/Guilds';
-import {setUrlQueryParams} from '@app/features/messaging/utils/MessagingUrlUtils';
 import {usePresenceCustomStatus} from '@app/features/presence/hooks/usePresenceCustomStatus';
+import {remFromPx} from '@app/features/theme/layout/RemFromPx';
 import {EmojiTooltipContent} from '@app/features/ui/emoji_tooltip_content/EmojiTooltipContent';
 import FocusRing from '@app/features/ui/focus_ring/FocusRing';
 import {useTextOverflow} from '@app/features/ui/hooks/useTextOverflow';
@@ -21,7 +22,6 @@ import {HoverFloatingTooltipTrigger} from '@app/features/ui/tooltip/HoverFloatin
 import {Tooltip, type TooltipPosition} from '@app/features/ui/tooltip/Tooltip';
 import {useHoverFloatingTooltip} from '@app/features/ui/tooltip/useHoverFloatingTooltip';
 import {type CustomStatus, getCustomStatusText, normalizeCustomStatus} from '@app/features/user/state/CustomStatus';
-import * as AvatarUtils from '@app/features/user/utils/AvatarUtils';
 import {Trans} from '@lingui/react/macro';
 import {PencilIcon, SmileyIcon} from '@phosphor-icons/react';
 import {clsx} from 'clsx';
@@ -61,14 +61,17 @@ interface ClampedStyle extends React.CSSProperties {
 const sanitizeText = (text: string): string => {
 	return text.replace(/[\r\n]+/g, ' ').trim();
 };
+const getStatusEmojiAnimatable = (status: CustomStatus): boolean => {
+	if (!status.emojiId) {
+		return false;
+	}
+	return Emoji.getEmojiById(status.emojiId)?.animated ?? status.emojiAnimated ?? false;
+};
+
 const getTooltipEmojiUrl = (status: CustomStatus, animationAllowed: boolean): string | null => {
 	if (status.emojiId) {
-		const emoji = Emoji.getEmojiById(status.emojiId);
-		const isAnimated = (emoji?.animated ?? status.emojiAnimated ?? false) && animationAllowed;
-		return setUrlQueryParams(AvatarUtils.getEmojiURL({id: status.emojiId, animated: isAnimated}), {
-			size: 96,
-			quality: 'lossless',
-		});
+		const isAnimatable = getStatusEmojiAnimatable(status);
+		return buildCustomEmojiURL({id: status.emojiId, animated: animationAllowed && isAnimatable});
 	}
 	if (status.emojiName) {
 		return getEmojiURL(status.emojiName);
@@ -98,12 +101,17 @@ const StatusEmojiWithTooltip = observer(
 				return `:${status.emojiName}:`;
 			}
 			if (status.emojiName) {
-				return UnicodeEmojis.convertSurrogateToName(status.emojiName, true, status.emojiName);
+				return UnicodeEmojis.nameForSurrogate(status.emojiName, true, status.emojiName);
 			}
 			return '';
 		};
 		const emojiName = getEmojiDisplayName();
-		const animationAllowed = useShouldAnimate({kind: 'custom_status_emoji', isHovering: true});
+		const isAnimatable = getStatusEmojiAnimatable(status);
+		const animationAllowed = useShouldAnimate({
+			kind: 'custom_status_emoji',
+			isAnimated: isAnimatable,
+			isHovering: isAnimatable,
+		});
 		const tooltipEmojiUrl = getTooltipEmojiUrl(status, animationAllowed);
 		const TriggerComponent = isButton ? 'button' : 'span';
 		const triggerProps = isButton
@@ -166,24 +174,15 @@ const renderStatusEmoji = (
 	animationAllowed: boolean = true,
 ): EmojiRenderResult | null => {
 	if (status.emojiId) {
-		const emoji = Emoji.getEmojiById(status.emojiId);
 		const altText = `:${status.emojiName}:`;
-		const isAnimated = (emoji?.animated ?? status.emojiAnimated ?? false) && animationAllowed;
-		const staticUrl = setUrlQueryParams(AvatarUtils.getEmojiURL({id: status.emojiId, animated: false}), {
-			size: 96,
-			quality: 'lossless',
-		});
-		const animatedUrl = isAnimated
-			? setUrlQueryParams(AvatarUtils.getEmojiURL({id: status.emojiId, animated: true}), {
-					size: 96,
-					quality: 'lossless',
-				})
-			: null;
+		const isAnimatable = getStatusEmojiAnimatable(status);
+		const staticUrl = buildCustomEmojiURL({id: status.emojiId, animated: false});
+		const animatedUrl = isAnimatable ? buildCustomEmojiURL({id: status.emojiId, animated: true}) : null;
 		if (alwaysAnimate && animatedUrl) {
 			return {
 				node: (
 					<img
-						src={animatedUrl}
+						src={animationAllowed ? animatedUrl : staticUrl}
 						alt={status.emojiName ?? undefined}
 						draggable={false}
 						className={clsx(styles.statusEmoji, emojiClassName)}
@@ -207,13 +206,15 @@ const renderStatusEmoji = (
 							className={clsx(styles.statusEmoji, styles.staticEmoji, emojiClassName)}
 							data-flx="app.custom-status-display.custom-status-display.render-status-emoji.status-emoji--2"
 						/>
-						<img
-							src={animatedUrl}
-							alt={status.emojiName ?? undefined}
-							draggable={false}
-							className={clsx(styles.statusEmoji, styles.animatedEmoji, emojiClassName)}
-							data-flx="app.custom-status-display.custom-status-display.render-status-emoji.status-emoji--3"
-						/>
+						{animationAllowed && (
+							<img
+								src={animatedUrl}
+								alt={status.emojiName ?? undefined}
+								draggable={false}
+								className={clsx(styles.statusEmoji, styles.animatedEmoji, emojiClassName)}
+								data-flx="app.custom-status-display.custom-status-display.render-status-emoji.status-emoji--3"
+							/>
+						)}
 					</span>
 				),
 				altText,
@@ -284,9 +285,11 @@ export const CustomStatusDisplay = observer(
 			checkVertical: maxLines > 1,
 			measureTextRange: true,
 		});
+		const emojiAnimatable = normalized ? getStatusEmojiAnimatable(normalized) : false;
 		const animationAllowed = useShouldAnimate({
 			kind: 'custom_status_emoji',
-			isHovering: Boolean(animateOnParentHover) || Boolean(alwaysAnimate),
+			isAnimated: emojiAnimatable,
+			isHovering: animateOnParentHover || alwaysAnimate,
 		});
 		if (!normalized) {
 			if (showPlaceholder && isEditable && onEdit) {
@@ -299,7 +302,7 @@ export const CustomStatusDisplay = observer(
 							data-flx="app.custom-status-display.custom-status-display.placeholder.edit.button"
 						>
 							<SmileyIcon
-								size={14}
+								size={remFromPx(14)}
 								weight="regular"
 								className={styles.placeholderIcon}
 								data-flx="app.custom-status-display.custom-status-display.placeholder-icon"
@@ -397,7 +400,7 @@ export const CustomStatusDisplay = observer(
 						</div>
 						{isEmojiOnly && (
 							<PencilIcon
-								size={12}
+								size={remFromPx(12)}
 								weight="bold"
 								className={styles.editPencilIcon}
 								data-flx="app.custom-status-display.custom-status-display.edit-pencil-icon"

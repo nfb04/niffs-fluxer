@@ -82,6 +82,17 @@ import {
 	ZOOM_IN_DESCRIPTOR,
 	ZOOM_OUT_DESCRIPTOR,
 } from '@app/features/input/state/input_keybind/shared';
+import {
+	getActiveCombosForResolvedAction,
+	getDisplayKeybindForResolvedAction,
+} from '@app/features/input/state/KeybindResolution';
+import {
+	DEFAULT_KEYBOARD_SHORTCUTS_OVERLAY_COMBO,
+	getKeyboardShortcutsOverlayComboForCurrentLayout,
+	keyCombosEqual,
+	SHIFTED_SLASH_FALLBACK_KEYBOARD_SHORTCUTS_OVERLAY_COMBO,
+} from '@app/features/input/utils/KeyboardShortcutLayoutUtils';
+import AppStorage from '@app/features/platform/state/PersistentStorage';
 import {awaitHydration, makePersistent} from '@app/features/platform/utils/MobXPersistence';
 import {makeSyncedField} from '@app/features/user/state/SyncedField';
 import UserSettings from '@app/features/user/state/UserSettings';
@@ -96,13 +107,6 @@ import {
 } from '@fluxer/schema/src/gen/fluxer/user/preferences/v1/preferences_pb';
 import type {I18n} from '@lingui/core';
 import {makeAutoObservable, runInAction} from 'mobx';
-import {
-	DEFAULT_KEYBOARD_SHORTCUTS_OVERLAY_COMBO,
-	getKeyboardShortcutsOverlayComboForCurrentLayout,
-	keyCombosEqual,
-	SHIFTED_SLASH_FALLBACK_KEYBOARD_SHORTCUTS_OVERLAY_COMBO,
-} from '../utils/KeyboardShortcutLayoutUtils';
-import {getActiveCombosForResolvedAction, getDisplayKeybindForResolvedAction} from './KeybindResolution';
 
 const KEYBIND_STORE_NAME = 'Keybind';
 const KEYBIND_COMMAND_VALUES = [
@@ -286,6 +290,8 @@ export interface CustomKeybindEntry {
 }
 
 const STORE_VERSION = 5 as const;
+
+const GLOBAL_KEYBIND_DEFAULT_MIGRATION_KEY = 'Keybind:globalDefaultMigration:v1';
 const generateId = (): string => {
 	if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
 		return crypto.randomUUID();
@@ -663,6 +669,8 @@ const getDefaultKeybinds = (
 			action: 'chat_toggle_inbox',
 			label: i18n._(TOGGLE_THE_INBOX_DESCRIPTOR),
 			combo: {key: 'i', ctrlOrMeta: true},
+			ignoreWhileTyping: true,
+			editableFocusBehavior: 'allow_when_empty',
 			section: 'chat',
 		},
 		{
@@ -1024,6 +1032,18 @@ class Keybind {
 		});
 	}
 
+	private migrateGlobalCapableKeybindsToGlobal(): void {
+		if (AppStorage.getItem(GLOBAL_KEYBIND_DEFAULT_MIGRATION_KEY) === '1') return;
+		for (const entry of this.customKeybinds) {
+			if (entry.action == null) continue;
+			const config = this.getDefaultByAction(entry.action);
+			if (config?.allowGlobal && entry.combo.global !== true) {
+				entry.combo = {...entry.combo, global: true};
+			}
+		}
+		AppStorage.setItem(GLOBAL_KEYBIND_DEFAULT_MIGRATION_KEY, '1');
+	}
+
 	setI18n(i18n: I18n): void {
 		this.i18n = i18n;
 		if (this.initialized) return;
@@ -1033,6 +1053,7 @@ class Keybind {
 				if (!Array.isArray(this.customKeybinds)) {
 					this.customKeybinds = [];
 				}
+				this.migrateGlobalCapableKeybindsToGlobal();
 				this.initialized = true;
 			});
 		});
@@ -1197,6 +1218,21 @@ class Keybind {
 			this.customKeybinds.push(created);
 		});
 		return created;
+	}
+
+	isActionGlobalCapable(action: KeybindCommand): boolean {
+		return this.getDefaultByAction(action)?.allowGlobal === true;
+	}
+
+	isActionGlobal(action: KeybindCommand): boolean {
+		const combo = this.getPrimaryCustomKeybind(action)?.combo ?? this.getDefaultByAction(action)?.combo;
+		return combo?.global === true;
+	}
+
+	setActionGlobal(action: KeybindCommand, global: boolean): void {
+		const baseCombo = this.getPrimaryCustomKeybind(action)?.combo ??
+			this.getDefaultByAction(action)?.combo ?? {key: ''};
+		this.setPrimaryCustomKeybindCombo(action, {...baseCombo, global});
 	}
 
 	setTransmitMode(mode: TransmitMode): void {

@@ -1,8 +1,27 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import type {ChannelID, EmojiID, GuildID, RoleID, StickerID, UserID} from '@app/api/BrandedTypes';
+import {createChannelID, createRoleID, createUserID} from '@app/api/BrandedTypes';
+import {mapChannelToResponse} from '@app/api/channel/ChannelMappers';
+import type {IChannelRepository} from '@app/api/channel/IChannelRepository';
+import type {PermissionOverwrite} from '@app/api/database/types/ChannelTypes';
+import type {GuildAuditLogService} from '@app/api/guild/GuildAuditLogService';
+import type {GuildAuditLogChange} from '@app/api/guild/GuildAuditLogTypes';
+import type {IGuildRepositoryAggregate} from '@app/api/guild/repositories/IGuildRepositoryAggregate';
+import {ChannelHelpers, type ChannelReorderOperation} from '@app/api/guild/services/channel/ChannelHelpers';
+import type {IGatewayService} from '@app/api/infrastructure/IGatewayService';
+import type {ISnowflakeService} from '@app/api/infrastructure/ISnowflakeService';
+import type {UserCacheService} from '@app/api/infrastructure/UserCacheService';
+import {Logger} from '@app/api/Logger';
+import type {LimitConfigService} from '@app/api/limits/LimitConfigService';
+import {resolveLimitSafe} from '@app/api/limits/LimitConfigUtils';
+import {createLimitMatchContext} from '@app/api/limits/LimitMatchContextBuilder';
+import type {RequestCache} from '@app/api/middleware/RequestCacheMiddleware';
+import type {Channel} from '@app/api/models/Channel';
+import {ChannelPermissionOverwrite} from '@app/api/models/ChannelPermissionOverwrite';
 import {AuditLogActionType} from '@fluxer/constants/src/AuditLogActionType';
 import {ALL_PERMISSIONS, ChannelTypes, Permissions} from '@fluxer/constants/src/ChannelConstants';
-import {ContentWarningLevel, GuildFeatures} from '@fluxer/constants/src/GuildConstants';
+import {ContentWarningLevel, GuildFeatures, resolveVoiceChannelBitrate} from '@fluxer/constants/src/GuildConstants';
 import {
 	MAX_CHANNELS_PER_CATEGORY,
 	MAX_GUILD_CHANNELS,
@@ -24,25 +43,6 @@ import {
 } from '@fluxer/schema/src/domains/channel/GuildChannelOrdering';
 import {ChannelNameType} from '@fluxer/schema/src/primitives/ChannelValidators';
 import type {ICacheService} from '@pkgs/cache/src/ICacheService';
-import type {ChannelID, EmojiID, GuildID, RoleID, StickerID, UserID} from '../../../BrandedTypes';
-import {createChannelID, createRoleID, createUserID} from '../../../BrandedTypes';
-import {mapChannelToResponse} from '../../../channel/ChannelMappers';
-import type {IChannelRepository} from '../../../channel/IChannelRepository';
-import type {PermissionOverwrite} from '../../../database/types/ChannelTypes';
-import type {IGatewayService} from '../../../infrastructure/IGatewayService';
-import type {ISnowflakeService} from '../../../infrastructure/ISnowflakeService';
-import type {UserCacheService} from '../../../infrastructure/UserCacheService';
-import {Logger} from '../../../Logger';
-import type {LimitConfigService} from '../../../limits/LimitConfigService';
-import {resolveLimitSafe} from '../../../limits/LimitConfigUtils';
-import {createLimitMatchContext} from '../../../limits/LimitMatchContextBuilder';
-import type {RequestCache} from '../../../middleware/RequestCacheMiddleware';
-import type {Channel} from '../../../models/Channel';
-import {ChannelPermissionOverwrite} from '../../../models/ChannelPermissionOverwrite';
-import type {GuildAuditLogService} from '../../GuildAuditLogService';
-import type {GuildAuditLogChange} from '../../GuildAuditLogTypes';
-import type {IGuildRepositoryAggregate} from '../../repositories/IGuildRepositoryAggregate';
-import {ChannelHelpers, type ChannelReorderOperation} from './ChannelHelpers';
 
 export class ChannelOperationsService {
 	constructor(
@@ -119,12 +119,16 @@ export class ChannelOperationsService {
 			);
 		}
 		let channelName = params.data.name;
-		if (params.data.type === ChannelTypes.GUILD_TEXT) {
+		let guildFeatures: Array<string> | null = null;
+		if (params.data.type === ChannelTypes.GUILD_TEXT || params.data.type === ChannelTypes.GUILD_VOICE) {
 			const guildData = await this.gatewayService.getGuildData({
 				guildId: params.guildId,
 				userId: params.userId,
 			});
-			const hasFlexibleNamesEnabled = guildData.features.includes(GuildFeatures.TEXT_CHANNEL_FLEXIBLE_NAMES);
+			guildFeatures = guildData.features;
+		}
+		if (params.data.type === ChannelTypes.GUILD_TEXT) {
+			const hasFlexibleNamesEnabled = (guildFeatures ?? []).includes(GuildFeatures.TEXT_CHANNEL_FLEXIBLE_NAMES);
 			if (!hasFlexibleNamesEnabled) {
 				channelName = ChannelNameType.parse(channelName);
 			}
@@ -156,7 +160,10 @@ export class ChannelOperationsService {
 			content_warning_level: requestedContentWarningLevel,
 			content_warning_text: requestedContentWarningText,
 			rate_limit_per_user: params.data.rate_limit_per_user ?? 0,
-			bitrate: params.data.type === ChannelTypes.GUILD_VOICE ? (params.data.bitrate ?? 64000) : null,
+			bitrate:
+				params.data.type === ChannelTypes.GUILD_VOICE
+					? resolveVoiceChannelBitrate(params.data.bitrate, guildFeatures)
+					: null,
 			user_limit: params.data.type === ChannelTypes.GUILD_VOICE ? (params.data.user_limit ?? 0) : null,
 			voice_connection_limit:
 				params.data.type === ChannelTypes.GUILD_VOICE
@@ -355,12 +362,18 @@ export class ChannelOperationsService {
 			requestCache,
 		});
 		if (update.lockPermissions && desiredParent && desiredParent !== (target.parentId ?? null)) {
-			await this.syncPermissionsWithParent({guildId, channelId: target.id, parentId: desiredParent});
+			await this.syncPermissionsWithParent({
+				guildId,
+				userId: params.userId,
+				channelId: target.id,
+				parentId: desiredParent,
+			});
 		}
 	}
 
 	private async syncPermissionsWithParent(params: {
 		guildId: GuildID;
+		userId: UserID;
 		channelId: ChannelID;
 		parentId: ChannelID;
 	}): Promise<void> {
@@ -368,6 +381,22 @@ export class ChannelOperationsService {
 		if (!parent || parent.guildId !== params.guildId || parent.type !== ChannelTypes.GUILD_CATEGORY) return;
 		const child = await this.channelRepository.findUnique(params.channelId);
 		if (!child || child.guildId !== params.guildId) return;
+		const userPermissions = await this.gatewayService.getUserPermissions({
+			guildId: params.guildId,
+			userId: params.userId,
+			channelId: child.id,
+		});
+		if ((userPermissions & Permissions.MANAGE_ROLES) === 0n) {
+			throw new MissingPermissionsError();
+		}
+		for (const [targetId, existing] of child.permissionOverwrites) {
+			const incomingDeny = parent.permissionOverwrites.get(targetId)?.deny ?? 0n;
+			if ((existing.deny & ~incomingDeny & ~userPermissions) !== 0n) throw new MissingPermissionsError();
+		}
+		for (const [targetId, incoming] of parent.permissionOverwrites) {
+			const existingAllow = child.permissionOverwrites.get(targetId)?.allow ?? 0n;
+			if ((incoming.allow & ~existingAllow & ~userPermissions) !== 0n) throw new MissingPermissionsError();
+		}
 		await this.channelRepository.upsert({
 			...child.toRow(),
 			permission_overwrites: new Map(

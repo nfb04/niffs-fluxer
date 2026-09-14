@@ -22,6 +22,7 @@ import {createDownloadHandler} from '@app/features/messaging/utils/FileDownloadU
 import {buildMediaProxyURL, stripMediaProxyParams} from '@app/features/messaging/utils/MediaProxyUtils';
 import Permission from '@app/features/permissions/state/Permission';
 import {Logger} from '@app/features/platform/utils/AppLogger';
+import {remFromPx} from '@app/features/theme/layout/RemFromPx';
 import {
 	CopyLinkIcon,
 	CopyMediaIcon,
@@ -130,7 +131,7 @@ const DOWNLOAD_MEDIA_DESCRIPTOR = msg({
 	comment: 'Generic media context menu download action when the specific type is unknown.',
 });
 const ATTACHMENT_IS_EXPIRED_OR_UNAVAILABLE_DESCRIPTOR = msg({
-	message: 'Attachment is expired or unavailable',
+	message: 'Attachment has expired or is unavailable',
 	comment: 'Toast shown when an attachment URL is no longer accessible.',
 });
 const URL_COPIED_TO_CLIPBOARD_DESCRIPTOR = msg({
@@ -569,6 +570,7 @@ export function useMediaMenuData(props: MediaMenuDataProps, options: MediaMenuDa
 	const canManageMessages = Permission.can(Permissions.MANAGE_MESSAGES, {channelId: message.channelId});
 	const canEditAltText = useMemo(() => {
 		if (!attachmentId) return false;
+		if (snapshotIndex !== undefined || message.messageSnapshots) return false;
 		const attachmentSource = snapshotAttachments ?? message.attachments;
 		const attachment = attachmentSource.find((att) => att.id === attachmentId);
 		const mimeType = attachment?.content_type?.toLowerCase() ?? '';
@@ -576,7 +578,7 @@ export function useMediaMenuData(props: MediaMenuDataProps, options: MediaMenuDa
 		if (!canEditMedia) return false;
 		const isMessageAuthor = currentUserId === message.author?.id;
 		return isMessageAuthor || canManageMessages;
-	}, [attachmentId, canManageMessages, currentUserId, message, snapshotAttachments]);
+	}, [attachmentId, canManageMessages, currentUserId, message, snapshotAttachments, snapshotIndex]);
 	const handleAddToFavorites = useCallback(() => {
 		ModalCommands.pushAfterBottomSheetClose(
 			onClose,
@@ -823,7 +825,10 @@ export function useMediaMenuData(props: MediaMenuDataProps, options: MediaMenuDa
 					{
 						id: mediaMenuItemIds.editAltText,
 						icon: (
-							<PencilSimpleIcon size={20} data-flx="ui.action-menu.items.media-menu-data.groups.pencil-simple-icon" />
+							<PencilSimpleIcon
+								size={remFromPx(20)}
+								data-flx="ui.action-menu.items.media-menu-data.groups.pencil-simple-icon"
+							/>
 						),
 						label: i18n._(EDIT_ALT_TEXT_DESCRIPTOR),
 						onClick: handleEditAltText,

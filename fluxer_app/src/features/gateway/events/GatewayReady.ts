@@ -10,6 +10,7 @@ import Channels from '@app/features/channel/state/Channels';
 import UserConnection from '@app/features/connection/state/UserConnection';
 import Emoji from '@app/features/emoji/state/Emoji';
 import Sticker from '@app/features/emoji/state/EmojiSticker';
+import ExperimentAssignments from '@app/features/experiment/state/ExperimentAssignments';
 import type {FavoriteMemeWire} from '@app/features/expressions/models/FavoriteMeme';
 import FavoriteMemes from '@app/features/expressions/state/FavoriteMemes';
 import type {GatewayHandlerContext} from '@app/features/gateway/events/EventRouter';
@@ -28,7 +29,6 @@ import MemberSidebar from '@app/features/member/state/MemberSidebar';
 import MessageReactions from '@app/features/messaging/state/MessageReactions';
 import Messages from '@app/features/messaging/state/MessagingMessages';
 import SavedMessages from '@app/features/messaging/state/SavedMessages';
-import ScheduledMessages from '@app/features/messaging/state/ScheduledMessages';
 import MentionFeed from '@app/features/notification/state/MentionFeed';
 import Permission from '@app/features/permissions/state/Permission';
 import {Logger} from '@app/features/platform/utils/AppLogger';
@@ -46,7 +46,6 @@ import Users from '@app/features/user/state/Users';
 import WebAuthnCredentials, {type WebAuthnCredential} from '@app/features/user/state/WebAuthnCredentials';
 import MediaEngine from '@app/features/voice/engine/MediaEngineFacade';
 import RtcRegions from '@app/features/voice/state/RtcRegions';
-import VoiceSettings from '@app/features/voice/state/VoiceSettings';
 import type {RtcRegionResponse, Channel as WireChannel} from '@fluxer/schema/src/domains/channel/ChannelSchemas';
 import type {UserPrivate, User as WireUser} from '@fluxer/schema/src/domains/user/UserResponseSchemas';
 import {runInAction} from 'mobx';
@@ -130,7 +129,8 @@ function handleReadyInternal(data: ReadyPayload, context: GatewayHandlerContext)
 	if (data.rtc_regions) {
 		RtcRegions.setRegions(data.rtc_regions);
 	}
-	Users.handleConnectionOpen(data.user);
+	ExperimentAssignments.start();
+	Users.handleGatewayReady(data.user);
 	if (data.users && data.users.length > 0) {
 		Users.cacheUsers(data.users);
 	}
@@ -146,44 +146,42 @@ function handleReadyInternal(data: ReadyPayload, context: GatewayHandlerContext)
 		void accountStorage.updateAccountUserData(user.id, userData);
 		void AccountManager.updateAccountUserData(user.id, userData);
 	}
-	VoiceSettings.handleConnectionOpen(data.user);
-	Authentication.handleConnectionOpen({user: data.user});
+	Authentication.handleGatewayReady({user: data.user});
 	void PremiumCommands.refreshPremiumState().catch((error) => {
 		logger.warn('Failed to refresh premium state after READY', error);
 	});
-	Guilds.handleConnectionOpen({guilds});
-	UserSettings.handleConnectionOpen(data.user_settings);
-	GuildList.handleConnectionOpen(guilds);
-	GuildCount.handleConnectionOpen(guilds);
-	GuildMembers.handleConnectionOpen(guilds);
-	GuildVerification.handleConnectionOpen();
-	Channels.handleConnectionOpen({channels});
+	Guilds.handleGatewayReady({guilds});
+	UserSettings.handleGatewayReady(data.user_settings);
+	GuildList.handleGatewayReady(guilds);
+	GuildCount.handleGatewayReady(guilds);
+	GuildMembers.handleGatewayReady(guilds);
+	GuildVerification.handleGatewayReady();
+	Channels.handleGatewayReady({channels});
 	if (data.auth_session_id_hash) {
-		AuthSession.handleConnectionOpen(data.auth_session_id_hash);
+		AuthSession.handleGatewayReady(data.auth_session_id_hash);
 	} else {
 		logger.warn('READY missing auth_session_id_hash; continuing without AuthSession init');
 	}
-	MessageReactions.handleConnectionOpen();
-	Sticker.handleConnectionOpen(guilds);
-	Emoji.handleConnectionOpen({guilds});
-	Permission.handleConnectionOpen();
-	MemberSearch.handleConnectionOpen();
-	SavedMessages.handleConnectionOpen();
-	MentionFeed.handleConnectionOpen();
-	ScheduledMessages.handleConnectionOpen();
-	ChannelPins.handleConnectionOpen();
-	UserConnection.handleConnectionOpen();
-	UserGuildSettings.handleConnectionOpen(data.user_guild_settings ?? []);
-	WebAuthnCredentials.handleConnectionOpen(data.webauthn_credentials);
-	ReadStates.handleConnectionOpen({
+	MessageReactions.handleGatewayReady();
+	Sticker.handleGatewayReady(guilds);
+	Emoji.handleGatewayReady({guilds});
+	Permission.handleGatewayReady();
+	MemberSearch.handleGatewayReady();
+	SavedMessages.handleGatewayReady();
+	MentionFeed.handleGatewayReady();
+	ChannelPins.handleGatewayReady();
+	UserConnection.handleGatewayReady();
+	UserGuildSettings.handleGatewayReady(data.user_guild_settings ?? []);
+	WebAuthnCredentials.handleGatewayReady(data.webauthn_credentials);
+	ReadStates.handleGatewayReady({
 		readState: data.read_states ?? [],
 		readStateProto: data.read_state_proto,
 		channels,
 	});
-	GuildReadState.handleConnectionOpen();
-	Presence.handleConnectionOpen(data.user, guilds, data.presences);
-	MediaEngine.handleConnectionOpen(guilds);
-	Initialization.setReady(data);
+	GuildReadState.handleGatewayReady();
+	Presence.handleGatewayReady(data.user, guilds, data.presences);
+	MediaEngine.handleGatewayReady(guilds);
+	Initialization.setReady();
 	context.setReady();
-	Messages.handleConnectionOpen();
+	Messages.handleGatewayReady();
 }

@@ -1,12 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import Accessibility from '@app/features/accessibility/state/Accessibility';
-import {useAnimatedImageDecoder} from '@app/features/app/hooks/useAnimatedImageDecoder';
-import {
-	getAnimatedMediaPlaybackAllowed,
-	subscribeAnimatedMediaPlaybackChange,
-	useAnimatedMediaPlaybackAllowed,
-} from '@app/features/app/hooks/useAnimatedMediaPlayback';
+import {useAnimatedMediaPlaybackAllowed} from '@app/features/app/hooks/useAnimatedMediaPlayback';
 import {useShouldAnimate} from '@app/features/app/hooks/useShouldAnimate';
 import {AltTextBadge} from '@app/features/channel/components/embeds/AltTextBadge';
 import embedStyles from '@app/features/channel/components/embeds/ChannelEmbed.module.css';
@@ -14,9 +9,12 @@ import {deriveDefaultNameFromMessage} from '@app/features/channel/components/emb
 import {MatureMediaBlurOverlay} from '@app/features/channel/components/embeds/MatureMediaBlurOverlay';
 import styles from '@app/features/channel/components/embeds/media/EmbedGifv.module.css';
 import {GifIndicator} from '@app/features/channel/components/embeds/media/GifIndicator';
+import {useGifViewportGate} from '@app/features/channel/components/embeds/media/GifViewportGate';
 import {getMediaButtonVisibility} from '@app/features/channel/components/embeds/media/MediaButtonUtils';
-import {MediaContainer, shouldShowOverlays} from '@app/features/channel/components/embeds/media/MediaContainer';
+import {MediaContainer} from '@app/features/channel/components/embeds/media/MediaContainer';
+import {shouldShowOverlays} from '@app/features/channel/components/embeds/media/MediaOverlayFit';
 import type {BaseMediaProps} from '@app/features/channel/components/embeds/media/MediaTypes';
+import {isInlinePlayableVideoSize} from '@app/features/channel/components/embeds/media/VideoDimensionUtils';
 import {safePause, safePlay} from '@app/features/channel/components/GifVideoPool';
 import {useMaybeMessageViewContext} from '@app/features/channel/components/MessageViewContext';
 import type {Channel} from '@app/features/channel/models/Channel';
@@ -25,31 +23,30 @@ import {useDeleteAttachment} from '@app/features/messaging/hooks/useDeleteAttach
 import {useMatureMedia} from '@app/features/messaging/hooks/useMatureMedia';
 import {useMediaFavorite} from '@app/features/messaging/hooks/useMediaFavorite';
 import {useMediaLoading} from '@app/features/messaging/hooks/useMediaLoading';
-import {useNearViewport} from '@app/features/messaging/hooks/useNearViewport';
+import {useMediaViewerHoverWarm} from '@app/features/messaging/hooks/useMediaViewerHoverWarm';
 import {useOpenInBrowserOnMiddleClick} from '@app/features/messaging/hooks/useOpenInBrowserOnMiddleClick';
 import type {Message} from '@app/features/messaging/models/MessagingMessage';
 import {createDownloadHandler} from '@app/features/messaging/utils/FileDownloadUtils';
+import * as ImageCacheUtils from '@app/features/messaging/utils/ImageCacheUtils';
 import {getEmbedMediaDimensions} from '@app/features/messaging/utils/MediaDimensionConfig';
+import {resolveProxyRequestSize} from '@app/features/messaging/utils/MediaProxyRequestSize';
 import {
 	buildFittedAnimatedImageProxyURL,
 	buildFittedStaticGifPreviewURL,
-	buildMediaProxyURL,
 	stripMediaProxyParams,
 } from '@app/features/messaging/utils/MediaProxyUtils';
+import {decodeThumbHashDataURL} from '@app/features/messaging/utils/ThumbHashUtils';
 import {remFromPx} from '@app/features/theme/layout/RemFromPx';
 import {MediaContextMenu} from '@app/features/ui/action_menu/MediaContextMenu';
 import * as ContextMenuCommands from '@app/features/ui/commands/ContextMenuCommands';
 import * as MediaViewerCommands from '@app/features/ui/commands/MediaViewerCommands';
-import MediaViewer from '@app/features/ui/state/MediaViewer';
-import MobileLayout from '@app/features/ui/state/MobileLayout';
+import MediaViewer, {type MediaViewerItem} from '@app/features/ui/state/MediaViewer';
 import {createCalculator} from '@app/features/ui/utils/DimensionUtils';
-import KlipyWatermarkSvg from '@app/media/images/klipy-watermark.svg?react';
 import {msg} from '@lingui/core/macro';
 import {useLingui} from '@lingui/react/macro';
 import {clsx} from 'clsx';
-import {motion} from 'framer-motion';
 import {observer} from 'mobx-react-lite';
-import {type FC, useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {type FC, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 
 const OPEN_ANIMATED_GIF_VIDEO_IN_FULL_VIEW_DESCRIPTOR = msg({
 	message: 'Open animated GIF video in full view',
@@ -63,10 +60,6 @@ const OPEN_IMAGE_IN_FULL_VIEW_DESCRIPTOR = msg({
 	message: 'Open image in full view',
 	comment: 'Button or menu action label in the channel and chat embed gifv. Keep it concise.',
 });
-const LOADING_PLACEHOLDER_DESCRIPTOR = msg({
-	message: 'Loading placeholder',
-	comment: 'Placeholder text in the channel and chat embed gifv. Keep it concise.',
-});
 const ANIMATED_GIF_VIDEO_DESCRIPTOR = msg({
 	message: 'Animated GIF video',
 	comment: 'Short label in the channel and chat embed gifv. Keep it concise.',
@@ -75,14 +68,14 @@ const ANIMATED_GIF_DESCRIPTOR = msg({
 	message: 'Animated GIF',
 	comment: 'Short label in the channel and chat embed gifv. Keep it concise.',
 });
-const EMBED_MEDIA_FADE_DURATION_SECONDS = 0.08;
-const DECODER_MAX_CACHED_FRAMES = 24;
+const PLACEHOLDER_FAST_FADE_WINDOW_MS = 200;
 
 type GifvEmbedProps = BaseMediaProps & {
 	embedURL: string;
 	naturalWidth: number;
 	naturalHeight: number;
 	placeholder?: string;
+	thumbnailProxyURL?: string;
 	alt?: string | null;
 };
 
@@ -110,6 +103,70 @@ function useEmbedMediaCalculator(constraints?: {maxWidth: number; maxHeight: num
 	);
 }
 
+function useAspectRatioStyle(width: number, height: number): React.CSSProperties | undefined {
+	return useMemo(() => {
+		if (width <= 0 || height <= 0) return undefined;
+		return {aspectRatio: `${width} / ${height}`};
+	}, [height, width]);
+}
+
+function useMediaSurfaceInteraction(container: HTMLDivElement | null): {
+	isPointerInside: boolean;
+	hasFocusInside: boolean;
+} {
+	const [isPointerInside, setIsPointerInside] = useState(false);
+	const [hasFocusInside, setHasFocusInside] = useState(false);
+	useEffect(() => {
+		if (container == null) return;
+		const handleMouseEnter = () => setIsPointerInside(true);
+		const handleMouseLeave = () => setIsPointerInside(false);
+		const handleFocusIn = () => setHasFocusInside(true);
+		const handleFocusOut = (event: FocusEvent) => {
+			const nextTarget = event.relatedTarget;
+			if (nextTarget != null && container.contains(nextTarget as Node)) return;
+			setHasFocusInside(false);
+		};
+		container.addEventListener('mouseenter', handleMouseEnter);
+		container.addEventListener('mouseleave', handleMouseLeave);
+		container.addEventListener('focusin', handleFocusIn);
+		container.addEventListener('focusout', handleFocusOut);
+		return () => {
+			container.removeEventListener('mouseenter', handleMouseEnter);
+			container.removeEventListener('mouseleave', handleMouseLeave);
+			container.removeEventListener('focusin', handleFocusIn);
+			container.removeEventListener('focusout', handleFocusOut);
+		};
+	}, [container]);
+	return {isPointerInside, hasFocusInside};
+}
+
+interface ThumbHashCurtainState {
+	shouldMount: boolean;
+	curtainLifted: boolean;
+	fastFade: boolean;
+	posterRevealed: boolean;
+}
+
+function useThumbHashCurtain(source: string, enabled: boolean): ThumbHashCurtainState {
+	const [mountedAt] = useState(() => Date.now());
+	const [cachedAtMount] = useState(() => ImageCacheUtils.hasImage(source));
+	const [curtainLifted, setCurtainLifted] = useState(false);
+	const [fastFade, setFastFade] = useState(false);
+	useLayoutEffect(() => {
+		if (!enabled || source.length === 0) return;
+		return ImageCacheUtils.loadImage(source, () => {
+			setFastFade(Date.now() - mountedAt < PLACEHOLDER_FAST_FADE_WINDOW_MS);
+			setCurtainLifted(true);
+		});
+	}, [enabled, mountedAt, source]);
+	return {
+		shouldMount: !cachedAtMount,
+		curtainLifted,
+		fastFade,
+		posterRevealed: source.length === 0 || cachedAtMount || curtainLifted,
+	};
+}
+
 const useImagePreview = ({
 	proxyUrl,
 	embedUrl,
@@ -124,6 +181,7 @@ const useImagePreview = ({
 	message,
 	sourceChannel,
 	providerName,
+	allowAttachmentDelete = false,
 }: {
 	proxyUrl: string;
 	embedUrl: string;
@@ -138,54 +196,41 @@ const useImagePreview = ({
 	message?: Message;
 	sourceChannel?: Channel | null;
 	providerName?: string;
-}) => {
-	return useCallback(
+	allowAttachmentDelete?: boolean;
+}): {viewerItem: MediaViewerItem; openPreview: (event: React.MouseEvent | React.KeyboardEvent) => void} => {
+	const viewerItem = useMemo<MediaViewerItem>(
+		() => ({
+			src: proxyUrl,
+			originalSrc: embedUrl,
+			naturalWidth,
+			naturalHeight,
+			type,
+			contentHash,
+			attachmentId,
+			embedIndex,
+			animated: true,
+			providerName,
+		}),
+		[proxyUrl, embedUrl, naturalWidth, naturalHeight, type, contentHash, attachmentId, embedIndex, providerName],
+	);
+	const openPreview = useCallback(
 		(event: React.MouseEvent | React.KeyboardEvent) => {
 			if (event.type === 'click' && (event as React.MouseEvent).button !== 0) {
 				return;
 			}
 			event.preventDefault();
 			event.stopPropagation();
-			MediaViewerCommands.openMediaViewer(
-				[
-					{
-						src: proxyUrl,
-						originalSrc: embedUrl,
-						naturalWidth,
-						naturalHeight,
-						type,
-						contentHash,
-						attachmentId,
-						embedIndex,
-						animated: true,
-						providerName,
-					},
-				],
-				0,
-				{
-					channelId,
-					messageId,
-					message,
-					sourceChannel,
-				},
-			);
+			MediaViewerCommands.openMediaViewer([viewerItem], 0, {
+				channelId,
+				messageId,
+				message,
+				sourceChannel,
+				allowAttachmentDelete,
+			});
 		},
-		[
-			proxyUrl,
-			embedUrl,
-			naturalWidth,
-			naturalHeight,
-			type,
-			channelId,
-			messageId,
-			attachmentId,
-			embedIndex,
-			contentHash,
-			message,
-			sourceChannel,
-			providerName,
-		],
+		[viewerItem, channelId, messageId, message, sourceChannel, allowAttachmentDelete],
 	);
+	return {viewerItem, openPreview};
 };
 
 interface ImagePreviewHandlerProps {
@@ -202,6 +247,8 @@ interface ImagePreviewHandlerProps {
 	contentHash?: string | null;
 	message?: Message;
 	sourceChannel?: Channel | null;
+	onViewerWarmEnter?: () => void;
+	onViewerWarmLeave?: () => void;
 	children: React.ReactNode;
 }
 
@@ -220,6 +267,8 @@ const ImagePreviewHandler: FC<ImagePreviewHandlerProps> = observer(
 		contentHash,
 		message,
 		sourceChannel,
+		onViewerWarmEnter,
+		onViewerWarmLeave,
 		children,
 	}) => {
 		const {i18n} = useLingui();
@@ -296,6 +345,8 @@ const ImagePreviewHandler: FC<ImagePreviewHandlerProps> = observer(
 				onMouseDown={openInBrowser.onMouseDown}
 				onAuxClick={openInBrowser.onAuxClick}
 				onKeyDown={openImagePreview}
+				onMouseEnter={onViewerWarmEnter}
+				onMouseLeave={onViewerWarmLeave}
 				data-flx="channel.embeds.media.embed-gifv.image-preview-handler.image-preview-handler.open-image-preview.button"
 			>
 				{children}
@@ -316,6 +367,7 @@ export const EmbedGifv: FC<
 	({
 		embedURL,
 		videoProxyURL,
+		thumbnailProxyURL,
 		alt,
 		naturalWidth,
 		naturalHeight,
@@ -337,36 +389,39 @@ export const EmbedGifv: FC<
 		const messageViewContext = useMaybeMessageViewContext();
 		const mediaCalculator = useEmbedMediaCalculator();
 		const videoRef = useRef<HTMLVideoElement>(null);
-		const containerRef = useRef<HTMLDivElement>(null);
-		const savedTimeRef = useRef(0);
-		const {ref: visibilityRef, isNearViewport} = useNearViewport<HTMLDivElement>({rememberKey: videoProxyURL});
+		const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null);
+		const {isPointerInside, hasFocusInside} = useMediaSurfaceInteraction(containerElement);
+		const {shouldBlur, gateReason, canReveal, reveal: revealSensitiveMedia} = useMatureMedia(nsfw, channelId);
+		const {
+			ref: visibilityRef,
+			loadMedia: shouldLoadMedia,
+			animate: shouldAnimate,
+		} = useGifViewportGate<HTMLDivElement>({
+			element: containerElement,
+			rememberKey: videoProxyURL,
+			shouldBlur,
+		});
 		const setContainerRef = useCallback(
 			(node: HTMLDivElement | null) => {
-				containerRef.current = node;
+				setContainerElement(node);
 				visibilityRef(node);
 			},
 			[visibilityRef],
 		);
-		const {shouldBlur, gateReason, canReveal, reveal: revealSensitiveMedia} = useMatureMedia(nsfw, channelId);
-		const shouldLoadMedia = isNearViewport && !shouldBlur;
-		const posterURL = useMemo(() => buildMediaProxyURL(videoProxyURL, {format: 'webp'}), [videoProxyURL]);
-		const {
-			loaded,
-			error,
-			cached,
-			cachedOnMount,
-			thumbHashURL,
-			ref: mediaRef,
-			onLoad: handleMediaLoad,
-			onError: handleMediaError,
-		} = useMediaLoading(videoProxyURL, placeholder, {enabled: shouldLoadMedia});
-		const setVideoRef = useCallback(
-			(node: HTMLVideoElement | null) => {
-				videoRef.current = node;
-				mediaRef(node);
-			},
-			[mediaRef],
-		);
+		const {dimensions} = mediaCalculator.calculate({width: naturalWidth, height: naturalHeight});
+		const canPlayInline = isInlinePlayableVideoSize({width: naturalWidth, height: naturalHeight});
+		const posterSource = thumbnailProxyURL && thumbnailProxyURL.length > 0 ? thumbnailProxyURL : videoProxyURL;
+		const posterURL = useMemo(() => {
+			const requestedSize = resolveProxyRequestSize(dimensions.width, dimensions.height, naturalWidth, naturalHeight);
+			return buildFittedStaticGifPreviewURL(
+				stripMediaProxyParams(posterSource),
+				requestedSize?.width,
+				requestedSize?.height,
+			);
+		}, [dimensions.width, naturalHeight, naturalWidth, posterSource]);
+		const thumbHashURL = useMemo(() => decodeThumbHashDataURL(placeholder), [placeholder]);
+		const thumbHashCurtain = useThumbHashCurtain(posterURL, shouldLoadMedia);
+		const aspectRatioStyle = useAspectRatioStyle(dimensions.width, dimensions.height);
 		const defaultName = deriveDefaultNameFromMessage({
 			message,
 			attachmentId,
@@ -388,10 +443,14 @@ export const EmbedGifv: FC<
 			naturalWidth,
 			naturalHeight,
 		});
-		const gifAutoPlay = useShouldAnimate({kind: 'gif', respectPlaybackAllowed: false});
+		const animationPolicyAllowed = useShouldAnimate({
+			kind: 'gif',
+			isHovering: isPointerInside,
+			isFocused: hasFocusInside,
+		});
 		const animatedMediaPlaybackAllowed = useAnimatedMediaPlaybackAllowed();
 		const isMediaViewerOpen = MediaViewer.isOpen;
-		const openImagePreview = useImagePreview({
+		const {openPreview: openImagePreview} = useImagePreview({
 			proxyUrl: videoProxyURL,
 			embedUrl: embedURL,
 			naturalWidth,
@@ -405,6 +464,7 @@ export const EmbedGifv: FC<
 			message,
 			sourceChannel: messageViewContext?.channel,
 			providerName,
+			allowAttachmentDelete: !isPreview && snapshotIndex === undefined,
 		});
 		const handleDeleteClick = useDeleteAttachment(message, attachmentId);
 		const handleDownloadClick = useCallback(
@@ -456,95 +516,29 @@ export const EmbedGifv: FC<
 				snapshotIndex,
 			],
 		);
+		const shouldPlay =
+			shouldAnimate &&
+			animationPolicyAllowed &&
+			animatedMediaPlaybackAllowed &&
+			!isMediaViewerOpen &&
+			thumbHashCurtain.posterRevealed;
 		useEffect(() => {
 			const video = videoRef.current;
-			if (!video) return;
-			const handlePlaying = () => {
-				if (video.hasAttribute('poster')) {
-					video.removeAttribute('poster');
-				}
-			};
-			video.addEventListener('playing', handlePlaying);
-			return () => {
-				video.removeEventListener('playing', handlePlaying);
-			};
-		}, []);
-		useEffect(() => {
-			const video = videoRef.current;
-			if (!video) return;
-			if (!shouldLoadMedia) {
-				video.autoplay = false;
-				safePause(video);
-				return;
-			}
-			if (isMediaViewerOpen) {
-				video.autoplay = false;
-				safePause(video);
-				return;
-			}
-			const shouldPlay = gifAutoPlay && animatedMediaPlaybackAllowed;
+			if (video == null) return;
 			if (shouldPlay) {
 				video.autoplay = true;
 				void safePlay(video);
-			} else {
-				video.autoplay = false;
-				safePause(video);
+				return;
 			}
-		}, [animatedMediaPlaybackAllowed, videoConfig, gifAutoPlay, isMediaViewerOpen, shouldLoadMedia]);
-		useEffect(() => {
-			if (!shouldLoadMedia || gifAutoPlay || isMediaViewerOpen) return;
-			const video = videoRef.current;
-			const container = containerRef.current;
-			if (!video || !container) return;
-			let isHovered = false;
-			const handleMouseEnter = () => {
-				isHovered = true;
-				if (!getAnimatedMediaPlaybackAllowed()) return;
-				const target = savedTimeRef.current;
-				if (Number.isFinite(target) && Math.abs(video.currentTime - target) > 0.01) {
-					try {
-						video.currentTime = target;
-					} catch {}
-				}
-				void safePlay(video);
-			};
-			const handleMouseLeave = () => {
-				isHovered = false;
-				if (Number.isFinite(video.currentTime)) {
-					savedTimeRef.current = video.currentTime;
-				}
-				safePause(video);
-			};
-			const handlePlaybackAllowedChange = () => {
-				if (getAnimatedMediaPlaybackAllowed()) {
-					if (!isHovered) return;
-					const target = savedTimeRef.current;
-					if (Number.isFinite(target) && Math.abs(video.currentTime - target) > 0.01) {
-						try {
-							video.currentTime = target;
-						} catch {}
-					}
-					void safePlay(video);
-					return;
-				}
-				if (Number.isFinite(video.currentTime)) {
-					savedTimeRef.current = video.currentTime;
-				}
-				safePause(video);
-			};
-			container.addEventListener('mouseenter', handleMouseEnter);
-			container.addEventListener('mouseleave', handleMouseLeave);
-			const unsubscribe = subscribeAnimatedMediaPlaybackChange(handlePlaybackAllowedChange);
-			return () => {
-				container.removeEventListener('mouseenter', handleMouseEnter);
-				container.removeEventListener('mouseleave', handleMouseLeave);
-				unsubscribe();
-			};
-		}, [gifAutoPlay, isMediaViewerOpen, shouldLoadMedia]);
+			video.autoplay = false;
+			safePause(video);
+		}, [shouldPlay]);
 		if (shouldBlur) {
-			const {style} = mediaCalculator.calculate({width: naturalWidth, height: naturalHeight}, {forceScale: true});
-			const {width: _width, height: _height, ...styleWithoutDimensions} = style;
-			const blurContainerStyle = {...styleWithoutDimensions, maxWidth: '100%', width: '100%'};
+			const blurContainerStyle: React.CSSProperties = {
+				maxWidth: '100%',
+				width: remFromPx(dimensions.width),
+				...aspectRatioStyle,
+			};
 			return (
 				<div
 					ref={visibilityRef}
@@ -562,6 +556,7 @@ export const EmbedGifv: FC<
 									src={thumbHashURL}
 									className={styles.thumbHashPlaceholder}
 									alt=""
+									aria-hidden={true}
 									style={{filter: 'blur(40px)'}}
 									data-flx="channel.embeds.media.embed-gifv.thumb-hash-placeholder"
 								/>
@@ -577,31 +572,18 @@ export const EmbedGifv: FC<
 				</div>
 			);
 		}
-		const {style, dimensions} = mediaCalculator.calculate(
-			{width: naturalWidth, height: naturalHeight},
-			{forceScale: true},
+		const {showFavoriteButton, showDeleteButton} = getMediaButtonVisibility(
+			canFavorite,
+			isPreview ? undefined : message,
+			attachmentId,
+			{disableDelete: !!isPreview || snapshotIndex !== undefined},
 		);
-		const {
-			showFavoriteButton,
-			showDownloadButton: _showDownloadButton,
-			showDeleteButton,
-		} = getMediaButtonVisibility(canFavorite, isPreview ? undefined : message, attachmentId, {
-			disableDelete: !!isPreview || snapshotIndex !== undefined,
-		});
-		const showDownloadButton = false;
 		const showGifIndicator = Accessibility.showGifIndicator && shouldShowOverlays(dimensions.width, dimensions.height);
-		const {width} = style;
-		const aspectRatio =
-			dimensions.width > 0 && dimensions.height > 0 ? `${dimensions.width} / ${dimensions.height}` : '';
-		const containerStyle = {
-			'--embed-aspect-ratio': aspectRatio || 'auto',
-			'--embed-height': remFromPx(dimensions.height),
-			'--embed-width': typeof width === 'number' ? remFromPx(width) : remFromPx(dimensions.width),
+		const containerStyle: React.CSSProperties = {
 			maxWidth: '100%',
 			width: remFromPx(dimensions.width),
-			...(aspectRatio ? {aspectRatio} : {}),
-		} as React.CSSProperties;
-		const effectivePreload = shouldLoadMedia ? (videoConfig?.preload ?? (gifAutoPlay ? 'auto' : 'metadata')) : 'none';
+			...aspectRatioStyle,
+		};
 		return (
 			<MediaContainer
 				ref={setContainerRef}
@@ -610,7 +592,7 @@ export const EmbedGifv: FC<
 				showFavoriteButton={showFavoriteButton}
 				isFavorited={isFavorited}
 				onFavoriteClick={toggleFavorite}
-				showDownloadButton={showDownloadButton}
+				showDownloadButton={false}
 				onDownloadClick={handleDownloadClick}
 				showDeleteButton={showDeleteButton}
 				onDeleteClick={handleDeleteClick}
@@ -621,11 +603,6 @@ export const EmbedGifv: FC<
 				data-flx="channel.embeds.media.embed-gifv.media-container.context-menu"
 			>
 				{showGifIndicator && <GifIndicator data-flx="channel.embeds.media.embed-gifv.gif-indicator" />}
-				{providerName === 'KLIPY' && (
-					<div className={styles.klipyWatermark} data-flx="channel.embeds.media.embed-gifv.klipy-watermark">
-						<KlipyWatermarkSvg data-flx="channel.embeds.media.embed-gifv.klipy-watermark-svg" />
-					</div>
-				)}
 				<ImagePreviewHandler
 					src={videoProxyURL}
 					originalSrc={embedURL}
@@ -635,40 +612,55 @@ export const EmbedGifv: FC<
 					handlePress={openImagePreview}
 					data-flx="channel.embeds.media.embed-gifv.image-preview-handler.gifv"
 				>
-					<div className={styles.videoWrapper} data-flx="channel.embeds.media.embed-gifv.video-wrapper">
-						{(!loaded || error) && thumbHashURL && (
+					<div
+						className={styles.videoWrapper}
+						style={aspectRatioStyle}
+						data-flx="channel.embeds.media.embed-gifv.video-wrapper"
+					>
+						{canPlayInline ? (
+							<video
+								ref={videoRef}
+								className={styles.videoElement}
+								src={shouldLoadMedia ? videoProxyURL : undefined}
+								poster={shouldLoadMedia ? posterURL : thumbHashURL}
+								preload={videoConfig?.preload ?? 'none'}
+								loop={videoConfig?.loop ?? true}
+								muted={videoConfig?.muted ?? true}
+								playsInline={videoConfig?.playsInline ?? true}
+								controls={videoConfig?.controls ?? false}
+								width={dimensions.width}
+								height={dimensions.height}
+								tabIndex={-1}
+								aria-label={i18n._(ANIMATED_GIF_VIDEO_DESCRIPTOR)}
+								data-embed-media="gifv"
+								data-flx="channel.embeds.media.embed-gifv.video-element"
+							/>
+						) : (
 							<img
-								src={thumbHashURL}
-								className={styles.thumbHashPlaceholder}
-								alt={i18n._(LOADING_PLACEHOLDER_DESCRIPTOR)}
-								data-flx="channel.embeds.media.embed-gifv.thumb-hash-placeholder--2"
+								className={styles.videoElement}
+								src={shouldLoadMedia ? posterURL : thumbHashURL}
+								alt=""
+								width={dimensions.width}
+								height={dimensions.height}
+								loading="eager"
+								tabIndex={-1}
+								data-embed-media="gifv-still"
+								data-flx="channel.embeds.media.embed-gifv.still-element"
 							/>
 						)}
-						<motion.video
-							className={styles.videoElement}
-							controls={videoConfig?.controls ?? false}
-							playsInline={videoConfig?.playsInline ?? true}
-							loop={videoConfig?.loop ?? true}
-							muted={videoConfig?.muted ?? true}
-							poster={shouldLoadMedia ? posterURL : thumbHashURL}
-							preload={effectivePreload}
-							src={shouldLoadMedia ? videoProxyURL : undefined}
-							ref={setVideoRef}
-							aria-label={i18n._(ANIMATED_GIF_VIDEO_DESCRIPTOR)}
-							data-embed-media="gifv"
-							tabIndex={-1}
-							width={dimensions.width}
-							height={dimensions.height}
-							onLoadedData={handleMediaLoad}
-							onError={handleMediaError}
-							initial={{opacity: cached || cachedOnMount ? 1 : 0}}
-							animate={{opacity: !loaded && !error ? 0 : 1}}
-							transition={{
-								duration:
-									cached || cachedOnMount || Accessibility.useReducedMotion ? 0 : EMBED_MEDIA_FADE_DURATION_SECONDS,
-							}}
-							data-flx="channel.embeds.media.embed-gifv.video-element"
-						/>
+						{thumbHashCurtain.shouldMount && thumbHashURL && (
+							<img
+								src={thumbHashURL}
+								className={clsx(
+									styles.placeholder,
+									thumbHashCurtain.curtainLifted ? styles.placeholderHidden : styles.placeholderVisible,
+									thumbHashCurtain.fastFade && styles.placeholderFastFade,
+								)}
+								alt=""
+								aria-hidden="true"
+								data-flx="channel.embeds.media.embed-gifv.image-placeholder"
+							/>
+						)}
 					</div>
 				</ImagePreviewHandler>
 				<AltTextBadge
@@ -710,78 +702,72 @@ export const EmbedGif: FC<
 	}) => {
 		const {i18n} = useLingui();
 		const messageViewContext = useMaybeMessageViewContext();
-		const isMobile = MobileLayout.enabled;
 		const mediaCalculator = useEmbedMediaCalculator(layoutConstraints);
-		const containerRef = useRef<HTMLDivElement>(null);
-		const imgRef = useRef<HTMLImageElement>(null);
-		const freezeCanvasRef = useRef<HTMLCanvasElement>(null);
-		const {ref: visibilityRef, isNearViewport} = useNearViewport<HTMLDivElement>({
-			disabled: !isMobile,
+		const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null);
+		const {isPointerInside, hasFocusInside} = useMediaSurfaceInteraction(containerElement);
+		const {shouldBlur, gateReason, canReveal, reveal: revealSensitiveMedia} = useMatureMedia(nsfw, channelId);
+		const {
+			ref: visibilityRef,
+			loadMedia: shouldLoadMedia,
+			animate: shouldAnimate,
+		} = useGifViewportGate<HTMLDivElement>({
+			element: containerElement,
 			rememberKey: proxyURL,
+			shouldBlur,
 		});
 		const setContainerRef = useCallback(
 			(node: HTMLDivElement | null) => {
-				containerRef.current = node;
+				setContainerElement(node);
 				visibilityRef(node);
 			},
 			[visibilityRef],
 		);
-		const {dimensions} = mediaCalculator.calculate({width: naturalWidth, height: naturalHeight}, {forceScale: true});
+		const {dimensions} = mediaCalculator.calculate({width: naturalWidth, height: naturalHeight});
 		const {width: displayWidth, height: displayHeight} = dimensions;
-		const gifAutoPlay = useShouldAnimate({kind: 'gif', respectPlaybackAllowed: false});
-		const animatedMediaPlaybackAllowed = useAnimatedMediaPlaybackAllowed();
+		const gifAutoPlay = useShouldAnimate({kind: 'gif'});
+		const animationPolicyAllowed = useShouldAnimate({
+			kind: 'gif',
+			isHovering: isPointerInside,
+			isFocused: hasFocusInside,
+		});
 		const baseProxyURL = stripMediaProxyParams(proxyURL);
-		const animatedTargetWidth = Math.min(naturalWidth, Math.round(displayWidth * 2));
-		const animatedTargetHeight = Math.min(naturalHeight, Math.round(displayHeight * 2));
-		const shouldResizeAnimated = animatedTargetWidth < naturalWidth || animatedTargetHeight < naturalHeight;
+		const requestedSize = resolveProxyRequestSize(displayWidth, displayHeight, naturalWidth, naturalHeight);
 		const optimizedAnimatedURL = buildFittedAnimatedImageProxyURL(
 			baseProxyURL,
-			shouldResizeAnimated ? animatedTargetWidth : undefined,
-			shouldResizeAnimated ? animatedTargetHeight : undefined,
+			requestedSize?.width,
+			requestedSize?.height,
 		);
 		const optimizedStaticURL = buildFittedStaticGifPreviewURL(
 			baseProxyURL,
-			Math.round(displayWidth * 2),
-			Math.round(displayHeight * 2),
+			requestedSize?.width,
+			requestedSize?.height,
 		);
-		const {shouldBlur, gateReason, canReveal, reveal: revealSensitiveMedia} = useMatureMedia(nsfw, channelId);
-		const shouldLoadMedia = isNearViewport && !shouldBlur;
+		const shouldShowAnimated = shouldAnimate && animationPolicyAllowed;
+		const activeSource = shouldShowAnimated ? optimizedAnimatedURL : optimizedStaticURL;
 		const {
 			loaded,
-			error,
-			cached,
 			cachedOnMount,
 			thumbHashURL,
 			ref: mediaRef,
 			onLoad: handleImageLoad,
 			onError: handleImageError,
-		} = useMediaLoading(optimizedStaticURL, placeholder, {
-			enabled: shouldLoadMedia,
-		});
-		const setImgRef = useCallback(
-			(node: HTMLImageElement | null) => {
-				imgRef.current = node;
-				mediaRef(node);
-			},
-			[mediaRef],
-		);
-		const [decoderCanvas, setDecoderCanvas] = useState<HTMLCanvasElement | null>(null);
-		const isHoveredRef = useRef(false);
-		const [hasStartedAnimating, setHasStartedAnimating] = useState(gifAutoPlay);
-		const [isHoveredState, setIsHoveredState] = useState(false);
-		const [decoderRequested, setDecoderRequested] = useState(() => getAnimatedMediaPlaybackAllowed());
-		const shouldUseDecoder = shouldLoadMedia && hasStartedAnimating;
-		const decoderPlaying =
-			shouldUseDecoder && decoderRequested && animatedMediaPlaybackAllowed && (gifAutoPlay || isHoveredState);
-		const decoderState = useAnimatedImageDecoder({
-			src: shouldUseDecoder && decoderRequested ? optimizedAnimatedURL : null,
-			playing: decoderPlaying,
-			canvas: decoderCanvas,
-			maxCachedFrames: DECODER_MAX_CACHED_FRAMES,
-		});
-		const useDecoder =
-			shouldUseDecoder && decoderRequested && decoderState.supported && hasStartedAnimating && !decoderState.error;
-		const shouldRenderFreezeFrame = !useDecoder && (gifAutoPlay || hasStartedAnimating);
+		} = useMediaLoading(activeSource, placeholder, {enabled: shouldLoadMedia});
+		const [mountedAt] = useState(() => Date.now());
+		const [placeholderMounted] = useState(!cachedOnMount);
+		const [placeholderHidden, setPlaceholderHidden] = useState(loaded);
+		const [placeholderFastFade, setPlaceholderFastFade] = useState(false);
+		const aspectRatioStyle = useAspectRatioStyle(dimensions.width, dimensions.height);
+		useEffect(() => {
+			if (!loaded) return;
+			setPlaceholderFastFade(Date.now() - mountedAt < PLACEHOLDER_FAST_FADE_WINDOW_MS);
+			setPlaceholderHidden(true);
+		}, [loaded, mountedAt]);
+		useEffect(() => {
+			if (!shouldLoadMedia) return;
+			if (!animationPolicyAllowed) return;
+			if (activeSource === optimizedAnimatedURL) return;
+			return ImageCacheUtils.pinImage(optimizedAnimatedURL);
+		}, [activeSource, animationPolicyAllowed, optimizedAnimatedURL, shouldLoadMedia]);
 		const defaultName = deriveDefaultNameFromMessage({
 			message,
 			attachmentId,
@@ -803,7 +789,7 @@ export const EmbedGif: FC<
 			naturalWidth,
 			naturalHeight,
 		});
-		const openImagePreview = useImagePreview({
+		const {viewerItem, openPreview: openImagePreview} = useImagePreview({
 			proxyUrl: optimizedAnimatedURL,
 			embedUrl: embedURL,
 			naturalWidth,
@@ -816,6 +802,11 @@ export const EmbedGif: FC<
 			contentHash,
 			message,
 			sourceChannel: messageViewContext?.channel,
+			allowAttachmentDelete: !isPreview && snapshotIndex === undefined,
+		});
+		const {scheduleViewerWarm, cancelViewerWarm} = useMediaViewerHoverWarm(viewerItem, {
+			allowAnimated: gifAutoPlay,
+			enabled: !shouldBlur,
 		});
 		const handleDeleteClick = useDeleteAttachment(message, attachmentId);
 		const handleDownloadClickGif = useCallback(
@@ -867,117 +858,12 @@ export const EmbedGif: FC<
 				snapshotIndex,
 			],
 		);
-		useEffect(() => {
-			if (gifAutoPlay) setHasStartedAnimating(true);
-		}, [gifAutoPlay]);
-		useEffect(() => {
-			if (!shouldUseDecoder) {
-				setDecoderRequested(false);
-				return;
-			}
-			if (animatedMediaPlaybackAllowed) {
-				setDecoderRequested(true);
-			}
-		}, [animatedMediaPlaybackAllowed, shouldUseDecoder]);
-		useEffect(() => {
-			if (!shouldLoadMedia || gifAutoPlay || !animatedMediaPlaybackAllowed) return;
-			if (!optimizedAnimatedURL) return;
-			const preloader = new Image();
-			preloader.src = optimizedAnimatedURL;
-		}, [animatedMediaPlaybackAllowed, gifAutoPlay, optimizedAnimatedURL, shouldLoadMedia]);
-		const showFreezeFrame = useCallback(() => {
-			const img = imgRef.current;
-			const canvas = freezeCanvasRef.current;
-			if (!img || !canvas) return;
-			const sourceWidth = img.naturalWidth || img.width;
-			const sourceHeight = img.naturalHeight || img.height;
-			if (sourceWidth === 0 || sourceHeight === 0) return;
-			if (canvas.width !== sourceWidth) canvas.width = sourceWidth;
-			if (canvas.height !== sourceHeight) canvas.height = sourceHeight;
-			const ctx = canvas.getContext('2d');
-			if (!ctx) return;
-			try {
-				ctx.clearRect(0, 0, sourceWidth, sourceHeight);
-				ctx.drawImage(img, 0, 0, sourceWidth, sourceHeight);
-			} catch {
-				return;
-			}
-			canvas.dataset.frozen = 'true';
-		}, []);
-		const hideFreezeFrame = useCallback(() => {
-			const canvas = freezeCanvasRef.current;
-			if (!canvas) return;
-			canvas.dataset.frozen = 'false';
-		}, []);
-		useEffect(() => {
-			if (!shouldLoadMedia || gifAutoPlay) return;
-			const container = containerRef.current;
-			if (!container) return;
-			const handleMouseEnter = () => {
-				isHoveredRef.current = true;
-				setIsHoveredState(true);
-				if (!getAnimatedMediaPlaybackAllowed()) return;
-				if (!hasStartedAnimating) {
-					setHasStartedAnimating(true);
-				}
-				hideFreezeFrame();
-			};
-			const handleMouseLeave = () => {
-				isHoveredRef.current = false;
-				setIsHoveredState(false);
-				if (!hasStartedAnimating) return;
-				showFreezeFrame();
-			};
-			container.addEventListener('mouseenter', handleMouseEnter);
-			container.addEventListener('mouseleave', handleMouseLeave);
-			return () => {
-				container.removeEventListener('mouseenter', handleMouseEnter);
-				container.removeEventListener('mouseleave', handleMouseLeave);
-			};
-		}, [gifAutoPlay, hasStartedAnimating, hideFreezeFrame, shouldLoadMedia, showFreezeFrame]);
-		useEffect(() => {
-			if (!shouldLoadMedia || gifAutoPlay) return;
-			if (!animatedMediaPlaybackAllowed) {
-				if (isHoveredRef.current && hasStartedAnimating) {
-					showFreezeFrame();
-				}
-				return;
-			}
-			if (isHoveredRef.current) {
-				if (!hasStartedAnimating) {
-					setHasStartedAnimating(true);
-				}
-				hideFreezeFrame();
-			}
-		}, [
-			animatedMediaPlaybackAllowed,
-			gifAutoPlay,
-			hasStartedAnimating,
-			hideFreezeFrame,
-			shouldLoadMedia,
-			showFreezeFrame,
-		]);
-		useEffect(() => {
-			if (!shouldLoadMedia || !shouldRenderFreezeFrame) return;
-			if (!animatedMediaPlaybackAllowed) {
-				showFreezeFrame();
-				return;
-			}
-			if (gifAutoPlay || isHoveredRef.current) {
-				hideFreezeFrame();
-			}
-		}, [
-			animatedMediaPlaybackAllowed,
-			gifAutoPlay,
-			hideFreezeFrame,
-			shouldLoadMedia,
-			shouldRenderFreezeFrame,
-			showFreezeFrame,
-		]);
 		if (shouldBlur) {
-			const {style} = mediaCalculator.calculate({width: naturalWidth, height: naturalHeight}, {forceScale: true});
-			const {width: _width, height: _height, ...styleWithoutDimensions} = style;
-			const blurContainerStyle = {...styleWithoutDimensions, maxWidth: '100%', width: '100%'};
+			const blurContainerStyle: React.CSSProperties = {
+				maxWidth: '100%',
+				width: remFromPx(dimensions.width),
+				...aspectRatioStyle,
+			};
 			return (
 				<div
 					ref={visibilityRef}
@@ -998,6 +884,7 @@ export const EmbedGif: FC<
 									src={thumbHashURL}
 									className={styles.thumbHashPlaceholder}
 									alt=""
+									aria-hidden={true}
 									style={{filter: 'blur(40px)'}}
 									data-flx="channel.embeds.media.embed-gifv.embed-gif.thumb-hash-placeholder"
 								/>
@@ -1013,36 +900,18 @@ export const EmbedGif: FC<
 				</div>
 			);
 		}
-		const {style, dimensions: renderedDimensions} = mediaCalculator.calculate(
-			{width: naturalWidth, height: naturalHeight},
-			{forceScale: true},
-		);
 		const {showFavoriteButton, showDownloadButton, showDeleteButton} = getMediaButtonVisibility(
 			canFavorite,
 			isPreview ? undefined : message,
 			attachmentId,
 			{disableDelete: !!isPreview || snapshotIndex !== undefined},
 		);
-		const showGifIndicator =
-			Accessibility.showGifIndicator && shouldShowOverlays(renderedDimensions.width, renderedDimensions.height);
-		const {width} = style;
-		const aspectRatio =
-			renderedDimensions.width > 0 && renderedDimensions.height > 0
-				? `${renderedDimensions.width} / ${renderedDimensions.height}`
-				: '';
-		const containerStyle = {
-			'--embed-aspect-ratio': aspectRatio || 'auto',
-			'--embed-height': remFromPx(renderedDimensions.height),
-			'--embed-width': typeof width === 'number' ? remFromPx(width) : remFromPx(renderedDimensions.width),
+		const showGifIndicator = Accessibility.showGifIndicator && shouldShowOverlays(dimensions.width, dimensions.height);
+		const containerStyle: React.CSSProperties = {
 			maxWidth: '100%',
-			width: remFromPx(renderedDimensions.width),
-			...(aspectRatio ? {aspectRatio} : {}),
-		} as React.CSSProperties;
-		const shouldUseAnimatedImage =
-			shouldLoadMedia &&
-			animatedMediaPlaybackAllowed &&
-			!useDecoder &&
-			(gifAutoPlay || (hasStartedAnimating && isHoveredState));
+			width: remFromPx(dimensions.width),
+			...aspectRatioStyle,
+		};
 		return (
 			<MediaContainer
 				ref={setContainerRef}
@@ -1056,8 +925,8 @@ export const EmbedGif: FC<
 				showDeleteButton={showDeleteButton}
 				onDeleteClick={handleDeleteClick}
 				onContextMenu={handleContextMenu}
-				renderedWidth={renderedDimensions.width}
-				renderedHeight={renderedDimensions.height}
+				renderedWidth={dimensions.width}
+				renderedHeight={dimensions.height}
 				forceShowFavoriteButton={true}
 				data-flx="channel.embeds.media.embed-gifv.embed-gif.media-container.context-menu"
 			>
@@ -1076,57 +945,40 @@ export const EmbedGif: FC<
 					contentHash={contentHash}
 					message={message}
 					sourceChannel={messageViewContext?.channel}
+					onViewerWarmEnter={scheduleViewerWarm}
+					onViewerWarmLeave={cancelViewerWarm}
 					data-flx="channel.embeds.media.embed-gifv.embed-gif.image-preview-handler.gif"
 				>
-					<div className={styles.videoWrapper} data-flx="channel.embeds.media.embed-gifv.embed-gif.video-wrapper">
-						{(!loaded || error) && thumbHashURL && (
-							<img
-								src={thumbHashURL}
-								className={styles.thumbHashPlaceholder}
-								alt={i18n._(LOADING_PLACEHOLDER_DESCRIPTOR)}
-								data-flx="channel.embeds.media.embed-gifv.embed-gif.thumb-hash-placeholder--2"
-							/>
-						)}
-						<motion.img
-							ref={setImgRef}
+					<div
+						className={styles.videoWrapper}
+						style={aspectRatioStyle}
+						data-flx="channel.embeds.media.embed-gifv.embed-gif.video-wrapper"
+					>
+						<img
+							ref={mediaRef}
 							alt={i18n._(ANIMATED_GIF_DESCRIPTOR)}
-							src={shouldLoadMedia ? (shouldUseAnimatedImage ? optimizedAnimatedURL : optimizedStaticURL) : undefined}
+							src={shouldLoadMedia ? activeSource : undefined}
 							className={styles.videoElement}
 							data-embed-media="gif"
-							loading={isMobile ? 'lazy' : 'eager'}
+							loading="eager"
 							tabIndex={-1}
-							width={renderedDimensions.width}
-							height={renderedDimensions.height}
+							width={dimensions.width}
+							height={dimensions.height}
 							onLoad={handleImageLoad}
 							onError={handleImageError}
-							initial={{opacity: cached || cachedOnMount ? 1 : 0}}
-							animate={{
-								opacity: (!loaded && !error) || (useDecoder && decoderState.loaded) ? 0 : 1,
-							}}
-							transition={{
-								duration:
-									cached || cachedOnMount || Accessibility.useReducedMotion ? 0 : EMBED_MEDIA_FADE_DURATION_SECONDS,
-							}}
 							data-flx="channel.embeds.media.embed-gifv.embed-gif.video-element"
 						/>
-						<canvas
-							ref={setDecoderCanvas}
-							className={clsx(styles.videoElement, useDecoder ? styles.videoOpacityVisible : styles.videoOpacityHidden)}
-							style={{position: 'absolute', inset: 0, pointerEvents: 'none'}}
-							tabIndex={-1}
-							aria-hidden={useDecoder ? undefined : true}
-							width={renderedDimensions.width}
-							height={renderedDimensions.height}
-							data-flx="channel.embeds.media.embed-gifv.embed-gif.video-element--2"
-						/>
-						{shouldRenderFreezeFrame && (
-							<canvas
-								ref={freezeCanvasRef}
-								className={styles.gifFreezeFrame}
-								data-frozen="false"
-								tabIndex={-1}
+						{placeholderMounted && thumbHashURL && (
+							<img
+								src={thumbHashURL}
+								className={clsx(
+									styles.placeholder,
+									placeholderHidden ? styles.placeholderHidden : styles.placeholderVisible,
+									placeholderFastFade && styles.placeholderFastFade,
+								)}
+								alt=""
 								aria-hidden="true"
-								data-flx="channel.embeds.media.embed-gifv.embed-gif.gif-freeze-frame"
+								data-flx="channel.embeds.media.embed-gifv.embed-gif.image-placeholder"
 							/>
 						)}
 					</div>

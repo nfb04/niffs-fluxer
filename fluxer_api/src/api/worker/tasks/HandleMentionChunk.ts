@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import {createChannelID, createGuildID, createMessageID, createUserID, type UserID} from '@app/api/BrandedTypes';
+import {Logger} from '@app/api/Logger';
+import {mapWithConcurrency} from '@app/api/utils/ConcurrencyUtils';
+import {getWorkerDependencies} from '@app/api/worker/WorkerContext';
 import type {WorkerTaskHandler} from '@pkgs/worker/src/contracts/WorkerTask';
 import {z} from 'zod';
-import {createChannelID, createGuildID, createMessageID, createUserID, type UserID} from '../../BrandedTypes';
-import {Logger} from '../../Logger';
-import {getWorkerDependencies} from '../WorkerContext';
 
+const MENTION_SETTINGS_FETCH_CONCURRENCY = 16;
 const MentionChunkEntrySchema = z.object({
 	userId: z.string(),
 	direct: z.boolean().optional(),
@@ -68,11 +70,14 @@ const handleMentionChunk: WorkerTaskHandler = async (payload, helpers) => {
 		}
 	>();
 	if (guildId != null) {
-		const resolvedSettings = await Promise.all(
-			mentions.map(async (mention) => ({
+		const mentionsNeedingSettings = mentions.filter((mention) => mention.everyone || mention.role);
+		const resolvedSettings = await mapWithConcurrency(
+			mentionsNeedingSettings,
+			MENTION_SETTINGS_FETCH_CONCURRENCY,
+			async (mention) => ({
 				userId: mention.userId,
 				settings: await userRepository.findGuildSettings(mention.userId, guildId),
-			})),
+			}),
 		);
 		for (const {userId, settings: userSettings} of resolvedSettings) {
 			settingsByUserId.set(userId.toString(), {

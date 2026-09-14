@@ -4,6 +4,7 @@ import {APIErrorCodes} from '@fluxer/constants/src/ApiErrorCodes';
 import {Locales} from '@fluxer/constants/src/Locales';
 import {OAuth2Error} from '@fluxer/errors/src/domains/auth/OAuth2Error';
 import {
+	getApiErrorCodeForStatus,
 	getErrorRecord,
 	hasApiErrorCode,
 	resolveApiErrorCode,
@@ -202,20 +203,6 @@ function handleKnownErrorCode<E extends BaseHonoEnv>(err: unknown, errorCode: st
 	});
 }
 
-const HTTP_STATUS_TO_ERROR_CODE: Partial<Record<number, string>> = {
-	400: APIErrorCodes.BAD_REQUEST,
-	403: APIErrorCodes.FORBIDDEN,
-	404: APIErrorCodes.NOT_FOUND,
-	405: APIErrorCodes.METHOD_NOT_ALLOWED,
-	409: APIErrorCodes.CONFLICT,
-	410: APIErrorCodes.GONE,
-	500: APIErrorCodes.INTERNAL_SERVER_ERROR,
-	501: APIErrorCodes.NOT_IMPLEMENTED,
-	502: APIErrorCodes.BAD_GATEWAY,
-	503: APIErrorCodes.SERVICE_UNAVAILABLE,
-	504: APIErrorCodes.GATEWAY_TIMEOUT,
-};
-
 function handleHTTPException<E extends BaseHonoEnv>(err: HTTPException, ctx: Context<E>): Response {
 	const errorRecord = getErrorRecord(err);
 	if (errorRecord && typeof errorRecord.code === 'string' && hasApiErrorCode(errorRecord.code)) {
@@ -235,7 +222,7 @@ function handleHTTPException<E extends BaseHonoEnv>(err: HTTPException, ctx: Con
 			headers: resolveErrorHeaders(err),
 		});
 	}
-	const code = HTTP_STATUS_TO_ERROR_CODE[err.status] ?? APIErrorCodes.GENERAL_ERROR;
+	const code = getApiErrorCodeForStatus(err.status);
 	const {errorI18nService, locale} = getI18nContext(ctx);
 	const resolvedMessage = resolveLocalizedMessage(errorI18nService, code, locale, undefined, err.message);
 	return createJsonErrorResponse({
@@ -256,33 +243,65 @@ function handleUnexpectedError<E extends BaseHonoEnv>(ctx: Context<E>): Response
 	});
 }
 
+interface ResolvedErrorResponse {
+	response: Response;
+	unexpected: boolean;
+}
+
+function resolveErrorResponse<E extends BaseHonoEnv>(err: Error, ctx: Context<E>): ResolvedErrorResponse {
+	if (err instanceof OAuth2Error) {
+		return {response: err.getResponse(), unexpected: false};
+	}
+	if (err instanceof FluxerError) {
+		return {response: handleFluxerError(err, ctx), unexpected: false};
+	}
+	const errorCode = resolveApiErrorCode(err);
+	if (errorCode) {
+		return {response: handleKnownErrorCode(err, errorCode, ctx), unexpected: false};
+	}
+	if (err instanceof HTTPException) {
+		return {response: handleHTTPException(err, ctx), unexpected: false};
+	}
+	if (isExpectedError(err)) {
+		return {
+			response: createJsonErrorResponse({
+				status: 400,
+				code: APIErrorCodes.GENERAL_ERROR,
+				message: err.message,
+			}),
+			unexpected: false,
+		};
+	}
+	return {response: handleUnexpectedError(ctx), unexpected: true};
+}
+
+function logErrorResponse<E extends BaseHonoEnv>(err: Error, resolved: ResolvedErrorResponse, ctx: Context<E>): void {
+	const status = resolved.response.status;
+	const details = {
+		err,
+		status,
+		method: ctx.req.method,
+		path: ctx.req.path,
+		requestId: ctx.get('requestId'),
+	};
+	if (resolved.unexpected) {
+		logger.error(details, 'Unhandled error occurred');
+		return;
+	}
+	if (status >= 500) {
+		logger.error(details, 'Request failed');
+		return;
+	}
+	logger.debug(details, 'Request rejected');
+}
+
 export function AppErrorHandler<E extends BaseHonoEnv = BaseHonoEnv>(
 	err: Error,
 	ctx: Context<E>,
 ): Response | Promise<Response> {
-	if (err instanceof OAuth2Error) {
-		return err.getResponse();
-	}
-	if (err instanceof FluxerError) {
-		return handleFluxerError(err, ctx);
-	}
-	const errorCode = resolveApiErrorCode(err);
-	if (errorCode) {
-		return handleKnownErrorCode(err, errorCode, ctx);
-	}
-	if (err instanceof HTTPException) {
-		return handleHTTPException(err, ctx);
-	}
-	if (isExpectedError(err)) {
-		logger.warn({err}, 'Expected error occurred');
-		return createJsonErrorResponse({
-			status: 400,
-			code: APIErrorCodes.GENERAL_ERROR,
-			message: err.message,
-		});
-	}
-	logger.error({err}, 'Unhandled error occurred');
-	return handleUnexpectedError(ctx);
+	const resolved = resolveErrorResponse(err, ctx);
+	logErrorResponse(err, resolved, ctx);
+	return resolved.response;
 }
 
 export function AppNotFoundHandler<E extends BaseHonoEnv = BaseHonoEnv>(ctx: Context<E>): Response | Promise<Response> {

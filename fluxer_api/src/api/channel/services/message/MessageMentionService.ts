@@ -1,5 +1,24 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import {
+	type ChannelID,
+	createChannelID,
+	createRoleID,
+	createUserID,
+	type GuildID,
+	type RoleID,
+	type UserID,
+} from '@app/api/BrandedTypes';
+import {isOperationDisabled, isPersonalNotesChannel} from '@app/api/channel/services/message/MessageHelpers';
+import type {MessageResponseDataService} from '@app/api/channel/services/message/MessageResponseDataService';
+import type {IGuildRepositoryAggregate} from '@app/api/guild/repositories/IGuildRepositoryAggregate';
+import type {GatewayChannelMention, IGatewayService} from '@app/api/infrastructure/IGatewayService';
+import {Logger} from '@app/api/Logger';
+import type {Channel} from '@app/api/models/Channel';
+import type {Message} from '@app/api/models/Message';
+import type {IUserRepository} from '@app/api/user/IUserRepository';
+import type {WorkerTaskName} from '@app/api/worker/WorkerLaneConfig';
+import {WorkerQueueOverflowError} from '@app/api/worker/WorkerQueueOverflowError';
 import {ChannelTypes, MessageTypes, SENDABLE_MESSAGE_FLAGS} from '@fluxer/constants/src/ChannelConstants';
 import {GuildOperations} from '@fluxer/constants/src/GuildConstants';
 import {RelationshipTypes, UserFlags} from '@fluxer/constants/src/UserConstants';
@@ -11,23 +30,6 @@ import {
 	type AllowedMentionsRequest,
 } from '@fluxer/schema/src/domains/message/SharedMessageSchemas';
 import type {IWorkerService} from '@pkgs/worker/src/contracts/IWorkerService';
-import {
-	type ChannelID,
-	createChannelID,
-	createRoleID,
-	createUserID,
-	type GuildID,
-	type RoleID,
-	type UserID,
-} from '../../../BrandedTypes';
-import type {IGuildRepositoryAggregate} from '../../../guild/repositories/IGuildRepositoryAggregate';
-import type {GatewayChannelMention, IGatewayService} from '../../../infrastructure/IGatewayService';
-import type {Channel} from '../../../models/Channel';
-import type {Message} from '../../../models/Message';
-import type {IUserRepository} from '../../../user/IUserRepository';
-import type {WorkerTaskName} from '../../../worker/WorkerLaneConfig';
-import {isOperationDisabled, isPersonalNotesChannel} from './MessageHelpers';
-import type {MessageResponseDataService} from './MessageResponseDataService';
 
 interface MentionData {
 	userMentions: Set<UserID>;
@@ -441,8 +443,7 @@ export class MessageMentionService {
 			return validUserIds;
 		}
 		const authorHasStaffFlag = (author.flags & UserFlags.STAFF) === UserFlags.STAFF;
-		const authorHasCtpFlag = (author.flags & UserFlags.CTP_MEMBER) === UserFlags.CTP_MEMBER;
-		if (authorHasStaffFlag || authorHasCtpFlag) {
+		if (authorHasStaffFlag) {
 			return validUserIds;
 		}
 		const staffTargets = validUsers.filter((user) => (user.flags & UserFlags.STAFF) === UserFlags.STAFF);
@@ -498,8 +499,19 @@ export class MessageMentionService {
 			mentionHere ||
 			mentionEveryone ||
 			(message.reference && message.type === MessageTypes.REPLY);
-		if (hasMentions) {
-			await this.workerService.addJob('handleMentions', taskData);
+		if (!hasMentions) {
+			return;
+		}
+		try {
+			await this.workerService.addJob('handleMentions', taskData, {skipLedger: true});
+		} catch (error) {
+			if (!(error instanceof WorkerQueueOverflowError)) {
+				throw error;
+			}
+			Logger.warn(
+				{channelId: message.channelId.toString(), messageId: message.id.toString()},
+				'Dropped mention fanout, jobs stream is at its limit',
+			);
 		}
 	}
 }

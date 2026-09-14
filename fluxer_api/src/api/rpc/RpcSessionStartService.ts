@@ -1,22 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import {PremiumFlags, SuspiciousActivityFlags, UserFlags} from '@fluxer/constants/src/UserConstants';
-import type {RpcSessionTimings} from '@fluxer/schema/src/domains/rpc/RpcSchemas';
-import {Config} from '../Config';
-import type {UserRow} from '../database/types/UserTypes';
-import {mapGuildMemberToResponse} from '../guild/GuildModel';
-import type {IGuildRepositoryAggregate} from '../guild/repositories/IGuildRepositoryAggregate';
-import type {IDiscriminatorService} from '../infrastructure/DiscriminatorService';
-import type {IGatewayService} from '../infrastructure/IGatewayService';
-import type {UserCacheService} from '../infrastructure/UserCacheService';
-import {Logger} from '../Logger';
-import type {RequestCache} from '../middleware/RequestCacheMiddleware';
-import type {User} from '../models/User';
-import {countryRequiresInboundPhoneVerification} from '../risk/AbusePolicy';
-import type {IUserRepository} from '../user/IUserRepository';
-import type {PaymentRepository} from '../user/repositories/PaymentRepository';
-import {createPremiumClearPatch, shouldStripExpiredPremium} from '../user/UserHelpers';
-import {mapUserToPrivateResponse} from '../user/UserMappers';
+import {Config} from '@app/api/Config';
+import type {UserRow} from '@app/api/database/types/UserTypes';
+import {mapGuildMemberToResponse} from '@app/api/guild/GuildModel';
+import type {IGuildRepositoryAggregate} from '@app/api/guild/repositories/IGuildRepositoryAggregate';
+import type {IDiscriminatorService} from '@app/api/infrastructure/DiscriminatorService';
+import type {IGatewayService} from '@app/api/infrastructure/IGatewayService';
+import type {UserCacheService} from '@app/api/infrastructure/UserCacheService';
+import {Logger} from '@app/api/Logger';
+import type {RequestCache} from '@app/api/middleware/RequestCacheMiddleware';
+import type {User} from '@app/api/models/User';
+import {countryRequiresInboundPhoneVerification} from '@app/api/risk/AbusePolicy';
 import {
 	createRpcTimingNode,
 	RpcTimingRecorder,
@@ -24,8 +18,20 @@ import {
 	startRpcTiming,
 	timeRpcStep,
 	timeRpcStepSync,
-} from './RpcTimings';
-import type {UserData} from './RpcTypes';
+} from '@app/api/rpc/RpcTimings';
+import type {UserData} from '@app/api/rpc/RpcTypes';
+import type {IUserRepository} from '@app/api/user/IUserRepository';
+import type {PaymentRepository} from '@app/api/user/repositories/PaymentRepository';
+import {createPremiumClearPatch, shouldStripExpiredPremium} from '@app/api/user/UserHelpers';
+import {mapUserToPrivateResponse} from '@app/api/user/UserMappers';
+import {
+	DEFERRED_PHONE_ON_COMMUNITY_JOIN,
+	imposePhoneRequirements,
+	PremiumFlags,
+	SuspiciousActivityFlags,
+	UserFlags,
+} from '@fluxer/constants/src/UserConstants';
+import type {RpcSessionTimings} from '@fluxer/schema/src/domains/rpc/RpcSchemas';
 
 interface SessionStartUserRepository
 	extends Pick<
@@ -44,10 +50,6 @@ interface SessionStartDiscriminatorService extends Pick<IDiscriminatorService, '
 
 interface SessionStartPaymentRepository extends Pick<PaymentRepository, 'hasEverPaidSuccessfully'> {}
 
-interface SessionStartPneumaticPostService {
-	considerPlutoniumMobileBetaDispatch(user: User, settings: UserData['settings']): Promise<void>;
-}
-
 interface SessionStartDeps {
 	userRepository: SessionStartUserRepository;
 	guildRepository: SessionStartGuildRepository;
@@ -55,7 +57,6 @@ interface SessionStartDeps {
 	gatewayService: SessionStartGatewayService;
 	discriminatorService: SessionStartDiscriminatorService;
 	paymentRepository: SessionStartPaymentRepository;
-	pneumaticPostService: SessionStartPneumaticPostService;
 }
 
 interface ProcessSessionStartParams {
@@ -278,9 +279,6 @@ export class RpcSessionStartService {
 				}
 			});
 		}
-		await timings.time('consider_pneumatic_post_dispatches', async () => {
-			await this.deps.pneumaticPostService.considerPlutoniumMobileBetaDispatch(user, userData.settings);
-		});
 		return {user, flagsToUpdate, timings: timings.finalize()};
 	}
 
@@ -370,12 +368,14 @@ export class RpcSessionStartService {
 			timeRpcStepSync(
 				timingSteps,
 				'check_required_inbound_phone_flags_already_set',
-				() => (user.suspiciousActivityFlags & requiredFlags) === requiredFlags,
+				() =>
+					(user.suspiciousActivityFlags & requiredFlags) === requiredFlags &&
+					(user.suspiciousActivityFlags & DEFERRED_PHONE_ON_COMMUNITY_JOIN) === 0,
 			)
 		) {
 			return null;
 		}
-		const newFlags = user.suspiciousActivityFlags | requiredFlags;
+		const newFlags = imposePhoneRequirements(user.suspiciousActivityFlags, requiredFlags);
 		try {
 			const updatedUser = await timeRpcStep(timingSteps, 'persist_inbound_phone_requirement', async () =>
 				this.deps.userRepository.patchUpsert(user.id, {suspicious_activity_flags: newFlags}, user.toRow()),

@@ -82,11 +82,10 @@ class Permission {
 		}
 		const wireGuild = guild.toJSON();
 		const myHighestRole = PermissionUtils.getHighestRole(wireGuild, me.id);
-		const otherHighestRole = PermissionUtils.getHighestRole(wireGuild, otherUserId);
-		return PermissionUtils.isRoleHigher(wireGuild, me.id, myHighestRole, otherHighestRole);
+		return PermissionUtils.canManageTargetUser(wireGuild, me.id, myHighestRole, otherUserId);
 	}
 
-	handleConnectionOpen(): void {
+	handleGatewayReady(): void {
 		this.rebuildPermissions();
 	}
 

@@ -1,20 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import {afterEach, beforeEach, describe, expect, test} from 'vitest';
-import {createTestAccount} from '../../auth/tests/AuthTestUtils';
-import {createChannelID, createMessageID} from '../../BrandedTypes';
-import {ChannelRepository} from '../../channel/ChannelRepository';
-import {createGuild} from '../../guild/tests/GuildTestUtils';
+import {createTestAccount} from '@app/api/auth/tests/AuthTestUtils';
+import {createChannelID, createMessageID} from '@app/api/BrandedTypes';
+import {Config} from '@app/api/Config';
+import {ChannelRepository} from '@app/api/channel/ChannelRepository';
+import {createGuild} from '@app/api/guild/tests/GuildTestUtils';
 import {
 	deleteMessage,
 	ensureSessionStarted,
 	markChannelAsIndexed,
 	sendMessage,
-} from '../../message/tests/MessageTestUtils';
-import {getMessageSearchService} from '../../SearchFactory';
-import {type ApiTestHarness, createApiTestHarness} from '../../test/ApiTestHarness';
-import {HTTP_STATUS, TEST_TIMEOUTS, wait} from '../../test/TestConstants';
-import {createBuilder} from '../../test/TestRequestBuilder';
+} from '@app/api/message/tests/MessageTestUtils';
+import {getMessageSearchService} from '@app/api/SearchFactory';
+import {type ApiTestHarness, createApiTestHarness} from '@app/api/test/ApiTestHarness';
+import {HTTP_STATUS, TEST_TIMEOUTS, wait} from '@app/api/test/TestConstants';
+import {createBuilder} from '@app/api/test/TestRequestBuilder';
+import {afterEach, beforeEach, describe, expect, test} from 'vitest';
 
 interface MessageSearchResult {
 	messages: Array<{
@@ -48,7 +49,47 @@ describe('Message Search Endpoint', () => {
 		harness = await createApiTestHarness({search: 'enabled'});
 	});
 	afterEach(async () => {
+		Config.dev.validateResponses = true;
 		await harness.shutdown();
+	});
+	describe('Response Shape', () => {
+		test('omits referenced_message from search hits when response validation is disabled', async () => {
+			const account = await createTestAccount(harness);
+			const guild = await createGuild(harness, account.token, 'Reply Search Guild');
+			const channelId = guild.system_channel_id!;
+			const uniqueContent = `reply-search-term-${Date.now()}`;
+			const target = await sendMessage(harness, account.token, channelId, `${uniqueContent} target`);
+			await createBuilder(harness, account.token)
+				.post(`/channels/${channelId}/messages`)
+				.body({
+					content: `${uniqueContent} reply`,
+					message_reference: {channel_id: channelId, guild_id: guild.id, message_id: target.id},
+				})
+				.expect(HTTP_STATUS.OK)
+				.execute();
+			await markChannelAsIndexed(harness, channelId);
+			Config.dev.validateResponses = false;
+			let hits: MessageSearchResult['messages'] = [];
+			for (let attempt = 0; attempt < 20; attempt++) {
+				const result = await createBuilder<MessageSearchResponse>(harness, account.token)
+					.post('/search/messages')
+					.body({
+						content: uniqueContent,
+						context_channel_id: channelId,
+					})
+					.expect(HTTP_STATUS.OK)
+					.execute();
+				if (isSearchResult(result) && result.messages.length > 0) {
+					hits = result.messages;
+					break;
+				}
+				await wait(TEST_TIMEOUTS.QUICK);
+			}
+			expect(hits.length).toBeGreaterThan(0);
+			for (const message of hits) {
+				expect(message).not.toHaveProperty('referenced_message');
+			}
+		});
 	});
 	describe('Authentication', () => {
 		test('requires authentication (401 without token)', async () => {

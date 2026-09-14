@@ -9,7 +9,6 @@ import ScreenReader from '@app/features/accessibility/state/ScreenReader';
 import {DndContext} from '@app/features/app/components/layout/DndContext';
 import GlobalOverlays from '@app/features/app/components/layout/GlobalOverlays';
 import {NativeTitlebar} from '@app/features/app/components/layout/NativeTitlebar';
-import {NativeTrafficLightsBackdrop} from '@app/features/app/components/layout/NativeTrafficLightsBackdrop';
 import {useDesktopAllowTransparency} from '@app/features/app/hooks/useDesktopAllowTransparency';
 import {useDesktopElectronBridges} from '@app/features/app/hooks/useDesktopElectronBridges';
 import {useDocumentClassToggle} from '@app/features/app/hooks/useDocumentClassToggle';
@@ -20,13 +19,18 @@ import {useNativePlatform} from '@app/features/app/hooks/useNativePlatform';
 import {usePlatformClasses} from '@app/features/app/hooks/usePlatformClasses';
 import {useServiceWorkerBadge} from '@app/features/app/hooks/useServiceWorkerBadge';
 import {useTabKeyFocusGuard} from '@app/features/app/hooks/useTabKeyFocusGuard';
-import Initialization from '@app/features/app/state/Initialization';
 import {type LayoutVariant, LayoutVariantProvider} from '@app/features/app/state/LayoutVariantContext';
 import RuntimeCrash from '@app/features/app/state/RuntimeCrash';
-import Authentication from '@app/features/auth/state/Authentication';
-import DeveloperOptions from '@app/features/devtools/state/DeveloperOptions';
+import BlockedMessageGroupsRollout, {
+	BLOCKED_MESSAGE_GROUPS_EXPERIMENT_CLASS,
+} from '@app/features/channel/state/BlockedMessageGroupsRollout';
+import MessageHoverTrackingRollout, {
+	MESSAGE_HOVER_TRACKING_EXPERIMENT_CLASS,
+} from '@app/features/channel/state/MessageHoverTrackingRollout';
 import {showMyselfTypingHelper} from '@app/features/devtools/utils/ShowMyselfTypingHelper';
 import GatewayConnection from '@app/features/gateway/transport/GatewayConnection';
+import {AppI18nProvider} from '@app/features/i18n/components/AppI18nProvider';
+import MemberSidebar from '@app/features/member/state/MemberSidebar';
 import {startDeepLinkHandling} from '@app/features/navigation/utils/DeepLinkUtils';
 import {Outlet, RouterProvider} from '@app/features/platform/components/router/RouterReact';
 import {ensureAutostartDefaultEnabled} from '@app/features/platform/utils/Autostart';
@@ -35,6 +39,7 @@ import {startDesktopLocaleBridge} from '@app/features/platform/utils/DesktopLoca
 import {PremiumCheckoutReturnWatcher} from '@app/features/premium/components/PremiumCheckoutReturnWatcher';
 import {QUICK_SWITCHER_PORTAL_ID} from '@app/features/search/components/quick_switcher/QuickSwitcherConstants';
 import {useCustomThemeStyle} from '@app/features/theme/hooks/useCustomThemeStyle';
+import {useRemScaleTracking} from '@app/features/theme/hooks/useRemScaleTracking';
 import {useThemeCssVariables} from '@app/features/theme/hooks/useThemeCssVariables';
 import Theme from '@app/features/theme/state/Theme';
 import ThemeLibrary from '@app/features/theme/state/ThemeLibrary';
@@ -47,31 +52,23 @@ import {getActivePortalHost, setActivePortalHost} from '@app/features/ui/overlay
 import MobileLayout from '@app/features/ui/state/MobileLayout';
 import Modal from '@app/features/ui/state/Modal';
 import Popout from '@app/features/ui/state/Popout';
-import {
-	getDesktopWindowBehaviorSettings,
-	setDesktopWindowBehaviorSettings,
-} from '@app/features/ui/utils/DesktopWindowBehaviorUtils';
-import {attachExternalLinkInterceptor, hasNativeInstanceTabShell, isDesktop} from '@app/features/ui/utils/NativeUtils';
-import {
-	FIRST_CLICK_PASSTHROUGH_WHEN_UNFOCUSED_CLASS,
-	UNFOCUSED_FULLY_INTERACTIVE_CLASS,
-} from '@app/features/ui/utils/WindowFocusInteractionGuard';
+import {getDesktopWindowBehaviorSettings} from '@app/features/ui/utils/DesktopWindowBehaviorUtils';
+import {attachExternalLinkInterceptor, isDesktop} from '@app/features/ui/utils/NativeUtils';
+import {UNFOCUSED_FULLY_INTERACTIVE_CLASS} from '@app/features/ui/utils/WindowFocusInteractionGuard';
 import UserSettings from '@app/features/user/state/UserSettings';
 import {IncomingCallManager} from '@app/features/voice/components/IncomingCallManager';
 import {VoiceLiveKitRoot} from '@app/features/voice/components/VoiceLiveKitRoot';
 import MediaEngine from '@app/features/voice/engine/MediaEngineFacade';
 import {useElectronScreenSharePicker} from '@app/features/voice/hooks/useElectronScreenSharePicker';
 import {startScreenSharePiPController} from '@app/features/voice/state/ScreenSharePiPController';
-import VoiceCallFullscreen from '@app/features/voice/state/VoiceCallFullscreen';
-import {startMediaDeviceStartupPreload} from '@app/features/voice/utils/MediaDeviceStartupPreload';
 import {useNativeTitleBar} from '@app/features/window/hooks/useNativeTitleBar';
 import {useStopFlashFrameOnFocus} from '@app/features/window/hooks/useStopFlashFrameOnFocus';
 import {useWindowEventListeners} from '@app/features/window/hooks/useWindowEventListeners';
 import {i18n} from '@lingui/core';
 import {msg} from '@lingui/core/macro';
-import {I18nProvider} from '@lingui/react';
 import {useLingui} from '@lingui/react/macro';
 import {IconContext} from '@phosphor-icons/react';
+import {reaction} from 'mobx';
 import {observer} from 'mobx-react-lite';
 import React, {type ReactNode, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
@@ -88,13 +85,9 @@ export const AppWrapper = observer(({children}: AppWrapperProps) => {
 	const {i18n} = useLingui();
 	const reducedMotion = Accessibility.useReducedMotion;
 	const stayInteractiveWhenUnfocused = Accessibility.stayInteractiveWhenUnfocused;
-	const usesNativeInstanceTabShell = hasNativeInstanceTabShell();
-	const firstClickPassThroughWhenUnfocused =
-		Accessibility.firstClickPassThroughWhenUnfocused || usesNativeInstanceTabShell;
-	const {platform, isNative, isMacOS} = useNativePlatform();
+	const {platform, isNative} = useNativePlatform();
 	const useSystemTitleBar = useNativeTitleBar();
 	const messageDisplayCompact = UserSettings.getMessageDisplayCompact();
-	const isVoiceCallFullscreenActive = VoiceCallFullscreen.isActive;
 	const isRootDocumentFullscreen = useIsRootDocumentFullscreen();
 	const [layoutVariant, setLayoutVariant] = useState<LayoutVariant>('app');
 	const layoutVariantContextValue = useMemo(
@@ -130,16 +123,20 @@ export const AppWrapper = observer(({children}: AppWrapperProps) => {
 		}, []),
 	);
 	const handleSkipLinkFocus = useTabKeyFocusGuard();
-	const isSplashScreenActive =
-		Authentication.isAuthenticated &&
-		!DeveloperOptions.bypassSplashScreen &&
-		(GatewayConnection.isConnectionInterrupted || !Initialization.canNavigateToProtectedRoutes);
 	useInertBackground(ringsContainerRef, hasBlockingModal || topPopoutRequiresBackdrop);
-	useInertBackground(overlayScopeRef, isSplashScreenActive);
 	useEffect(() => {
 		showMyselfTypingHelper.start();
 		return () => showMyselfTypingHelper.stop();
 	}, []);
+	useEffect(
+		() =>
+			reaction(
+				() => GatewayConnection.sessionId,
+				(sessionId) => MemberSidebar.synchronizeGatewaySession(sessionId),
+				{fireImmediately: true},
+			),
+		[],
+	);
 	useEffect(() => {
 		const clearForeignPortalHost = (): void => {
 			const activePortalHost = getActivePortalHost();
@@ -157,20 +154,17 @@ export const AppWrapper = observer(({children}: AppWrapperProps) => {
 		};
 	}, []);
 	useEffect(() => startScreenSharePiPController(), []);
-	useEffect(() => startMediaDeviceStartupPreload(), []);
 	useServiceWorkerBadge();
 	useKeybindManager(i18n);
 	useDesktopElectronBridges();
 	useDocumentClassToggle('reduced-motion', reducedMotion);
 	useDocumentClassToggle('mobile-layout', MobileLayout.platformMobileDetected || MobileLayout.enabled);
 	useDocumentClassToggle(UNFOCUSED_FULLY_INTERACTIVE_CLASS, stayInteractiveWhenUnfocused);
-	useDocumentClassToggle(FIRST_CLICK_PASSTHROUGH_WHEN_UNFOCUSED_CLASS, firstClickPassThroughWhenUnfocused);
-	useEffect(() => {
-		if (!isNative) return;
-		void setDesktopWindowBehaviorSettings({firstClickPassThroughWhenUnfocused});
-	}, [isNative, firstClickPassThroughWhenUnfocused]);
+	useDocumentClassToggle(MESSAGE_HOVER_TRACKING_EXPERIMENT_CLASS, MessageHoverTrackingRollout.enabled);
+	useDocumentClassToggle(BLOCKED_MESSAGE_GROUPS_EXPERIMENT_CLASS, BlockedMessageGroupsRollout.enabled);
 	useDesktopAllowTransparency(isNative);
 	useWindowEventListeners({preventDocumentScroll: !isNative});
+	useRemScaleTracking();
 	usePlatformClasses(platform, isNative);
 	useThemeCssVariables({
 		effectiveTheme: Theme.effectiveTheme,
@@ -204,12 +198,7 @@ export const AppWrapper = observer(({children}: AppWrapperProps) => {
 						>
 							{i18n._(SKIP_TO_CONTENT_DESCRIPTOR)}
 						</a>
-						<NativeTrafficLightsBackdrop
-							variant={layoutVariant}
-							hidden={isVoiceCallFullscreenActive}
-							data-flx="app.app.app-wrapper.native-traffic-lights-backdrop"
-						/>
-						{isNative && !isMacOS && !useSystemTitleBar && !isRootDocumentFullscreen && (
+						{isNative && !useSystemTitleBar && !isRootDocumentFullscreen && (
 							<NativeTitlebar platform={platform} data-flx="app.app.app-wrapper.native-titlebar" />
 						)}
 						{children}
@@ -256,7 +245,7 @@ export const App = observer((): React.ReactElement => {
 		return () => detach?.();
 	}, []);
 	return (
-		<I18nProvider i18n={i18n}>
+		<AppI18nProvider i18n={i18n}>
 			<IconContext.Provider value={{color: 'currentColor', weight: 'fill'}}>
 				<PremiumCheckoutReturnWatcher data-flx="app.app.premium-checkout-return-watcher" />
 				<DndContext data-flx="app.app.dnd-context">
@@ -267,6 +256,6 @@ export const App = observer((): React.ReactElement => {
 					</RouterProvider>
 				</DndContext>
 			</IconContext.Provider>
-		</I18nProvider>
+		</AppI18nProvider>
 	);
 });

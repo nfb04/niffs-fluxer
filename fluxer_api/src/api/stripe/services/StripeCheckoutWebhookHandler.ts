@@ -1,35 +1,34 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import {createUserID, type UserID} from '@app/api/BrandedTypes';
+import {Config} from '@app/api/Config';
+import type {BillingSubscriptionRow} from '@app/api/database/types/BillingTypes';
+import type {UserRow} from '@app/api/database/types/UserTypes';
+import type {IDonationRepository} from '@app/api/donation/IDonationRepository';
+import type {IGatewayService} from '@app/api/infrastructure/IGatewayService';
+import {Logger} from '@app/api/Logger';
+import {getBillingRepository} from '@app/api/middleware/ServiceRegistry';
+import type {Payment} from '@app/api/models/Payment';
+import type {User} from '@app/api/models/User';
+import type {ProductInfo, ProductRegistry} from '@app/api/stripe/ProductRegistry';
+import {
+	getFirstInvoicePaymentIntentId,
+	getPrimarySubscriptionItem,
+	getSubscriptionItemPeriodEnd,
+	getSubscriptionPremiumPeriodEnd,
+} from '@app/api/stripe/StripeSubscriptionPeriod';
+import {extractId} from '@app/api/stripe/StripeUtils';
+import {EU_WITHDRAWAL_WAIVER_TEXT_VERSION} from '@app/api/stripe/services/StripeCheckoutService';
+import type {StripeGiftService} from '@app/api/stripe/services/StripeGiftService';
+import type {StripePremiumService} from '@app/api/stripe/services/StripePremiumService';
+import type {IUserRepository} from '@app/api/user/IUserRepository';
+import {mapUserToPrivateResponse} from '@app/api/user/UserMappers';
 import {UserPremiumTypes} from '@fluxer/constants/src/UserConstants';
 import {StripeError} from '@fluxer/errors/src/domains/payment/StripeError';
 import type {ICacheService} from '@pkgs/cache/src/ICacheService';
 import type {IEmailService} from '@pkgs/email/src/IEmailService';
 import {seconds} from 'itty-time';
 import type Stripe from 'stripe';
-import {createUserID, type UserID} from '../../BrandedTypes';
-import {Config} from '../../Config';
-import type {BillingSubscriptionRow} from '../../database/types/BillingTypes';
-import type {UserRow} from '../../database/types/UserTypes';
-import type {IDonationRepository} from '../../donation/IDonationRepository';
-import type {IGatewayService} from '../../infrastructure/IGatewayService';
-import {Logger} from '../../Logger';
-import {getBillingRepository} from '../../middleware/ServiceRegistry';
-import type {Payment} from '../../models/Payment';
-import type {User} from '../../models/User';
-import type {IUserRepository} from '../../user/IUserRepository';
-import {mapUserToPrivateResponse} from '../../user/UserMappers';
-import type {ProductInfo, ProductRegistry} from '../ProductRegistry';
-import {
-	getFirstInvoicePaymentIntentId,
-	getFirstInvoicePaymentIntentLatestChargeId,
-	getPrimarySubscriptionItem,
-	getSubscriptionItemPeriodEnd,
-	getSubscriptionPremiumPeriodEnd,
-} from '../StripeSubscriptionPeriod';
-import {extractId} from '../StripeUtils';
-import {EU_WITHDRAWAL_WAIVER_TEXT_VERSION} from './StripeCheckoutService';
-import type {StripeGiftService} from './StripeGiftService';
-import type {StripePremiumService} from './StripePremiumService';
 
 interface DonationCustomerDetails {
 	businessName: string | null;
@@ -583,6 +582,15 @@ export class StripeCheckoutWebhookHandler {
 		if (chargeId) {
 			await this.refundChargeForDuplicateSubscription(chargeId, session.id);
 		}
+		const latestUser = await this.userRepository.findUnique(payment.userId);
+		if (latestUser && latestUser.stripeSubscriptionId === subscriptionId) {
+			const restoredUser = await this.userRepository.patchUpsert(
+				payment.userId,
+				{stripe_subscription_id: existingSubscriptionId},
+				latestUser.toRow(),
+			);
+			await this.dispatchUser(restoredUser);
+		}
 		await this.userRepository.updatePayment({
 			...payment.toRow(),
 			stripe_customer_id: customerId,
@@ -600,11 +608,16 @@ export class StripeCheckoutWebhookHandler {
 		if (!this.stripe) return null;
 		try {
 			const subscription = await this.stripe.subscriptions.retrieve(subscriptionId, {
-				expand: ['latest_invoice.payments.data.payment.payment_intent.latest_charge'],
+				expand: ['latest_invoice.payments.data.payment'],
 			});
 			const latestInvoice =
 				typeof subscription.latest_invoice === 'string' ? null : (subscription.latest_invoice ?? null);
-			return getFirstInvoicePaymentIntentLatestChargeId(latestInvoice);
+			const paymentIntentId = getFirstInvoicePaymentIntentId(latestInvoice);
+			if (!paymentIntentId) {
+				return null;
+			}
+			const paymentIntent = await this.stripe.paymentIntents.retrieve(paymentIntentId);
+			return extractId(paymentIntent.latest_charge);
 		} catch (err) {
 			Logger.warn({err, subscriptionId}, 'Failed to resolve latest charge for duplicate-subscription refund');
 			return null;
@@ -739,7 +752,7 @@ export class StripeCheckoutWebhookHandler {
 		};
 		try {
 			const subscription = (await this.stripe.subscriptions.retrieve(subscriptionId, {
-				expand: ['default_payment_method', 'latest_invoice.payments.data.payment.payment_intent'],
+				expand: ['default_payment_method', 'latest_invoice.payments.data.payment'],
 			})) as StripeSubscriptionWithFallbackPaymentState;
 			const latestInvoice =
 				typeof subscription.latest_invoice === 'string' ? null : (subscription.latest_invoice ?? null);
@@ -884,6 +897,7 @@ export class StripeCheckoutWebhookHandler {
 			Logger.error({sessionId: session.id}, 'Donation checkout missing customer');
 			throw new StripeError('Donation checkout missing customer id');
 		}
+		const donationLocale = session.metadata?.donation_locale ?? null;
 		const isRecurring = session.mode === 'subscription';
 		const subscriptionId = extractId(session.subscription);
 		if (isRecurring && !subscriptionId) {
@@ -939,7 +953,7 @@ export class StripeCheckoutWebhookHandler {
 				recurringCurrency,
 				recurringInterval,
 				manageUrl,
-				null,
+				donationLocale,
 			);
 		} else {
 			const oneTimeAmountCents = session.amount_total;
@@ -957,7 +971,7 @@ export class StripeCheckoutWebhookHandler {
 				oneTimeCurrency,
 				'once',
 				manageUrl,
-				null,
+				donationLocale,
 			);
 		}
 		Logger.info(

@@ -1,8 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import {DND_TYPES, type DragItem} from '@app/features/app/components/layout/types/DndTypes';
-import {ChannelTypes} from '@fluxer/constants/src/ChannelConstants';
-import {describe, expect, it} from 'vitest';
 import {
 	type ChannelReorderRect,
 	type ChannelReorderTarget,
@@ -13,7 +10,10 @@ import {
 	selectChannelReorderIntent,
 	selectChannelReorderResolution,
 	transitionChannelReorderSnapshot,
-} from './ChannelReorderStateMachine';
+} from '@app/features/app/components/layout/dnd/ChannelReorderStateMachine';
+import {type DragItem, DragItemType} from '@app/features/app/components/layout/types/DndTypes';
+import {ChannelTypes} from '@fluxer/constants/src/ChannelConstants';
+import {describe, expect, it} from 'vitest';
 
 const rect: ChannelReorderRect = {
 	top: 40,
@@ -35,7 +35,7 @@ function channelItem(
 	parentId: string | null = null,
 ): DragItem {
 	return {
-		type: DND_TYPES.CHANNEL,
+		type: DragItemType.CHANNEL,
 		id,
 		channelType,
 		parentId,
@@ -45,7 +45,7 @@ function channelItem(
 
 function categoryItem(id = 'category-source'): DragItem {
 	return {
-		type: DND_TYPES.CATEGORY,
+		type: DragItemType.CATEGORY,
 		id,
 		channelType: ChannelTypes.GUILD_CATEGORY,
 		parentId: null,
@@ -55,7 +55,7 @@ function categoryItem(id = 'category-source'): DragItem {
 
 function voiceParticipantItem(id = 'user-1', currentChannelId = 'voice-source'): DragItem {
 	return {
-		type: DND_TYPES.VOICE_PARTICIPANT,
+		type: DragItemType.VOICE_PARTICIPANT,
 		id,
 		channelType: ChannelTypes.GUILD_VOICE,
 		parentId: null,

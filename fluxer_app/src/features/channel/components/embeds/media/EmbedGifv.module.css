@@ -43,6 +43,7 @@
 	height: 100%;
 	width: 100%;
 	object-fit: cover;
+	z-index: 0;
 }
 
 .mediaContainer {
@@ -61,7 +62,7 @@
 	max-width: 100%;
 	min-height: 0.0625rem;
 	min-width: 0;
-	aspect-ratio: var(--embed-aspect-ratio, auto);
+	overflow: hidden;
 }
 
 .videoElement {
@@ -71,44 +72,39 @@
 	max-height: 100%;
 	max-width: 100%;
 	border-radius: var(--media-border-radius, 0px);
-	transition: opacity 80ms ease-out;
 	object-fit: contain;
 	pointer-events: none;
+	position: relative;
+	z-index: 1;
 }
 
-.videoOpacityHidden {
-	opacity: 0;
-}
-
-.videoOpacityVisible {
-	opacity: 1;
-}
-.gifFreezeFrame {
+.placeholder {
 	position: absolute;
 	inset: 0;
+	display: block;
 	width: 100%;
 	height: 100%;
-	display: block;
+	object-fit: cover;
 	border-radius: var(--media-border-radius, 0px);
-	object-fit: contain;
+	background: var(--background-primary);
 	pointer-events: none;
-	opacity: 0;
+	transition: none;
+	z-index: 2;
 }
 
-.gifFreezeFrame[data-frozen='true'] {
+:global(html:not(.reduced-motion)) .placeholder {
+	transition: opacity 0.2s ease;
+}
+
+:global(html:not(.reduced-motion)) .placeholderFastFade {
+	transition: opacity 0.05s ease;
+}
+
+.placeholderVisible {
 	opacity: 1;
 }
 
-.klipyWatermark {
-	position: absolute;
-	bottom: 0.5rem;
-	left: 0.5rem;
-	z-index: 5;
-	pointer-events: none;
+.placeholderHidden {
 	opacity: 0;
-}
-
-.klipyWatermark svg {
-	height: 0.75rem;
-	width: auto;
+	pointer-events: none;
 }

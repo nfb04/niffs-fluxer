@@ -2,130 +2,279 @@
 
 import {LRUCache} from 'lru-cache';
 
+export interface CachedImageSize {
+	width: number;
+	height: number;
+}
+
+interface ImageSubscriber {
+	onLoad: () => void;
+	onError: (() => void) | undefined;
+}
+
 interface ImageCacheEntry {
-	image?: HTMLImageElement;
+	src: string;
+	loaded: boolean;
+	width: number;
+	height: number;
+	image: HTMLImageElement | null;
+	subscribers: Set<ImageSubscriber>;
+	failedAttempts: number;
+	retryDelayMs: number;
+	failedUntil: number;
+	loadTimeoutId: number;
+	retryTimeoutId: number;
+	connectivityListener: (() => void) | null;
 }
 
-interface PendingImageLoad {
-	image: HTMLImageElement;
-	onLoadCallbacks: Set<() => void>;
-	onErrorCallbacks: Set<() => void>;
-}
-
-const MAX_CACHE_ENTRIES = 500;
-const MAX_CACHE_BYTES = 64 * 1024 * 1024;
-const FALLBACK_IMAGE_BYTES = 256 * 1024;
-
-const estimateImageBytes = (entry: ImageCacheEntry): number => {
-	const width = entry.image?.naturalWidth ?? 0;
-	const height = entry.image?.naturalHeight ?? 0;
-	if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
-		return FALLBACK_IMAGE_BYTES;
-	}
-	return Math.min(width * height * 4, MAX_CACHE_BYTES);
-};
+const MAX_CACHE_ENTRIES = 1000;
+const MAX_IMAGE_SOURCE_LENGTH = 16 * 1024;
+const MAX_PENDING_IMAGE_CALLBACKS_PER_LOAD = 256;
+const IMAGE_LOAD_TIMEOUT_MS = 30_000;
+const IMAGE_RETRY_ATTEMPT_LIMIT = 2;
+const IMAGE_RETRY_INITIAL_DELAY_MS = 1000;
+const IMAGE_RETRY_MAX_DELAY_MS = IMAGE_RETRY_INITIAL_DELAY_MS * 10;
+const IMAGE_FAILURE_COOLDOWN_MS = 60_000;
 
 const imageCache = new LRUCache<string, ImageCacheEntry>({
 	max: MAX_CACHE_ENTRIES,
-	maxSize: MAX_CACHE_BYTES,
-	sizeCalculation: estimateImageBytes,
-	dispose: (entry) => {
-		if (!entry.image) return;
-		entry.image.onload = null;
-		entry.image.onerror = null;
+	disposeAfter: (entry: ImageCacheEntry) => {
+		abandonEntry(entry);
 	},
 });
-const pendingImageLoads = new Map<string, PendingImageLoad>();
-const isLoadedImage = (image?: HTMLImageElement): image is HTMLImageElement => {
-	return Boolean(image?.complete && image.naturalWidth > 0);
+
+const imageSourceEncoder = new TextEncoder();
+
+const acceptsImageSource = (src: string | null | undefined): src is string =>
+	typeof src === 'string' &&
+	src.length > 0 &&
+	src.length <= MAX_IMAGE_SOURCE_LENGTH &&
+	imageSourceEncoder.encode(src).byteLength <= MAX_IMAGE_SOURCE_LENGTH;
+
+const isLoadedImage = (image: HTMLImageElement | null | undefined): image is HTMLImageElement =>
+	image?.complete === true && image.naturalWidth > 0;
+
+const imageHasSource = (image: HTMLImageElement, src: string): boolean => {
+	if (image.currentSrc.length > 0) {
+		try {
+			return image.currentSrc === new URL(src, image.ownerDocument.baseURI).href;
+		} catch {
+			return image.currentSrc === src;
+		}
+	}
+	if (image.getAttribute('src') === src) return true;
+	return image.src === src;
 };
-const isCached = (src: string | null): boolean => {
-	if (!src) return false;
-	return isLoadedImage(imageCache.get(src)?.image);
-};
 
-export function hasImage(src: string | null): boolean {
-	return isCached(src);
-}
+const ownsCacheKey = (entry: ImageCacheEntry): boolean => imageCache.peek(entry.src) === entry;
 
-export function getImage(src: string | null): HTMLImageElement | undefined {
-	if (!src) return undefined;
-	const image = imageCache.get(src)?.image;
-	return isLoadedImage(image) ? image : undefined;
-}
+const isCoolingDown = (entry: ImageCacheEntry): boolean => entry.failedUntil > Date.now();
 
-export function rememberImage(src: string | null, image?: HTMLImageElement): void {
-	if (!src) return;
-	imageCache.set(src, image ? {image} : {});
-	const currentPendingLoad = pendingImageLoads.get(src);
-	pendingImageLoads.delete(src);
-	if (!currentPendingLoad) return;
-	currentPendingLoad.image.onload = null;
-	currentPendingLoad.image.onerror = null;
-	for (const callback of currentPendingLoad.onLoadCallbacks) {
-		callback();
+function clearRetryState(entry: ImageCacheEntry): void {
+	if (entry.retryTimeoutId !== 0) {
+		window.clearTimeout(entry.retryTimeoutId);
+		entry.retryTimeoutId = 0;
+	}
+	if (entry.connectivityListener != null) {
+		window.removeEventListener('online', entry.connectivityListener);
+		entry.connectivityListener = null;
 	}
 }
 
-export function forgetImage(src: string | null): void {
-	if (!src) return;
-	imageCache.delete(src);
-	const currentPendingLoad = pendingImageLoads.get(src);
-	pendingImageLoads.delete(src);
-	if (!currentPendingLoad) return;
-	currentPendingLoad.image.onload = null;
-	currentPendingLoad.image.onerror = null;
-	for (const callback of currentPendingLoad.onErrorCallbacks) {
-		callback();
+function detachImageLoad(entry: ImageCacheEntry): void {
+	if (entry.loadTimeoutId !== 0) {
+		window.clearTimeout(entry.loadTimeoutId);
+		entry.loadTimeoutId = 0;
+	}
+	if (entry.image != null) {
+		entry.image.onload = null;
+		entry.image.onerror = null;
+		entry.image = null;
 	}
 }
 
-export function loadImage(src: string | null, onLoad: () => void, onError?: () => void): () => void {
-	if (!src) {
-		onError?.();
-		return () => {};
+function notifySubscribers(entry: ImageCacheEntry, loaded: boolean): void {
+	const subscribers = [...entry.subscribers];
+	entry.subscribers.clear();
+	const failures: Array<unknown> = [];
+	for (const subscriber of subscribers) {
+		try {
+			if (loaded) subscriber.onLoad();
+			else if (subscriber.onError) subscriber.onError();
+		} catch (error) {
+			failures.push(error);
+		}
 	}
-	if (isCached(src)) {
-		imageCache.get(src);
+	if (failures.length > 0) throw new AggregateError(failures, 'Image load callbacks failed');
+}
+
+function abandonEntry(entry: ImageCacheEntry): void {
+	clearRetryState(entry);
+	detachImageLoad(entry);
+	notifySubscribers(entry, false);
+}
+
+function dropEntry(entry: ImageCacheEntry): void {
+	if (ownsCacheKey(entry)) imageCache.delete(entry.src);
+	abandonEntry(entry);
+}
+
+function failEntry(entry: ImageCacheEntry): void {
+	entry.failedAttempts = 0;
+	entry.retryDelayMs = IMAGE_RETRY_INITIAL_DELAY_MS;
+	entry.failedUntil = Date.now() + IMAGE_FAILURE_COOLDOWN_MS;
+	abandonEntry(entry);
+}
+
+function settleLoaded(entry: ImageCacheEntry, image: HTMLImageElement): void {
+	clearRetryState(entry);
+	detachImageLoad(entry);
+	entry.loaded = true;
+	entry.width = image.naturalWidth;
+	entry.height = image.naturalHeight;
+	entry.failedAttempts = 0;
+	entry.retryDelayMs = IMAGE_RETRY_INITIAL_DELAY_MS;
+	entry.failedUntil = 0;
+	notifySubscribers(entry, true);
+}
+
+function retryDelayForAttempt(entry: ImageCacheEntry): number {
+	const growth = 2 * entry.retryDelayMs * Math.random();
+	entry.retryDelayMs = Math.min(entry.retryDelayMs + growth, IMAGE_RETRY_MAX_DELAY_MS);
+	return entry.retryDelayMs;
+}
+
+function startImageLoad(entry: ImageCacheEntry): void {
+	const image = new Image();
+	image.decoding = 'async';
+	entry.image = image;
+	entry.loadTimeoutId = window.setTimeout(() => {
+		entry.loadTimeoutId = 0;
+		failEntry(entry);
+	}, IMAGE_LOAD_TIMEOUT_MS);
+	image.onload = () => {
+		detachImageLoad(entry);
+		if (!isLoadedImage(image)) {
+			scheduleRetryOrFail(entry);
+			return;
+		}
+		settleLoaded(entry, image);
+	};
+	image.onerror = () => {
+		detachImageLoad(entry);
+		scheduleRetryOrFail(entry);
+	};
+	image.src = entry.src;
+}
+
+function scheduleRetryOrFail(entry: ImageCacheEntry): void {
+	if (entry.failedAttempts >= IMAGE_RETRY_ATTEMPT_LIMIT) {
+		failEntry(entry);
+		return;
+	}
+	entry.failedAttempts += 1;
+	const resume = (): void => {
+		clearRetryState(entry);
+		if (!ownsCacheKey(entry)) {
+			abandonEntry(entry);
+			return;
+		}
+		startImageLoad(entry);
+	};
+	if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+		entry.connectivityListener = resume;
+		window.addEventListener('online', resume, {once: true});
+		return;
+	}
+	entry.retryTimeoutId = window.setTimeout(resume, retryDelayForAttempt(entry));
+}
+
+function createEntry(src: string): ImageCacheEntry {
+	const entry: ImageCacheEntry = {
+		src,
+		loaded: false,
+		width: 0,
+		height: 0,
+		image: null,
+		subscribers: new Set(),
+		failedAttempts: 0,
+		retryDelayMs: IMAGE_RETRY_INITIAL_DELAY_MS,
+		failedUntil: 0,
+		loadTimeoutId: 0,
+		retryTimeoutId: 0,
+		connectivityListener: null,
+	};
+	imageCache.set(src, entry);
+	return entry;
+}
+
+function rejectImageLoad(onError: (() => void) | undefined): () => void {
+	if (onError) onError();
+	return () => {};
+}
+
+export function hasImage(src: string | null | undefined): boolean {
+	if (!acceptsImageSource(src)) return false;
+	return imageCache.get(src)?.loaded === true;
+}
+
+export function hasFailedImage(src: string | null | undefined): boolean {
+	if (!acceptsImageSource(src)) return false;
+	const entry = imageCache.peek(src);
+	return entry != null && isCoolingDown(entry);
+}
+
+export function getImageSize(src: string | null | undefined): CachedImageSize | undefined {
+	if (!acceptsImageSource(src)) return undefined;
+	const entry = imageCache.get(src);
+	if (entry == null || !entry.loaded || entry.width <= 0 || entry.height <= 0) return undefined;
+	return {width: entry.width, height: entry.height};
+}
+
+export function rememberImage(src: string | null | undefined, image: HTMLImageElement): void {
+	if (!acceptsImageSource(src) || !imageHasSource(image, src) || !isLoadedImage(image)) return;
+	const entry = imageCache.get(src) ?? createEntry(src);
+	if (entry.loaded) return;
+	settleLoaded(entry, image);
+}
+
+export function forgetImage(src: string | null | undefined): void {
+	if (!acceptsImageSource(src)) return;
+	const entry = imageCache.get(src);
+	if (entry == null) return;
+	dropEntry(entry);
+}
+
+export function loadImage(src: string | null | undefined, onLoad: () => void, onError?: () => void): () => void {
+	if (!acceptsImageSource(src)) return rejectImageLoad(onError);
+	const cached = imageCache.get(src);
+	if (cached?.loaded === true) {
 		onLoad();
 		return () => {};
 	}
-	const pendingLoad = pendingImageLoads.get(src);
-	if (pendingLoad) {
-		pendingLoad.onLoadCallbacks.add(onLoad);
-		if (onError) {
-			pendingLoad.onErrorCallbacks.add(onError);
-		}
-		return () => {
-			pendingLoad.onLoadCallbacks.delete(onLoad);
-			if (onError) {
-				pendingLoad.onErrorCallbacks.delete(onError);
-			}
-		};
+	if (cached != null && (isCoolingDown(cached) || cached.subscribers.size >= MAX_PENDING_IMAGE_CALLBACKS_PER_LOAD)) {
+		return rejectImageLoad(onError);
 	}
-	const image = new Image();
-	const onLoadCallbacks = new Set<() => void>([onLoad]);
-	const onErrorCallbacks = new Set<() => void>();
-	if (onError) {
-		onErrorCallbacks.add(onError);
+	const entry = cached ?? createEntry(src);
+	const subscriber: ImageSubscriber = {onLoad, onError};
+	entry.subscribers.add(subscriber);
+	if (cached == null || cached.failedUntil !== 0) {
+		entry.failedUntil = 0;
+		startImageLoad(entry);
 	}
-	pendingImageLoads.set(src, {image, onLoadCallbacks, onErrorCallbacks});
-	image.onload = () => {
-		rememberImage(src, image);
-	};
-	image.onerror = () => {
-		forgetImage(src);
-	};
-	image.src = src;
 	return () => {
-		onLoadCallbacks.delete(onLoad);
-		if (onError) {
-			onErrorCallbacks.delete(onError);
-		}
+		entry.subscribers.delete(subscriber);
 	};
+}
+
+export function pinImage(src: string | null | undefined): () => void {
+	return loadImage(src, () => {});
+}
+
+export function warmImage(src: string | null | undefined): void {
+	loadImage(src, () => {});
 }
 
 export function _clearForTests(): void {
 	imageCache.clear();
-	pendingImageLoads.clear();
 }

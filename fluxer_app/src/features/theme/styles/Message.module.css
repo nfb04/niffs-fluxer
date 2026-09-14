@@ -30,13 +30,13 @@
 	word-break: break-word;
 	-webkit-tap-highlight-color: transparent;
 	display: grid;
-	grid-template-columns: var(--chat-horizontal-padding, var(--message-gutter)) var(--message-avatar-size) var(
-			--message-gutter
-		) minmax(0, 1fr);
+	grid-template-columns: var(--chat-horizontal-padding, var(--chat-horizontal-padding-default)) var(
+			--message-avatar-size
+		) var(--message-gutter) minmax(0, 1fr);
 	grid-template-rows: auto auto auto;
 	grid-template-areas: '. . . reply' 'gutter-left avatar gutter-right content' '. . . container';
 	padding-block: var(--message-spacing-y);
-	padding-inline-end: var(--chat-horizontal-padding, var(--message-gutter));
+	padding-inline-end: var(--chat-horizontal-padding, var(--chat-horizontal-padding-default));
 	padding-inline-start: 0;
 	margin-inline: calc(-1 * var(--message-mobile-margin));
 }
@@ -62,28 +62,47 @@
 
 @media (min-width: 768px) {
 	.message {
-		margin-inline: calc(-1 * var(--chat-horizontal-padding, var(--message-gutter)));
-		padding-inline-end: calc(var(--chat-horizontal-padding, var(--message-gutter)) + var(--message-action-bar-offset));
+		margin-inline: calc(-1 * var(--chat-horizontal-padding, var(--chat-horizontal-padding-default)));
+		padding-inline-end: calc(
+			var(--chat-horizontal-padding, var(--chat-horizontal-padding-default)) +
+			var(--message-action-bar-offset)
+		);
 	}
 
 	.messagePreview {
 		margin-inline: 0;
-		padding-inline-end: var(--chat-horizontal-padding, var(--message-gutter));
+		padding-inline-end: var(--chat-horizontal-padding, var(--chat-horizontal-padding-default));
 	}
 }
 
-:global(:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard))
+:global(
+		:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard):not(
+			.experiment-message-hover-tracking
+		)
+	)
 	.message.messageHovered:not(.messageMentioned):not(.messageReplying):not(.messageHighlight):not(.messagePreview),
-:global(:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard))
+:global(
+		:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard):not(
+			.experiment-message-hover-tracking
+		)
+	)
 	.messageCompact.messageHovered:not(.messageMentioned):not(.messageReplying):not(.messageHighlight):not(
 		.messagePreview
 	) {
 	background-color: var(--background-modifier-hover);
 }
 
-:global(:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard))
+:global(
+		:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard):not(
+			.experiment-message-hover-tracking
+		)
+	)
 	.message.messageMentioned.messageHovered,
-:global(:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard))
+:global(
+		:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard):not(
+			.experiment-message-hover-tracking
+		)
+	)
 	.messageCompact.messageMentioned.messageHovered {
 	background-color: var(--message-mention-bg-hover);
 }
@@ -95,13 +114,29 @@
 	background-color: var(--message-mention-bg);
 }
 
-:global(:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard))
+:global(
+		:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard):not(
+			.experiment-message-hover-tracking
+		)
+	)
 	.message.messageReplying.messageHovered:not(.messageMentioned),
-:global(:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard))
+:global(
+		:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard):not(
+			.experiment-message-hover-tracking
+		)
+	)
 	.message.messageHighlight.messageHovered:not(.messageMentioned),
-:global(:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard))
+:global(
+		:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard):not(
+			.experiment-message-hover-tracking
+		)
+	)
 	.messageCompact.messageReplying.messageHovered:not(.messageMentioned),
-:global(:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard))
+:global(
+		:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard):not(
+			.experiment-message-hover-tracking
+		)
+	)
 	.messageCompact.messageHighlight.messageHovered:not(.messageMentioned) {
 	background-color: var(--message-reply-bg);
 }
@@ -124,9 +159,17 @@
 }
 
 @media (pointer: coarse) {
-	:global(:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard))
+	:global(
+			:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard):not(
+				.experiment-message-hover-tracking
+			)
+		)
 		.message:hover,
-	:global(:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard))
+	:global(
+			:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard):not(
+				.experiment-message-hover-tracking
+			)
+		)
 		.messageCompact:hover {
 		background-color: transparent;
 	}
@@ -145,19 +188,17 @@
 .messageGrouped {
 	grid-template-areas: '. . . reply' 'gutter-left timestamp gutter-right content' '. . . container';
 
-	grid-template-columns: var(--chat-horizontal-padding, var(--message-gutter)) var(--message-avatar-size) var(
-			--message-gutter
-		) minmax(0, 1fr);
+	grid-template-columns: var(--chat-horizontal-padding, var(--chat-horizontal-padding-default)) var(
+			--message-avatar-size
+		) var(--message-gutter) minmax(0, 1fr);
 }
 
 .messageCompact {
-	--message-compact-horizontal-padding: min(var(--chat-horizontal-padding, var(--message-gutter)), 1rem);
 	--message-compact-timestamp-column-width: var(--message-compact-measured-timestamp-width, max-content);
 	--message-compact-timestamp-calc-width: var(
 		--message-compact-measured-timestamp-width,
 		var(--message-compact-timestamp-width)
 	);
-	--message-compact-text-indent-from-username: 2rem;
 	--message-compact-text-start: calc(
 		var(--message-compact-timestamp-calc-width) +
 		var(--message-compact-gap) +
@@ -177,7 +218,7 @@
 	padding-inline-start: 0;
 	padding-inline-end: var(--message-compact-horizontal-padding);
 	text-indent: 0;
-	margin-inline: calc(-1 * var(--chat-horizontal-padding, var(--message-gutter)));
+	margin-inline: calc(-1 * var(--chat-horizontal-padding, var(--chat-horizontal-padding-default)));
 }
 
 @media (min-width: 768px) {
@@ -208,6 +249,8 @@
 }
 
 .messageFailed {
+	--markup-link-color: var(--status-danger);
+	--markup-mention-color: var(--status-danger);
 	color: var(--status-danger);
 }
 
@@ -216,7 +259,6 @@
 	opacity: 1;
 }
 
-.messageFailed .link,
 .messageFailed a {
 	color: var(--status-danger) !important;
 }
@@ -426,6 +468,7 @@
 	max-inline-size: none;
 	overflow: visible;
 	white-space: nowrap;
+	unicode-bidi: plaintext;
 	user-select: text;
 	-webkit-user-select: text;
 }
@@ -503,6 +546,7 @@
 	font-weight: 400;
 	color: var(--message-timestamp-color);
 	line-height: var(--message-line-height);
+	unicode-bidi: isolate;
 }
 
 .messageTimestamp {
@@ -555,6 +599,7 @@
 	font-size: var(--message-timestamp-compact-font-size);
 	font-weight: 500;
 	line-height: var(--message-line-height);
+	unicode-bidi: isolate;
 }
 
 .messageTimestampHover {
@@ -573,7 +618,11 @@
 	transform: translateX(0.5rem);
 }
 
-:global(:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard))
+:global(
+		:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard):not(
+			.experiment-message-hover-tracking
+		)
+	)
 	.message.messageHovered
 	.messageTimestampHover {
 	opacity: 1;
@@ -581,7 +630,11 @@
 }
 
 @media (pointer: coarse) {
-	:global(:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard))
+	:global(
+			:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard):not(
+				.experiment-message-hover-tracking
+			)
+		)
 		.message:hover
 		.messageTimestampHover {
 		opacity: 0;
@@ -645,7 +698,11 @@
 	margin-inline-end: 0;
 }
 
-:global(:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard))
+:global(
+		:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard):not(
+			.experiment-message-hover-tracking
+		)
+	)
 	.messageCompact.messageHovered
 	.messageTimestampCompactHover {
 	opacity: 1;
@@ -653,7 +710,11 @@
 }
 
 @media (pointer: coarse) {
-	:global(:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard))
+	:global(
+			:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard):not(
+				.experiment-message-hover-tracking
+			)
+		)
 		.messageCompact:hover
 		.messageTimestampCompactHover {
 		opacity: 0;
@@ -673,40 +734,80 @@
 	min-inline-size: 0;
 }
 
-.message .buttons,
-.messageCompact .buttons {
+:global(html:not(.experiment-message-hover-tracking)) .message .buttons,
+:global(html:not(.experiment-message-hover-tracking)) .messageCompact .buttons {
 	opacity: 0;
 	pointer-events: none;
 }
 
-:global(:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard))
+:global(
+		:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard):not(
+			.experiment-message-hover-tracking
+		)
+	)
 	.message.messageHovered
 	.buttons,
-:global(:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard))
+:global(
+		:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard):not(
+			.experiment-message-hover-tracking
+		)
+	)
 	.message
 	.buttons:hover,
-:global(:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard))
+:global(
+		:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard):not(
+			.experiment-message-hover-tracking
+		)
+	)
 	.message
-	.buttons:focus-within,
-:global(:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard))
+	.buttons:has(:focus-visible),
+:global(
+		:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard):not(
+			.experiment-message-hover-tracking
+		)
+	)
 	.message.selected
 	.buttons,
-:global(:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard))
+:global(
+		:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard):not(
+			.experiment-message-hover-tracking
+		)
+	)
 	.message
 	.buttons.emojiPickerOpen,
-:global(:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard))
+:global(
+		:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard):not(
+			.experiment-message-hover-tracking
+		)
+	)
 	.messageCompact.messageHovered
 	.buttons,
-:global(:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard))
+:global(
+		:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard):not(
+			.experiment-message-hover-tracking
+		)
+	)
 	.messageCompact
 	.buttons:hover,
-:global(:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard))
+:global(
+		:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard):not(
+			.experiment-message-hover-tracking
+		)
+	)
 	.messageCompact
-	.buttons:focus-within,
-:global(:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard))
+	.buttons:has(:focus-visible),
+:global(
+		:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard):not(
+			.experiment-message-hover-tracking
+		)
+	)
 	.messageCompact.selected
 	.buttons,
-:global(:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard))
+:global(
+		:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard):not(
+			.experiment-message-hover-tracking
+		)
+	)
 	.messageCompact
 	.buttons.emojiPickerOpen {
 	opacity: 1;
@@ -714,10 +815,18 @@
 }
 
 @media (pointer: coarse) {
-	:global(:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard))
+	:global(
+			:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard):not(
+				.experiment-message-hover-tracking
+			)
+		)
 		.message:hover
 		.buttons,
-	:global(:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard))
+	:global(
+			:where(html.window-focused, html.unfocused-fully-interactive):not(.window-focus-activation-guard):not(
+				.experiment-message-hover-tracking
+			)
+		)
 		.messageCompact:hover
 		.buttons {
 		opacity: 0;
@@ -946,6 +1055,7 @@
 	white-space: nowrap;
 	max-width: 30%;
 	vertical-align: baseline;
+	unicode-bidi: plaintext;
 	font-weight: 500;
 	color: color-mix(
 		in srgb,
@@ -987,11 +1097,18 @@
 }
 
 .repliedTextContent {
-	--mention-offset-block-end: 0px;
+	--markup-restricted-inline-icon-baseline-shift: -0.125em;
+	--markup-restricted-inline-emoji-size: var(--reply-height);
+	--markup-restricted-inline-emoji-baseline-shift: bottom;
 	display: inline;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+.repliedTextContent,
+.repliedTextContent * {
+	white-space: nowrap !important;
 }
 
 .repliedMessage .repliedTextPreview .repliedTextContent {
@@ -1004,15 +1121,15 @@
 }
 
 .repliedTextContent :global(.emoji) {
-	width: var(--reply-height);
-	height: var(--reply-height);
+	width: var(--markup-restricted-inline-emoji-size);
+	height: var(--markup-restricted-inline-emoji-size);
 	min-height: 0;
-	margin-bottom: 0;
-	vertical-align: text-bottom;
+	margin-block: 0;
+	vertical-align: var(--markup-restricted-inline-emoji-baseline-shift);
 }
 
 .repliedTextContent :global(.emoji:not(img)) {
-	font-size: var(--reply-height);
+	font-size: var(--markup-restricted-inline-emoji-size);
 	line-height: 1;
 }
 
@@ -1071,19 +1188,6 @@
 	align-items: flex-start;
 	justify-content: center;
 	padding-block-start: 0.15em;
-	padding-inline-start: max(
-		0px,
-		calc(
-			(
-				var(--textarea-horizontal-padding, 1rem) +
-				var(--textarea-side-button-padding, 0.34375rem) +
-				(var(--textarea-button-height, 2rem) / 2) -
-				var(--chat-horizontal-padding, 1rem) -
-				(var(--message-avatar-size) / 2)
-			) *
-			2
-		)
-	);
 	user-select: none;
 	-webkit-user-select: none;
 }
@@ -1259,7 +1363,10 @@
 
 .typingCluster {
 	display: grid;
-	grid-template-columns: var(--typing-upload-column-width) minmax(0, 1fr);
+	grid-template-columns: calc(var(--textarea-button-height, 2rem) + var(--textarea-side-button-padding, 0.25rem) * 2) minmax(
+			0,
+			1fr
+		);
 	column-gap: var(--textarea-upload-gap, 0.75rem);
 	align-items: center;
 	pointer-events: none;
@@ -1282,7 +1389,6 @@
 	grid-column: 1 / -1;
 	justify-self: flex-start;
 	margin-inline-start: 0;
-	transform: translateY(50%);
 }
 
 :global(.theme-light) .typingPill {
@@ -1324,8 +1430,21 @@
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	font-size: 0.625rem;
+	font-size: 0.75rem;
 	line-height: var(--typing-pill-height);
+}
+
+.typingClusterComposerStatus {
+	display: inline-flex;
+	grid-template-columns: none;
+	column-gap: 0;
+	width: auto;
+	max-width: 100%;
+	flex: 0 1 auto;
+}
+
+.typingClusterComposerStatus .typingAvatarContainer {
+	--avatar-stack-outline-color: var(--composer-surface-color, var(--background-secondary-lighter));
 }
 
 .compactContentWrapper {
@@ -1407,15 +1526,21 @@
 	max-inline-size: calc(100% - var(--message-compact-text-start));
 }
 
-.contextMenuActive {
+:global(html:not(.experiment-message-hover-tracking)) .contextMenuActive,
+:global(html.experiment-message-hover-tracking:where(.window-focused, .unfocused-fully-interactive))
+	.contextMenuActive {
 	background-color: var(--background-modifier-hover) !important;
 }
 
-:global(html.reduced-motion) .contextMenuActive {
+:global(html.reduced-motion:not(.experiment-message-hover-tracking)) .contextMenuActive {
 	background-color: transparent !important;
 }
 
-.contextMenuActive .buttons {
+:global(html.reduced-motion.experiment-message-hover-tracking) .contextMenuActive {
+	background-color: var(--background-modifier-hover) !important;
+}
+
+:global(html:not(.experiment-message-hover-tracking)) .contextMenuActive .buttons {
 	opacity: 1 !important;
 	pointer-events: auto !important;
 }
@@ -1430,7 +1555,9 @@
 	pointer-events: auto !important;
 }
 
-.contextMenuActive.messageMentioned {
+:global(html:not(.experiment-message-hover-tracking)) .contextMenuActive.messageMentioned,
+:global(html.experiment-message-hover-tracking:where(.window-focused, .unfocused-fully-interactive))
+	.contextMenuActive.messageMentioned {
 	background-color: var(--message-mention-bg-hover) !important;
 }
 
@@ -1438,8 +1565,12 @@
 	background-color: var(--message-mention-bg) !important;
 }
 
-.contextMenuActive.messageReplying:not(.messageMentioned),
-.contextMenuActive.messageHighlight:not(.messageMentioned) {
+:global(html:not(.experiment-message-hover-tracking)) .contextMenuActive.messageReplying:not(.messageMentioned),
+:global(html:not(.experiment-message-hover-tracking)) .contextMenuActive.messageHighlight:not(.messageMentioned),
+:global(html.experiment-message-hover-tracking:where(.window-focused, .unfocused-fully-interactive))
+	.contextMenuActive.messageReplying:not(.messageMentioned),
+:global(html.experiment-message-hover-tracking:where(.window-focused, .unfocused-fully-interactive))
+	.contextMenuActive.messageHighlight:not(.messageMentioned) {
 	background-color: var(--message-reply-bg) !important;
 }
 
@@ -1448,20 +1579,27 @@
 	background-color: var(--message-reply-bg) !important;
 }
 
-.keyboardFocused {
+:global(html:not(.experiment-message-hover-tracking)) .keyboardFocused,
+:global(html.experiment-message-hover-tracking:where(.window-focused, .unfocused-fully-interactive)) .keyboardFocused {
 	background-color: var(--background-modifier-hover);
 }
 
-.keyboardFocused.messageMentioned {
+:global(html:not(.experiment-message-hover-tracking)) .keyboardFocused.messageMentioned,
+:global(html.experiment-message-hover-tracking:where(.window-focused, .unfocused-fully-interactive))
+	.keyboardFocused.messageMentioned {
 	background-color: var(--message-mention-bg);
 }
 
-.keyboardFocused.messageReplying:not(.messageMentioned),
-.keyboardFocused.messageHighlight:not(.messageMentioned) {
+:global(html:not(.experiment-message-hover-tracking)) .keyboardFocused.messageReplying:not(.messageMentioned),
+:global(html:not(.experiment-message-hover-tracking)) .keyboardFocused.messageHighlight:not(.messageMentioned),
+:global(html.experiment-message-hover-tracking:where(.window-focused, .unfocused-fully-interactive))
+	.keyboardFocused.messageReplying:not(.messageMentioned),
+:global(html.experiment-message-hover-tracking:where(.window-focused, .unfocused-fully-interactive))
+	.keyboardFocused.messageHighlight:not(.messageMentioned) {
 	background-color: var(--message-reply-bg);
 }
 
-.keyboardFocused .buttons {
+:global(html:not(.experiment-message-hover-tracking)) .keyboardFocused .buttons {
 	opacity: 1;
 	pointer-events: auto;
 }

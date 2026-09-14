@@ -1,19 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import {TorBlockedError} from '@fluxer/errors/src/domains/moderation/TorBlockedError';
-import {extractClientIp} from '@fluxer/ip_utils/src/ClientIp';
+import {torExitListCache} from '@app/api/middleware/TorExitListCache';
+import type {HonoEnv} from '@app/api/types/HonoEnv';
+import {getRequestClientIp} from '@app/api/utils/RequestClientIp';
+import {IpBannedError} from '@fluxer/errors/src/domains/moderation/IpBannedError';
 import {createMiddleware} from 'hono/factory';
-import {Config} from '../Config';
-import type {HonoEnv} from '../types/HonoEnv';
-import {torExitListCache} from './TorExitListCache';
 
 export const TorExitMiddleware = createMiddleware<HonoEnv>(async (ctx, next) => {
-	const clientIp = extractClientIp(ctx.req.raw, {
-		trustClientIpHeader: Config.proxy.trust_client_ip_header,
-		clientIpHeaderName: Config.proxy.client_ip_header,
-	});
+	const clientIp = getRequestClientIp(ctx);
 	if (clientIp && torExitListCache.isTorExit(clientIp)) {
-		throw new TorBlockedError();
+		throw new IpBannedError({
+			ipAddress: clientIp,
+			kind: 'permanent',
+		});
 	}
 	await next();
 });

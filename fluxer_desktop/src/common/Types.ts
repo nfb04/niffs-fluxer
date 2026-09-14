@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type {VoiceEngineV2BridgeApi} from '@fluxer/voice_engine_v2/bridge';
+import type {VoiceEngineV2BridgeHardwareEncoderApi} from '@fluxer/voice_engine_v2/bridge';
 import type {
 	AuthenticationResponseJSON,
 	PublicKeyCredentialCreationOptionsJSON,
@@ -120,7 +120,6 @@ export interface DesktopWindowBehaviorSettings {
 	activeSmoothScrolling: boolean;
 	middleClickAutoscroll: boolean;
 	activeMiddleClickAutoscroll: boolean;
-	firstClickPassThroughWhenUnfocused: boolean;
 }
 
 export interface ThemeLocalFileReference {
@@ -444,6 +443,7 @@ export interface NativeAudioApi {
 	listAudibleApplications: () => Promise<Array<NativeAudioApplication>>;
 	resolveAudioRootPidForSource: (sourceId: string) => Promise<number | null>;
 	start: (options: NativeAudioStartOptions) => Promise<NativeAudioStartResult>;
+	setRule: (captureId: string, linuxRule: NonNullable<NativeAudioStartOptions['linuxRule']>) => Promise<boolean>;
 	stop: (captureId: string) => Promise<void>;
 	getRoutingGraph: (captureId?: string) => Promise<NativeAudioRoutingGraphResult>;
 	onFrame: (callback: (message: NativeAudioFrameMessage) => void) => () => void;
@@ -486,8 +486,6 @@ export interface NativeScreenCaptureSource {
 	targetPid?: number;
 }
 
-export type GameCaptureInjectionMethod = 'auto' | 'remote-thread' | 'set-windows-hook';
-
 export interface NativeScreenCaptureRect {
 	x: number;
 	y: number;
@@ -501,7 +499,6 @@ export interface NativeScreenCaptureStartOptions {
 	width?: number;
 	height?: number;
 	frameRate?: number;
-	injectionMethod?: GameCaptureInjectionMethod;
 	captureId?: string;
 	colorRange?: 'full' | 'limited';
 	colorSpace?: 'rec709' | 'srgb';
@@ -537,7 +534,7 @@ export interface NativeScreenCaptureLifecycleMessage {
 	source?: NativeScreenCaptureLifecycleSource;
 }
 
-export type NativeScreenCaptureStrategy = 'game-hook' | 'wgc' | 'dxgi-duplication' | 'window-gdi' | string;
+export type NativeScreenCaptureStrategy = 'wgc' | 'dxgi-duplication' | 'window-gdi' | string;
 
 export interface NativeScreenCaptureDiagnostics {
 	state?: number;
@@ -552,8 +549,6 @@ export interface NativeScreenCaptureDiagnostics {
 	droppedFrameCounter?: number;
 	lastPresentTimestampUs?: number;
 	lastError?: number;
-	requestedInjectionMethod?: string;
-	injectionMethod?: string;
 	activeStrategy?: NativeScreenCaptureStrategy;
 	lastFallbackReason?: string;
 	backend?: string;
@@ -670,7 +665,6 @@ export interface ElectronAPI {
 	clearThemeLocalFiles: () => Promise<void>;
 	importThemeDirectory: () => Promise<Array<ThemeDirectoryCssFile>>;
 	cacheVoiceBackgroundMedia: (options: VoiceBackgroundMediaCacheRequest) => Promise<VoiceBackgroundMediaCacheResult>;
-	resolveVoiceBackgroundMedia: (id: string) => Promise<VoiceBackgroundMediaCacheResult | null>;
 	readVoiceBackgroundMedia: (id: string) => Promise<VoiceBackgroundMediaReadResult | null>;
 	deleteVoiceBackgroundMedia: (id: string) => Promise<void>;
 	getDesktopTroubleshootingSettings: () => Promise<DesktopTroubleshootingSettings>;
@@ -703,7 +697,6 @@ export interface ElectronAPI {
 	pasteFromClipboard: () => Promise<void>;
 	onDeepLink: (callback: (url: string) => void) => () => void;
 	getInitialDeepLink: () => Promise<string | null>;
-	onRpcNavigate: (callback: (path: string) => void) => () => void;
 	autostartEnable: () => Promise<void>;
 	autostartDisable: () => Promise<void>;
 	autostartIsEnabled: () => Promise<boolean>;
@@ -805,7 +798,7 @@ export interface ElectronAPI {
 	virtmic: VirtmicApi;
 	nativeAudio: NativeAudioApi;
 	nativeScreenCapture: NativeScreenCaptureApi;
-	voiceEngine: VoiceEngineV2BridgeApi;
+	voiceEngine: VoiceEngineV2BridgeHardwareEncoderApi;
 	getDesktopSources: (
 		types: Array<'screen' | 'window'>,
 		requestId?: string,

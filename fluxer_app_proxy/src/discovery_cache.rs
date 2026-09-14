@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+use crate::config::HttpEndpoint;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use std::time::Duration;
-use tokio::sync::RwLock;
+use std::time::{Duration, Instant};
+use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
+
+const COLD_START_RETRY_COOLDOWN: Duration = Duration::from_secs(10);
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DiscoveryResponse {
@@ -12,15 +15,67 @@ pub struct DiscoveryResponse {
     pub data: serde_json::Value,
 }
 
+pub fn discovery_endpoint(
+    discovery: &DiscoveryResponse,
+    key: &'static str,
+) -> Option<HttpEndpoint> {
+    let raw = discovery
+        .data
+        .get("endpoints")
+        .and_then(|endpoints| endpoints.get(key))
+        .and_then(|value| value.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())?;
+    match HttpEndpoint::parse(key, raw) {
+        Ok(endpoint) => Some(endpoint),
+        Err(error) => {
+            tracing::warn!(%error, "ignoring invalid discovery endpoint");
+            None
+        }
+    }
+}
+
 pub struct DiscoveryCache {
     cached: RwLock<Option<DiscoveryResponse>>,
+    cold_start_attempt: Mutex<Option<Instant>>,
 }
 
 impl DiscoveryCache {
     pub fn new() -> Self {
         Self {
             cached: RwLock::new(None),
+            cold_start_attempt: Mutex::new(None),
         }
+    }
+
+    /// Discovery for a request that has no cached value yet.
+    ///
+    /// Steady-state freshness is owned by `start_background_refresh`, which backs off when the
+    /// upstream is unhealthy. Request handlers must never block on the network while a cached
+    /// value exists, and must not retry a failing upstream once per request: the upstream is
+    /// reached through this proxy's own public hostname, so a stall here feeds back into the
+    /// front door that serves it.
+    pub async fn get_or_cold_start(
+        &self,
+        client: &reqwest::Client,
+        upstream_url: &str,
+    ) -> Option<DiscoveryResponse> {
+        if let Some(cached) = self.get().await {
+            return Some(cached);
+        }
+        {
+            let mut last_attempt = self.cold_start_attempt.lock().await;
+            if let Some(at) = *last_attempt
+                && at.elapsed() < COLD_START_RETRY_COOLDOWN
+            {
+                return None;
+            }
+            *last_attempt = Some(Instant::now());
+        }
+        if let Err(err) = self.refresh(client, upstream_url).await {
+            tracing::warn!(%err, url = upstream_url, "cold-start discovery fetch failed");
+        }
+        self.get().await
     }
 
     pub async fn refresh(
@@ -53,6 +108,10 @@ impl DiscoveryCache {
 
     pub async fn get(&self) -> Option<DiscoveryResponse> {
         self.cached.read().await.clone()
+    }
+
+    pub async fn has_snapshot(&self) -> bool {
+        self.cached.read().await.is_some()
     }
 
     pub fn start_background_refresh(
@@ -112,6 +171,53 @@ mod tests {
     async fn default_cache_starts_with_none() {
         let cache = DiscoveryCache::default();
         assert!(cache.get().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn a_seeded_cache_reports_a_snapshot_without_cloning_it() {
+        let cache = DiscoveryCache::new();
+        assert!(!cache.has_snapshot().await);
+        *cache.cached.write().await =
+            Some(serde_json::from_str(r#"{"api_code_version":"v1"}"#).unwrap());
+        assert!(cache.has_snapshot().await);
+    }
+
+    #[tokio::test]
+    async fn cached_discovery_never_touches_the_network() {
+        let cache = DiscoveryCache::new();
+        let json = r#"{"api_code_version":"v1"}"#;
+        *cache.cached.write().await = Some(serde_json::from_str(json).unwrap());
+        // An unroutable upstream: if this were contacted the call would stall or error.
+        let client = reqwest::Client::new();
+        let got = cache
+            .get_or_cold_start(&client, "http://127.0.0.1:1/discovery")
+            .await;
+        assert!(got.is_some());
+        assert!(cache.cold_start_attempt.lock().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn cold_start_failure_is_not_retried_on_every_request() {
+        let cache = DiscoveryCache::new();
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_millis(50))
+            .build()
+            .unwrap();
+        assert!(
+            cache
+                .get_or_cold_start(&client, "http://127.0.0.1:1/discovery")
+                .await
+                .is_none()
+        );
+        let first = *cache.cold_start_attempt.lock().await;
+        assert!(first.is_some());
+        assert!(
+            cache
+                .get_or_cold_start(&client, "http://127.0.0.1:1/discovery")
+                .await
+                .is_none()
+        );
+        assert_eq!(*cache.cold_start_attempt.lock().await, first);
     }
 
     #[test]

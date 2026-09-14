@@ -1,6 +1,31 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import fs from 'node:fs/promises';
+import type {ChannelID, GuildID, MessageID, UserID, WebhookID, WebhookToken} from '@app/api/BrandedTypes';
+import {createChannelID, createGuildID, createWebhookID, createWebhookToken} from '@app/api/BrandedTypes';
+import type {IChannelRepository} from '@app/api/channel/IChannelRepository';
+import type {MessageRequest, MessageUpdateRequest} from '@app/api/channel/MessageTypes';
+import type {ChannelService} from '@app/api/channel/services/ChannelService';
+import type {GuildAuditLogService} from '@app/api/guild/GuildAuditLogService';
+import type {GuildService} from '@app/api/guild/services/GuildService';
+import type {AvatarService} from '@app/api/infrastructure/AvatarService';
+import {contentModerationService} from '@app/api/infrastructure/ContentModerationService';
+import type {IGatewayService} from '@app/api/infrastructure/IGatewayService';
+import type {IMediaService} from '@app/api/infrastructure/IMediaService';
+import type {ISnowflakeService} from '@app/api/infrastructure/ISnowflakeService';
+import {Logger} from '@app/api/Logger';
+import type {LimitConfigService} from '@app/api/limits/LimitConfigService';
+import {resolveLimitSafe} from '@app/api/limits/LimitConfigUtils';
+import {createLimitMatchContext} from '@app/api/limits/LimitMatchContextBuilder';
+import type {RequestCache} from '@app/api/middleware/RequestCacheMiddleware';
+import type {Channel} from '@app/api/models/Channel';
+import type {Message} from '@app/api/models/Message';
+import type {Webhook} from '@app/api/models/Webhook';
+import {resolveAssetPath} from '@app/api/utils/AssetPaths';
+import * as RandomUtils from '@app/api/utils/RandomUtils';
+import type {IWebhookRepository} from '@app/api/webhook/IWebhookRepository';
+import {transform as GitHubTransform} from '@app/api/webhook/transformers/GitHubTransformer';
+import {instatusDeliveryKey, transformInstatusWebhook} from '@app/api/webhook/transformers/InstatusTransformer';
 import {AuditLogActionType} from '@fluxer/constants/src/AuditLogActionType';
 import {GUILD_TEXT_BASED_CHANNEL_TYPES, Permissions} from '@fluxer/constants/src/ChannelConstants';
 import type {LimitKey} from '@fluxer/constants/src/LimitConfigMetadata';
@@ -22,30 +47,6 @@ import type {
 } from '@fluxer/schema/src/domains/webhook/WebhookRequestSchemas';
 import type {ICacheService} from '@pkgs/cache/src/ICacheService';
 import {seconds} from 'itty-time';
-import type {ChannelID, GuildID, MessageID, UserID, WebhookID, WebhookToken} from '../BrandedTypes';
-import {createChannelID, createGuildID, createWebhookID, createWebhookToken} from '../BrandedTypes';
-import type {IChannelRepository} from '../channel/IChannelRepository';
-import type {MessageRequest, MessageUpdateRequest} from '../channel/MessageTypes';
-import type {ChannelService} from '../channel/services/ChannelService';
-import type {GuildAuditLogService} from '../guild/GuildAuditLogService';
-import type {GuildService} from '../guild/services/GuildService';
-import type {AvatarService} from '../infrastructure/AvatarService';
-import {contentModerationService} from '../infrastructure/ContentModerationService';
-import type {IGatewayService} from '../infrastructure/IGatewayService';
-import type {IMediaService} from '../infrastructure/IMediaService';
-import type {ISnowflakeService} from '../infrastructure/ISnowflakeService';
-import {Logger} from '../Logger';
-import type {LimitConfigService} from '../limits/LimitConfigService';
-import {resolveLimitSafe} from '../limits/LimitConfigUtils';
-import {createLimitMatchContext} from '../limits/LimitMatchContextBuilder';
-import type {RequestCache} from '../middleware/RequestCacheMiddleware';
-import type {Channel} from '../models/Channel';
-import type {Message} from '../models/Message';
-import type {Webhook} from '../models/Webhook';
-import * as RandomUtils from '../utils/RandomUtils';
-import type {IWebhookRepository} from './IWebhookRepository';
-import {transform as GitHubTransform} from './transformers/GitHubTransformer';
-import {transformInstatusWebhook} from './transformers/InstatusTransformer';
 
 export interface WebhookExecuteMessageData extends Omit<WebhookMessageRequest, 'attachments'> {
 	attachments?: WebhookMessageRequest['attachments'] | MessageRequest['attachments'];
@@ -142,7 +143,15 @@ export class WebhookService {
 	async getGuildWebhooks({userId, guildId}: {userId: UserID; guildId: GuildID}): Promise<Array<Webhook>> {
 		const {checkPermission} = await this.guildService.getGuildAuthenticated({userId, guildId});
 		await checkPermission(Permissions.MANAGE_WEBHOOKS);
-		return await this.repository.listByGuild(guildId);
+		const webhooks = await this.repository.listByGuild(guildId);
+		const visibility = await Promise.all(
+			webhooks.map((webhook) =>
+				webhook.channelId
+					? this.canManageChannelWebhooks({userId, guildId, channelId: webhook.channelId})
+					: Promise.resolve(false),
+			),
+		);
+		return webhooks.filter((_webhook, index) => visibility[index]);
 	}
 
 	async getChannelWebhooks({userId, channelId}: {userId: UserID; channelId: ChannelID}): Promise<Array<Webhook>> {
@@ -153,6 +162,7 @@ export class WebhookService {
 			guildId: channel.guildId,
 		});
 		await checkPermission(Permissions.MANAGE_WEBHOOKS);
+		await this.assertChannelWebhookPermission({userId, guildId: channel.guildId, channelId});
 		return await this.repository.listByChannel(channelId);
 	}
 
@@ -172,6 +182,7 @@ export class WebhookService {
 			guildId: channel.guildId,
 		});
 		await checkPermission(Permissions.MANAGE_WEBHOOKS);
+		await this.assertChannelWebhookPermission({userId, guildId: channel.guildId, channelId});
 		const guildLimit = this.resolveWebhookLimit(guildData.features, 'max_webhooks_per_guild', MAX_WEBHOOKS_PER_GUILD);
 		const guildWebhookCount = await this.repository.countByGuild(channel.guildId);
 		if (guildWebhookCount >= guildLimit) {
@@ -419,6 +430,11 @@ export class WebhookService {
 		const {webhookId, token, data, requestCache} = params;
 		const webhook = await this.getTokenAuthenticatedWebhook({webhookId, token});
 		await this.assertWebhookGuildChannel(webhook);
+		const delivery = instatusDeliveryKey(data);
+		if (delivery) {
+			const isCached = await this.cacheService.get<number>(`instatus:${webhookId}:${delivery}`);
+			if (isCached) return;
+		}
 		const embed = transformInstatusWebhook(data);
 		if (!embed) return;
 		await this.channelService.messages.send.sendWebhookMessage({
@@ -428,6 +444,7 @@ export class WebhookService {
 			avatar: await this.getInstatusWebhookAvatar(webhook.id),
 			requestCache,
 		});
+		if (delivery) await this.cacheService.set(`instatus:${webhookId}:${delivery}`, 1, seconds('1 day'));
 	}
 
 	async dispatchWebhooksUpdate({
@@ -451,7 +468,39 @@ export class WebhookService {
 		if (!webhook) throw new UnknownWebhookError();
 		const {checkPermission} = await this.guildService.getGuildAuthenticated({userId, guildId: webhook.guildId!});
 		await checkPermission(Permissions.MANAGE_WEBHOOKS);
+		if (webhook.guildId && webhook.channelId) {
+			await this.assertChannelWebhookPermission({
+				userId,
+				guildId: webhook.guildId,
+				channelId: webhook.channelId,
+			});
+		}
 		return webhook;
+	}
+
+	private async canManageChannelWebhooks({
+		userId,
+		guildId,
+		channelId,
+	}: {
+		userId: UserID;
+		guildId: GuildID;
+		channelId: ChannelID;
+	}): Promise<boolean> {
+		const [canView, canManage] = await Promise.all([
+			this.gatewayService.checkPermission({guildId, userId, permission: Permissions.VIEW_CHANNEL, channelId}),
+			this.gatewayService.checkPermission({guildId, userId, permission: Permissions.MANAGE_WEBHOOKS, channelId}),
+		]);
+		return canView && canManage;
+	}
+
+	private async assertChannelWebhookPermission(params: {
+		userId: UserID;
+		guildId: GuildID;
+		channelId: ChannelID;
+	}): Promise<void> {
+		const allowed = await this.canManageChannelWebhooks(params);
+		if (!allowed) throw new MissingPermissionsError();
 	}
 
 	private async getTokenAuthenticatedWebhook({webhookId, token}: WebhookTokenParams): Promise<Webhook> {
@@ -537,7 +586,7 @@ export class WebhookService {
 				type: 'external',
 				url: avatarUrl,
 				with_base64: true,
-				nsfw: 'block',
+				nsfw: 'allow',
 			});
 			if (!metadata?.base64) {
 				await this.cacheService.set(cacheKey, WEBHOOK_AVATAR_MISSING_CACHE_VALUE, seconds('5 minutes'));
@@ -578,7 +627,7 @@ export class WebhookService {
 		const cacheKey = `webhook:${webhookId}:avatar:${provider}`;
 		const avatarCache = await this.cacheService.get<string | null>(cacheKey);
 		if (avatarCache) return avatarCache;
-		const avatarFile = await fs.readFile(new URL(`../assets/${provider}.webp`, import.meta.url));
+		const avatarFile = await fs.readFile(resolveAssetPath('assets', `${provider}.webp`));
 		const avatar = await this.avatarService.uploadAvatar({
 			prefix: 'avatars',
 			entityId: webhookId,

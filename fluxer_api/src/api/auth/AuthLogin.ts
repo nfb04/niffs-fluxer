@@ -1,5 +1,30 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import type {ApiContext} from '@app/api/ApiContext';
+import * as AuthMfa from '@app/api/auth/AuthMfa';
+import * as AuthPassword from '@app/api/auth/AuthPassword';
+import * as AuthSession from '@app/api/auth/AuthSession';
+import * as AuthUtility from '@app/api/auth/AuthUtility';
+import {
+	createInviteCode,
+	createIpAuthorizationTicket,
+	createIpAuthorizationToken,
+	createMfaTicket,
+	createUserID,
+} from '@app/api/BrandedTypes';
+import {getContentMessage} from '@app/api/content_i18n/ContentI18n';
+import type {KVAccountDeletionQueueService} from '@app/api/infrastructure/KVAccountDeletionQueueService';
+import {
+	REGISTRATION_PENDING_APPROVAL_TRAIT,
+	REGISTRATION_REJECTED_TRAIT,
+} from '@app/api/instance/InstanceConfigRepository';
+import type {InviteService} from '@app/api/invite/InviteService';
+import {Logger} from '@app/api/Logger';
+import {createRequestCache} from '@app/api/middleware/RequestCacheMiddleware';
+import {getInstanceConfigRepository} from '@app/api/middleware/ServiceSingletons';
+import type {User} from '@app/api/models/User';
+import {lookupGeoip} from '@app/api/utils/IpUtils';
+import {createRateLimitError} from '@app/api/utils/RateLimitUtils';
 import {UserAuthenticatorTypes, UserFlags} from '@fluxer/constants/src/UserConstants';
 import {ValidationErrorCodes} from '@fluxer/constants/src/ValidationErrorCodes';
 import {IpAuthorizationRequiredError} from '@fluxer/errors/src/domains/auth/IpAuthorizationRequiredError';
@@ -8,48 +33,16 @@ import {IpAuthorizationResendLimitExceededError} from '@fluxer/errors/src/domain
 import {RegistrationPendingApprovalError} from '@fluxer/errors/src/domains/auth/RegistrationPendingApprovalError';
 import {RegistrationRejectedError} from '@fluxer/errors/src/domains/auth/RegistrationRejectedError';
 import {InputValidationError} from '@fluxer/errors/src/domains/core/InputValidationError';
-import {RateLimitError} from '@fluxer/errors/src/domains/core/RateLimitError';
 import {UnknownUserError} from '@fluxer/errors/src/domains/user/UnknownUserError';
 import {requireClientIp} from '@fluxer/ip_utils/src/ClientIp';
 import {getSameIpDecisionKey} from '@fluxer/ip_utils/src/IpAddress';
 import type {LoginRequest} from '@fluxer/schema/src/domains/auth/AuthSchemas';
-import {formatGeoipLocation, UNKNOWN_LOCATION} from '@pkgs/geoip/src/GeoipLookup';
-import type {RateLimitResult} from '@pkgs/rate_limit/src/IRateLimitService';
+import {formatGeoipLocation} from '@pkgs/geoip/src/GeoipLookup';
 import type {AuthenticationResponseJSON} from '@simplewebauthn/server';
 import {ms, seconds} from 'itty-time';
-import type {ApiContext} from '../ApiContext';
-import {
-	createInviteCode,
-	createIpAuthorizationTicket,
-	createIpAuthorizationToken,
-	createMfaTicket,
-	createUserID,
-} from '../BrandedTypes';
-import type {KVAccountDeletionQueueService} from '../infrastructure/KVAccountDeletionQueueService';
-import {REGISTRATION_PENDING_APPROVAL_TRAIT, REGISTRATION_REJECTED_TRAIT} from '../instance/InstanceConfigRepository';
-import type {InviteService} from '../invite/InviteService';
-import {Logger} from '../Logger';
-import type {RequestCache} from '../middleware/RequestCacheMiddleware';
-import {getInstanceConfigRepository} from '../middleware/ServiceSingletons';
-import type {User} from '../models/User';
-import {lookupGeoip} from '../utils/IpUtils';
-import * as AuthMfa from './AuthMfa';
-import * as AuthPassword from './AuthPassword';
-import * as AuthSession from './AuthSession';
-import * as AuthUtility from './AuthUtility';
 
-function createRequestCache(): RequestCache {
-	const userPartials = new Map();
-	const messageMentionChannels = new Map();
-	return {
-		userPartials,
-		messageMentionChannels,
-		clear: () => {
-			userPartials.clear();
-			messageMentionChannels.clear();
-		},
-	};
-}
+const DUMMY_ARGON2_HASH =
+	'$argon2id$v=19$m=65536,t=3,p=4$fT6tGpAyxFiz+n1RbkRqWQ$v05UT17QGeqhsgRjcVjIWcGw6gUDYeCcAA8FiZ63MtA';
 
 interface LoginParams {
 	data: LoginRequest;
@@ -89,34 +82,21 @@ interface LoginMfaResult {
 
 type LoginResult = LoginTokenResult | LoginMfaResult;
 
-function getRetryAfterSeconds(result: RateLimitResult): number {
-	return result.retryAfter ?? Math.max(0, Math.ceil((result.resetTime.getTime() - Date.now()) / 1000));
-}
-
-function throwLoginRateLimit(result: RateLimitResult): never {
-	throw new RateLimitError({
-		retryAfter: getRetryAfterSeconds(result),
-		limit: result.limit,
-		resetTime: result.resetTime,
-	});
-}
-
 export interface IpAuthorizationTicketCache {
 	userId: string;
 	email: string;
 	username: string;
-	clientIp: string;
-	userAgent: string;
-	platform: string | null;
+	origin: AuthSession.SessionOrigin;
 	authToken: string;
 	clientLocation: string;
+	locale?: string | null;
 	inviteCode?: string | null;
 	resendUsed?: boolean;
 	createdAt: number;
 }
 
-function getTicketCacheKey(ticket: string): string {
-	return `ip-auth-ticket:${ticket}`;
+export function getTicketCacheKey(ticket: string): string {
+	return `ip-auth-ticket-v2:${ticket}`;
 }
 
 function getTokenCacheKey(token: string): string {
@@ -148,9 +128,9 @@ export async function resendIpAuthorization(
 		payload.email,
 		payload.username,
 		payload.authToken,
-		payload.clientIp,
+		payload.origin.ip,
 		payload.clientLocation,
-		null,
+		payload.locale ?? null,
 	);
 	const ttl = await cache.ttl(cacheKey);
 	await cache.set(
@@ -172,7 +152,7 @@ export async function completeIpAuthorization(
 	user_id: string;
 	ticket: string;
 }> {
-	const {users, cache, config} = ctx.services;
+	const {users, cache} = ctx.services;
 	const tokenMapping = await cache.get<{
 		ticket: string;
 	}>(getTokenCacheKey(token));
@@ -193,19 +173,8 @@ export async function completeIpAuthorization(
 		throw new UnknownUserError();
 	}
 	AuthUtility.assertNonBotUser(ctx, user);
-	await users.createAuthorizedIp(user.id, payload.clientIp);
-	const headers: Record<string, string> = {
-		[config.proxy.client_ip_header]: payload.clientIp,
-		'user-agent': payload.userAgent,
-	};
-	if (payload.platform) {
-		headers['x-fluxer-platform'] = payload.platform;
-	}
-	const syntheticRequest = new Request('https://api.fluxer.app/auth/ip-authorization', {
-		headers,
-		method: 'POST',
-	});
-	const [sessionToken] = await AuthSession.createAuthSession(ctx, {user, request: syntheticRequest});
+	await users.createAuthorizedIp(user.id, payload.origin.ip);
+	const [sessionToken] = await AuthSession.createAuthSession(ctx, {user, origin: payload.origin});
 	await cache.delete(cacheKey);
 	await cache.delete(getTokenCacheKey(token));
 	return {token: sessionToken, user_id: user.id.toString(), ticket: tokenMapping.ticket};
@@ -220,12 +189,12 @@ export async function login(
 	const {inviteService, kvDeletionQueue} = deps;
 	const skipRateLimits = config.dev.testModeEnabled || config.dev.disableRateLimits;
 	const emailRateLimit = await rateLimit.checkLimit({
-		identifier: `login:email:${data.email}`,
+		identifier: `login:email:${data.email.toLowerCase()}`,
 		maxAttempts: 5,
 		windowMs: ms('15 minutes'),
 	});
 	if (!emailRateLimit.allowed && !skipRateLimits) {
-		throwLoginRateLimit(emailRateLimit);
+		throw createRateLimitError(emailRateLimit);
 	}
 	const clientIp = requireClientIp(request, {
 		trustClientIpHeader: config.proxy.trust_client_ip_header,
@@ -237,7 +206,7 @@ export async function login(
 		windowMs: ms('30 minutes'),
 	});
 	if (!ipRateLimit.allowed && !skipRateLimits) {
-		throwLoginRateLimit(ipRateLimit);
+		throw createRateLimitError(ipRateLimit);
 	}
 	const user = await users.findByEmail(data.email);
 	if (!user) {
@@ -247,9 +216,16 @@ export async function login(
 		]);
 	}
 	AuthUtility.assertNonBotUser(ctx, user);
+	if (!user.passwordHash) {
+		await AuthPassword.verifyPassword(ctx, {password: data.password, passwordHash: DUMMY_ARGON2_HASH});
+		throw InputValidationError.fromCodes([
+			{path: 'email', code: ValidationErrorCodes.INVALID_EMAIL_OR_PASSWORD},
+			{path: 'password', code: ValidationErrorCodes.INVALID_EMAIL_OR_PASSWORD},
+		]);
+	}
 	const isMatch = await AuthPassword.verifyPassword(ctx, {
 		password: data.password,
-		passwordHash: user.passwordHash!,
+		passwordHash: user.passwordHash,
 	});
 	if (!isMatch) {
 		throw InputValidationError.fromCodes([
@@ -270,22 +246,19 @@ export async function login(
 		Logger.info({userId: currentUser.id}, 'Auto-undisabled user on login');
 	}
 	if ((currentUser.flags & UserFlags.SELF_DELETED) !== 0n) {
-		if (currentUser.pendingDeletionAt) {
-			await users.removePendingDeletion(currentUser.id, currentUser.pendingDeletionAt);
+		const pendingDeletionAt = currentUser.pendingDeletionAt;
+		const updatedFlags = currentUser.flags & ~UserFlags.SELF_DELETED;
+		currentUser = await users.updateDeletionSchedule(currentUser, {
+			flags: updatedFlags,
+			pending_deletion_at: null,
+			deletion_reason_code: null,
+			deletion_public_reason: null,
+			deletion_audit_log_reason: null,
+		});
+		if (pendingDeletionAt) {
+			await users.removePendingDeletion(currentUser.id, pendingDeletionAt);
 		}
 		await kvDeletionQueue.removeFromQueue(currentUser.id);
-		const updatedFlags = currentUser.flags & ~UserFlags.SELF_DELETED;
-		currentUser = await users.patchUpsert(
-			currentUser.id,
-			{
-				flags: updatedFlags,
-				pending_deletion_at: null,
-				deletion_reason_code: null,
-				deletion_public_reason: null,
-				deletion_audit_log_reason: null,
-			},
-			currentUser.toRow(),
-		);
 		Logger.info({userId: currentUser.id}, 'Auto-cancelled deletion on login');
 	}
 	if (currentUser.traits.has(REGISTRATION_PENDING_APPROVAL_TRAIT)) {
@@ -312,24 +285,23 @@ export async function login(
 				const ticket = createIpAuthorizationTicket(await AuthUtility.generateSecureToken(ctx));
 				const authToken = createIpAuthorizationToken(await AuthUtility.generateSecureToken(ctx));
 				const geoipResult = await lookupGeoip(clientIp);
-				const clientLocation = formatGeoipLocation(geoipResult) ?? UNKNOWN_LOCATION;
-				const userAgent = request.headers.get('user-agent') || '';
-				const platform = request.headers.get('x-fluxer-platform');
+				const clientLocation =
+					formatGeoipLocation(geoipResult, currentUser.locale) ??
+					getContentMessage('auth.unknown_location', currentUser.locale);
 				const cachePayload: IpAuthorizationTicketCache = {
 					userId: currentUser.id.toString(),
 					email: currentUser.email!,
 					username: currentUser.username,
-					clientIp,
-					userAgent,
-					platform: platform ?? null,
+					origin: AuthSession.resolveSessionOrigin(ctx, request),
 					authToken,
 					clientLocation,
+					locale: currentUser.locale,
 					inviteCode: data.invite_code ?? null,
 					resendUsed: false,
 					createdAt: Date.now(),
 				};
 				const ttlSeconds = seconds('15 minutes');
-				await cache.set<IpAuthorizationTicketCache>(`ip-auth-ticket:${ticket}`, cachePayload, ttlSeconds);
+				await cache.set<IpAuthorizationTicketCache>(getTicketCacheKey(ticket), cachePayload, ttlSeconds);
 				await cache.set<{
 					ticket: string;
 				}>(`ip-auth-token:${authToken}`, {ticket}, ttlSeconds);
@@ -364,7 +336,10 @@ export async function login(
 			Logger.warn({inviteCode: data.invite_code, error}, 'Failed to auto-join invite on login');
 		}
 	}
-	const [token] = await AuthSession.createAuthSession(ctx, {user: currentUser, request});
+	const [token] = await AuthSession.createAuthSession(ctx, {
+		user: currentUser,
+		origin: AuthSession.resolveSessionOrigin(ctx, request),
+	});
 	return {
 		user_id: currentUser.id.toString(),
 		token,
@@ -373,60 +348,36 @@ export async function login(
 
 const MFA_TICKET_MAX_ATTEMPTS = 5;
 const MFA_USER_MAX_ATTEMPTS = 10;
-const MFA_USER_ATTEMPTS_WINDOW = seconds('15 minutes');
+
+async function consumeMfaAttempt(
+	ctx: ApiContext,
+	{userId, ticket, field}: {userId: string; ticket: string; field: string},
+): Promise<void> {
+	const {cache, rateLimit} = ctx.services;
+	const userLimit = await rateLimit.checkLimit({
+		identifier: `mfa:user:${userId}`,
+		maxAttempts: MFA_USER_MAX_ATTEMPTS,
+		windowMs: ms('15 minutes'),
+	});
+	if (!userLimit.allowed) {
+		throw InputValidationError.fromCode(field, ValidationErrorCodes.INVALID_CODE);
+	}
+	const ticketLimit = await rateLimit.checkLimit({
+		identifier: `mfa:ticket:${ticket}`,
+		maxAttempts: MFA_TICKET_MAX_ATTEMPTS,
+		windowMs: ms('5 minutes'),
+	});
+	if (!ticketLimit.allowed) {
+		await cache.delete(`mfa-ticket:${ticket}`);
+		throw InputValidationError.fromCode(field, ValidationErrorCodes.INVALID_CODE);
+	}
+}
 
 export async function loginMfaTotp(
 	ctx: ApiContext,
 	{code, ticket, request}: LoginMfaTotpParams,
 ): Promise<LoginTokenResult> {
-	const {users, cache} = ctx.services;
-	const userId = await cache.get<string>(`mfa-ticket:${ticket}`);
-	if (!userId) {
-		throw InputValidationError.fromCode('code', ValidationErrorCodes.SESSION_TIMEOUT);
-	}
-	const user = await users.findUnique(createUserID(BigInt(userId)));
-	if (!user) {
-		throw new UnknownUserError();
-	}
-	AuthUtility.assertNonBotUser(ctx, user);
-	if (!user.totpSecret || !user.authenticatorTypes?.has(UserAuthenticatorTypes.TOTP)) {
-		throw InputValidationError.fromCode('code', ValidationErrorCodes.TOTP_NOT_ENABLED);
-	}
-	const userAttemptsKey = `mfa-user-attempts:${user.id}`;
-	const userAttempts = (await cache.get<number>(userAttemptsKey)) ?? 0;
-	if (userAttempts >= MFA_USER_MAX_ATTEMPTS) {
-		throw InputValidationError.fromCode('code', ValidationErrorCodes.INVALID_CODE);
-	}
-	const isValid = await AuthMfa.verifyMfaCode(ctx, {
-		userId: user.id,
-		mfaSecret: user.totpSecret,
-		code,
-		allowBackup: true,
-	});
-	const attemptsKey = `mfa-ticket-attempts:${ticket}`;
-	if (!isValid) {
-		await cache.set(userAttemptsKey, userAttempts + 1, MFA_USER_ATTEMPTS_WINDOW);
-		const attempts = ((await cache.get<number>(attemptsKey)) ?? 0) + 1;
-		if (attempts >= MFA_TICKET_MAX_ATTEMPTS) {
-			await cache.delete(`mfa-ticket:${ticket}`);
-			await cache.delete(attemptsKey);
-		} else {
-			await cache.set(attemptsKey, attempts, seconds('5 minutes'));
-		}
-		throw InputValidationError.fromCode('code', ValidationErrorCodes.INVALID_CODE);
-	}
-	await cache.delete(`mfa-ticket:${ticket}`);
-	await cache.delete(attemptsKey);
-	await cache.delete(userAttemptsKey);
-	const [token] = await AuthSession.createAuthSession(ctx, {user, request});
-	return {user_id: user.id.toString(), token};
-}
-
-export async function loginMfaWebAuthn(
-	ctx: ApiContext,
-	{response, challenge, ticket, request}: LoginMfaWebAuthnParams,
-): Promise<LoginTokenResult> {
-	const {users, cache} = ctx.services;
+	const {users, cache, rateLimit} = ctx.services;
 	const userId = await cache.get<string>(`mfa-ticket:${ticket}`);
 	if (!userId) {
 		throw InputValidationError.fromCode('ticket', ValidationErrorCodes.SESSION_TIMEOUT);
@@ -436,9 +387,52 @@ export async function loginMfaWebAuthn(
 		throw new UnknownUserError();
 	}
 	AuthUtility.assertNonBotUser(ctx, user);
+	if (!user.totpSecret || !user.authenticatorTypes?.has(UserAuthenticatorTypes.TOTP)) {
+		throw InputValidationError.fromCode('code', ValidationErrorCodes.TOTP_NOT_ENABLED);
+	}
+	await consumeMfaAttempt(ctx, {userId: user.id.toString(), ticket, field: 'code'});
+	const isValid = await AuthMfa.verifyMfaCode(ctx, {
+		userId: user.id,
+		mfaSecret: user.totpSecret,
+		code,
+		allowBackup: true,
+	});
+	if (!isValid) {
+		throw InputValidationError.fromCode('code', ValidationErrorCodes.INVALID_CODE);
+	}
+	await cache.delete(`mfa-ticket:${ticket}`);
+	await rateLimit.resetLimit(`mfa:ticket:${ticket}`);
+	await rateLimit.resetLimit(`mfa:user:${user.id}`);
+	const [token] = await AuthSession.createAuthSession(ctx, {
+		user,
+		origin: AuthSession.resolveSessionOrigin(ctx, request),
+	});
+	return {user_id: user.id.toString(), token};
+}
+
+export async function loginMfaWebAuthn(
+	ctx: ApiContext,
+	{response, challenge, ticket, request}: LoginMfaWebAuthnParams,
+): Promise<LoginTokenResult> {
+	const {users, cache, rateLimit} = ctx.services;
+	const userId = await cache.get<string>(`mfa-ticket:${ticket}`);
+	if (!userId) {
+		throw InputValidationError.fromCode('ticket', ValidationErrorCodes.SESSION_TIMEOUT);
+	}
+	const user = await users.findUnique(createUserID(BigInt(userId)));
+	if (!user) {
+		throw new UnknownUserError();
+	}
+	AuthUtility.assertNonBotUser(ctx, user);
+	await consumeMfaAttempt(ctx, {userId: user.id.toString(), ticket, field: 'ticket'});
 	await AuthMfa.verifyWebAuthnAuthentication(ctx, user.id, response, challenge, 'mfa', ticket);
 	await cache.delete(`mfa-ticket:${ticket}`);
-	const [token] = await AuthSession.createAuthSession(ctx, {user, request});
+	await rateLimit.resetLimit(`mfa:ticket:${ticket}`);
+	await rateLimit.resetLimit(`mfa:user:${user.id}`);
+	const [token] = await AuthSession.createAuthSession(ctx, {
+		user,
+		origin: AuthSession.resolveSessionOrigin(ctx, request),
+	});
 	return {user_id: user.id.toString(), token};
 }
 

@@ -658,10 +658,6 @@
 				"serverRegion": "us-east",
 				"failure": null
 			},
-			"nativeAudioDeviceModule": {
-				"status": "unsupported",
-				"detail": null
-			},
 			"microphone": {
 				"status": "published",
 				"desired": {
@@ -770,12 +766,6 @@
 				}
 			},
 			"watchedStreams": {},
-			"codecNegotiation": {
-				"overrides": {},
-				"localSupportedVideoCodecs": [],
-				"remoteSupportedVideoCodecs": {},
-				"streams": {}
-			},
 			"stats": {
 				"rttMs": 42,
 				"outbound": [

@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type {AuditLogActionType} from '@fluxer/constants/src/AuditLogActionType';
-import {seconds} from 'itty-time';
-import type {GuildID, UserID} from '../../BrandedTypes';
-import {BatchBuilder, fetchMany, fetchOne} from '../../database/CassandraQueryExecution';
-import {Db, type DbOp, type QueryTemplate, type WhereExpr} from '../../database/CassandraTypes';
-import {executeVersionedUpdate} from '../../database/CassandraVersionedUpdate';
+import type {GuildID, UserID} from '@app/api/BrandedTypes';
+import {BatchBuilder, fetchMany, fetchOne} from '@app/api/database/CassandraQueryExecution';
+import {Db, type DbOp, type QueryTemplate, type WhereExpr} from '@app/api/database/CassandraTypes';
+import {executeVersionedUpdate} from '@app/api/database/CassandraVersionedUpdate';
 import type {
 	GuildAuditLogRow,
 	GuildBanByEmailRow,
 	GuildBanByUserIdRow,
 	GuildBanRow,
 	GuildRow,
-} from '../../database/types/GuildTypes';
-import {GuildAuditLog} from '../../models/GuildAuditLog';
-import {GuildBan} from '../../models/GuildBan';
+} from '@app/api/database/types/GuildTypes';
+import {IGuildModerationRepository} from '@app/api/guild/repositories/IGuildModerationRepository';
+import type {RequestCache} from '@app/api/middleware/RequestCacheMiddleware';
+import {GuildAuditLog} from '@app/api/models/GuildAuditLog';
+import {GuildBan} from '@app/api/models/GuildBan';
 import {
 	GuildAuditLogs,
 	GuildAuditLogsByAction,
@@ -24,8 +24,9 @@ import {
 	GuildBansByEmail,
 	GuildBansByUserId,
 	Guilds,
-} from '../../Tables';
-import {IGuildModerationRepository} from './IGuildModerationRepository';
+} from '@app/api/Tables';
+import type {AuditLogActionType} from '@fluxer/constants/src/AuditLogActionType';
+import {seconds} from 'itty-time';
 
 const FETCH_GUILD_BAN_BY_GUILD_AND_USER_ID_QUERY = GuildBans.selectCql({
 	where: [GuildBans.where.eq('guild_id'), GuildBans.where.eq('user_id')],
@@ -55,6 +56,10 @@ const FETCH_GUILD_AUDIT_LOGS_BY_IDS_QUERY = GuildAuditLogs.selectCql({
 });
 
 export class GuildModerationRepository extends IGuildModerationRepository {
+	constructor(private readonly requestCache?: RequestCache) {
+		super();
+	}
+
 	async getBan(guildId: GuildID, userId: UserID): Promise<GuildBan | null> {
 		const ban = await fetchOne<GuildBanRow>(FETCH_GUILD_BAN_BY_GUILD_AND_USER_ID_QUERY, {
 			guild_id: guildId,
@@ -135,7 +140,7 @@ export class GuildModerationRepository extends IGuildModerationRepository {
 		batch.addPrepared(GuildAuditLogsByUser.insertWithTtl(payload, AUDIT_LOG_TTL_SECONDS));
 		batch.addPrepared(GuildAuditLogsByAction.insertWithTtl(payload, AUDIT_LOG_TTL_SECONDS));
 		batch.addPrepared(GuildAuditLogsByUserAction.insertWithTtl(payload, AUDIT_LOG_TTL_SECONDS));
-		await batch.execute();
+		await batch.execute(false);
 		return this.mapRowToGuildAuditLog(data);
 	}
 
@@ -279,6 +284,7 @@ export class GuildModerationRepository extends IGuildModerationRepository {
 	}
 
 	async updateAuditLogsIndexedAt(guildId: GuildID, indexedAt: Date | null): Promise<void> {
+		this.requestCache?.guilds.delete(guildId);
 		await executeVersionedUpdate<GuildRow, 'guild_id'>(
 			() => fetchOne<GuildRow>(FETCH_GUILD_BY_ID_QUERY, {guild_id: guildId}),
 			(current) => {

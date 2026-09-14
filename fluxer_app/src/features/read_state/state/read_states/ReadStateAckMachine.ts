@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import {assign, getInitialSnapshot, type SnapshotFrom, setup, transition} from 'xstate';
-import {compareMessageIds} from './shared';
+import {compareMessageIds} from '@app/features/read_state/state/read_states/shared';
+import {assign, initialTransition, type SnapshotFrom, setup, transition} from 'xstate';
 
 export interface ReadStateAckInput {
 	requestedMessageId?: string | null;
 	lastMessageId: string | null;
 	ackMessageId: string | null;
-	isManualAck: boolean;
-	loadedMessages: boolean;
-	canTrackUnreads: boolean;
+	ackedManually: boolean;
+	messagesLoaded: boolean;
+	supportsUnreadTracking: boolean;
 	hasMentions: boolean;
 	hasOldestUnreadMessage: boolean;
 	hasStickyUnreadMessage: boolean;
@@ -80,9 +80,9 @@ export const readStateAckMachine = setup({
 		}),
 	},
 	guards: {
-		isManualAckHeld: ({context}) => !isOverrideAck(context) && context.isManualAck,
-		isNotLoaded: ({context}) => !isOverrideAck(context) && !context.loadedMessages,
-		isUntracked: ({context}) => !isOverrideAck(context) && !context.canTrackUnreads,
+		isManualAckHeld: ({context}) => !isOverrideAck(context) && context.ackedManually,
+		isNotLoaded: ({context}) => !isOverrideAck(context) && !context.messagesLoaded,
+		isUntracked: ({context}) => !isOverrideAck(context) && !context.supportsUnreadTracking,
 		isMissingMessage: ({context}) => getFinalMessageId(context) == null,
 		isOlderThanCurrentAck: ({context}) => {
 			const finalMessageId = getFinalMessageId(context);
@@ -128,7 +128,7 @@ export const readStateAckMachine = setup({
 export type ReadStateAckSnapshot = SnapshotFrom<typeof readStateAckMachine>;
 
 export function createReadStateAckSnapshot(input: ReadStateAckInput): ReadStateAckSnapshot {
-	return getInitialSnapshot(readStateAckMachine, input);
+	return initialTransition(readStateAckMachine, input)[0];
 }
 
 export function transitionReadStateAckSnapshot(

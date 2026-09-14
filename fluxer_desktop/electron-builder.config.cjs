@@ -9,12 +9,14 @@ const {promisify} = require('node:util');
 const execFileAsync = promisify(execFile);
 const productName =
 	process.env.NIFFBOT_PRODUCT_NAME?.trim() || (isCanary ? 'Fluxer Canary' : 'Fluxer');
+const artifactProductName = isCanary ? 'Fluxer-Canary' : 'Fluxer';
 const appId = isCanary ? 'app.fluxer.canary' : 'app.fluxer';
 const iconDir = isCanary ? 'icons-canary' : 'icons-stable';
 const packageName = isCanary ? 'fluxer_desktop_canary' : 'fluxer_desktop';
 const linuxPackageName = isCanary ? 'fluxer-canary' : 'fluxer';
 const linuxDesktopActionIds = ['open-settings', 'new-dm'];
 const linuxDesktopActionList = `${linuxDesktopActionIds.join(';')};`;
+const linuxGlibcBaseline = Object.freeze({major: 2, minor: 35, patch: 0, name: 'GLIBC_2.35'});
 const rpmBuildIdFilePrefix = '/usr/lib/.build-id';
 const rpmBuildIdLinkFpmArgs = [
 	'--rpm-rpmbuild-define',
@@ -22,7 +24,7 @@ const rpmBuildIdLinkFpmArgs = [
 	'--rpm-rpmbuild-define',
 	'_missing_build_ids_terminate_build 0',
 ];
-const macOSMinimumSystemVersion = '12.0';
+const macOSMinimumSystemVersion = '13.0';
 const isLinuxBuild = process.argv.includes('--linux');
 const isMacBuild = process.argv.includes('--mac');
 const isWindowsBuild = process.argv.includes('--win');
@@ -32,15 +34,23 @@ const provisioningProfile = isCanary
 	? 'build_resources/profiles/Fluxer_Canary.provisionprofile'
 	: 'build_resources/profiles/Fluxer.provisionprofile';
 const supportedTargetArchs = ['x64', 'arm64'];
+const supportedMacTargetArchs = [...supportedTargetArchs, 'universal'];
 const electronArch = process.env.ELECTRON_ARCH;
-const cliTargetArch = supportedTargetArchs.find((arch) => process.argv.includes(`--${arch}`)) || null;
+const cliTargetArch = supportedMacTargetArchs.find((arch) => process.argv.includes(`--${arch}`)) || null;
 const targetNativeArch = electronArch || cliTargetArch;
 
-if (electronArch && !supportedTargetArchs.includes(electronArch)) {
+if (electronArch && !supportedMacTargetArchs.includes(electronArch)) {
 	throw new Error(`Unsupported ELECTRON_ARCH: ${electronArch}`);
 }
 
-const targetArchs = electronArch ? [electronArch] : supportedTargetArchs;
+if (targetNativeArch === 'universal' && targetPlatform !== 'darwin') {
+	throw new Error(`ELECTRON_ARCH=universal is only supported for macOS builds, received platform ${targetPlatform}`);
+}
+
+const targetArchs = electronArch && electronArch !== 'universal' ? [electronArch] : supportedTargetArchs;
+const macTargetArchs = targetNativeArch ? [targetNativeArch] : supportedTargetArchs;
+const winGameCaptureTargetArchs =
+	targetPlatform === 'win32' && targetNativeArch ? [targetNativeArch] : supportedTargetArchs;
 const winTargets = [
 	{
 		target: 'dir',
@@ -67,9 +77,9 @@ const fluxerNativePackages = [
 	'@fluxer/linux-evdev',
 	'@fluxer/linux-input-hook',
 	'@fluxer/system-hunspell',
+	'@fluxer/hardware-encoder',
 	'@fluxer/platform-info',
 	'@fluxer/webauthn',
-	'@fluxer/webrtc-sender',
 ];
 const fluxerNativePackagesByPlatform = {
 	darwin: [
@@ -81,7 +91,7 @@ const fluxerNativePackagesByPlatform = {
 		'@fluxer/macos-input-hook',
 		'@fluxer/platform-info',
 		'@fluxer/webauthn',
-		'@fluxer/webrtc-sender',
+		'@fluxer/hardware-encoder',
 	],
 	win32: [
 		'@fluxer/win-process-loopback',
@@ -92,7 +102,7 @@ const fluxerNativePackagesByPlatform = {
 		'@fluxer/windows-input-hook',
 		'@fluxer/platform-info',
 		'@fluxer/webauthn',
-		'@fluxer/webrtc-sender',
+		'@fluxer/hardware-encoder',
 	],
 	linux: [
 		'@fluxer/linux-audio-capture',
@@ -104,7 +114,7 @@ const fluxerNativePackagesByPlatform = {
 		'@fluxer/system-hunspell',
 		'@fluxer/platform-info',
 		'@fluxer/webauthn',
-		'@fluxer/webrtc-sender',
+		'@fluxer/hardware-encoder',
 	],
 };
 const velopackNativeFiles = [
@@ -144,11 +154,9 @@ const nativeRuntimeFilePatterns = [
 	'node_modules/@fluxer/win-game-capture/package.json',
 	'node_modules/@fluxer/win-game-capture/index.js',
 	'node_modules/@fluxer/win-game-capture/loader-diagnostics.cjs',
-	'node_modules/@fluxer/win-game-capture/*.node',
-	'node_modules/@fluxer/win-game-capture/*.dll',
-	'node_modules/@fluxer/win-game-capture/*.exe',
-	'node_modules/@fluxer/win-game-capture/compatibility.json',
-	'node_modules/@fluxer/win-game-capture/fluxer-vulkan-layer.*.json',
+	...winGameCaptureTargetArchs.map(
+		(arch) => `node_modules/@fluxer/win-game-capture/win-game-capture.win32-${arch}-msvc.node`,
+	),
 	'node_modules/@fluxer/win-clipboard/package.json',
 	'node_modules/@fluxer/win-clipboard/index.js',
 	'node_modules/@fluxer/win-clipboard/loader-diagnostics.cjs',
@@ -211,18 +219,17 @@ const nativeRuntimeFilePatterns = [
 	'node_modules/@fluxer/webauthn/loader-diagnostics.cjs',
 	'node_modules/@fluxer/webauthn/*.node',
 	'node_modules/@fluxer/webauthn/*.so*',
-	'node_modules/@fluxer/webrtc-sender/package.json',
-	'node_modules/@fluxer/webrtc-sender/index.js',
-	'node_modules/@fluxer/webrtc-sender/index.d.ts',
-	'node_modules/@fluxer/webrtc-sender/*.node',
+	'node_modules/@fluxer/hardware-encoder/package.json',
+	'node_modules/@fluxer/hardware-encoder/index.js',
+	'node_modules/@fluxer/hardware-encoder/index.d.ts',
+	'node_modules/@fluxer/hardware-encoder/*.node',
 	'node_modules/.pnpm/@fluxer+*/node_modules/@fluxer/*/loader-diagnostics.cjs',
 	'node_modules/.pnpm/@fluxer+*/node_modules/@fluxer/*/pure.cjs',
 	'node_modules/.pnpm/@fluxer+win-process-loopback@*/node_modules/@fluxer/win-process-loopback/*.node',
-	'node_modules/.pnpm/@fluxer+win-game-capture@*/node_modules/@fluxer/win-game-capture/*.node',
-	'node_modules/.pnpm/@fluxer+win-game-capture@*/node_modules/@fluxer/win-game-capture/*.dll',
-	'node_modules/.pnpm/@fluxer+win-game-capture@*/node_modules/@fluxer/win-game-capture/*.exe',
-	'node_modules/.pnpm/@fluxer+win-game-capture@*/node_modules/@fluxer/win-game-capture/compatibility.json',
-	'node_modules/.pnpm/@fluxer+win-game-capture@*/node_modules/@fluxer/win-game-capture/fluxer-vulkan-layer.*.json',
+	...winGameCaptureTargetArchs.map(
+		(arch) =>
+			`node_modules/.pnpm/@fluxer+win-game-capture@*/node_modules/@fluxer/win-game-capture/win-game-capture.win32-${arch}-msvc.node`,
+	),
 	'node_modules/.pnpm/@fluxer+win-clipboard@*/node_modules/@fluxer/win-clipboard/*.node',
 	'node_modules/.pnpm/@fluxer+win-shell@*/node_modules/@fluxer/win-shell/*.node',
 	'node_modules/.pnpm/@fluxer+win-toast@*/node_modules/@fluxer/win-toast/*.node',
@@ -244,7 +251,7 @@ const nativeRuntimeFilePatterns = [
 	'node_modules/.pnpm/@fluxer+platform-info@*/node_modules/@fluxer/platform-info/*.node',
 	'node_modules/.pnpm/@fluxer+webauthn@*/node_modules/@fluxer/webauthn/*.node',
 	'node_modules/.pnpm/@fluxer+webauthn@*/node_modules/@fluxer/webauthn/*.so*',
-	'node_modules/.pnpm/@fluxer+webrtc-sender@*/node_modules/@fluxer/webrtc-sender/*.node',
+	'node_modules/.pnpm/@fluxer+hardware-encoder@*/node_modules/@fluxer/hardware-encoder/*.node',
 ];
 const nativeBuildArtifactExcludes = [
 	'!node_modules/@fluxer/**/src/**/*',
@@ -346,6 +353,17 @@ function pnpmStoreDirName(packageName) {
 	return packageName.replace('/', '+');
 }
 
+function windowsGameCaptureArtifactExcludes(arch) {
+	const packageRoots = [
+		'node_modules/@fluxer/win-game-capture',
+		'node_modules/.pnpm/@fluxer+win-game-capture@*/node_modules/@fluxer/win-game-capture',
+	];
+	const excludedNodeArchs = [...supportedTargetArchs, 'ia32'].filter((candidate) => candidate !== arch);
+	return packageRoots.flatMap((packageRoot) => [
+		...excludedNodeArchs.map((excludedArch) => `!${packageRoot}/win-game-capture.win32-${excludedArch}-msvc.node`),
+	]);
+}
+
 function platformNativeExcludes(platform, arch) {
 	const keepFluxerPackages = new Set(fluxerNativePackagesByPlatform[platform] ?? []);
 	const fluxerPackageExcludes = fluxerNativePackages
@@ -365,6 +383,7 @@ function platformNativeExcludes(platform, arch) {
 	}
 	return [
 		...fluxerPackageExcludes,
+		...windowsGameCaptureArtifactExcludes(arch),
 		...velopackNativeFiles
 			.filter((fileName) => fileName !== keepVelopackNativeFile)
 			.map((fileName) => `!node_modules/velopack/lib/native/${fileName}`),
@@ -383,8 +402,10 @@ function normalizeArch(arch) {
 	if (arch === 'x64' || arch === 'arm64') {
 		return arch;
 	}
+	if (arch === 'universal') return 'universal';
 	if (arch === 1) return 'x64';
 	if (arch === 3) return 'arm64';
+	if (arch === 4) return 'universal';
 	return electronArch || process.arch;
 }
 
@@ -395,25 +416,24 @@ function platformTag(platform, arch) {
 	return null;
 }
 
-function addWindowsGameCaptureArtifacts(artifacts, tag, arch) {
-	const add = (relativePath) => {
-		artifacts.push({
-			packageName: '@fluxer/win-game-capture',
-			relativePath,
-		});
-	};
-	add(`win-game-capture.${tag}.node`);
-	add(`fluxer-game-hook.${tag}.dll`);
-	add(`fluxer-inject-helper.${tag}.exe`);
-	add(`fluxer-vulkan-layer.${tag}.dll`);
-	add(`fluxer-vulkan-layer.${tag}.json`);
-	if (arch === 'x64') {
-		add('fluxer-game-hook.win32-ia32-msvc.dll');
-		add('fluxer-inject-helper.win32-ia32-msvc.exe');
-	}
+function addWindowsGameCaptureArtifacts(artifacts, tag) {
+	artifacts.push({
+		packageName: '@fluxer/win-game-capture',
+		relativePath: `win-game-capture.${tag}.node`,
+	});
 }
 
 function expectedNativeRuntimeArtifacts(platform, arch) {
+	if (platform === 'darwin' && arch === 'universal') {
+		return [
+			...expectedNativeRuntimeArtifactsForArch(platform, 'arm64'),
+			...expectedNativeRuntimeArtifactsForArch(platform, 'x64'),
+		];
+	}
+	return expectedNativeRuntimeArtifactsForArch(platform, arch);
+}
+
+function expectedNativeRuntimeArtifactsForArch(platform, arch) {
 	const tag = platformTag(platform, arch);
 	if (!tag) return [];
 	const artifacts = [];
@@ -422,8 +442,8 @@ function expectedNativeRuntimeArtifacts(platform, arch) {
 		relativePath: `webauthn.${tag}.node`,
 	});
 	artifacts.push({
-		packageName: '@fluxer/webrtc-sender',
-		relativePath: `webrtc-sender.${tag}.node`,
+		packageName: '@fluxer/hardware-encoder',
+		relativePath: `hardware-encoder.${tag}.node`,
 	});
 	if (platform === 'darwin') {
 		artifacts.push({
@@ -459,7 +479,7 @@ function expectedNativeRuntimeArtifacts(platform, arch) {
 			packageName: '@fluxer/win-process-loopback',
 			relativePath: `win-process-loopback.${tag}.node`,
 		});
-		addWindowsGameCaptureArtifacts(artifacts, tag, arch);
+		addWindowsGameCaptureArtifacts(artifacts, tag);
 		artifacts.push({
 			packageName: '@fluxer/win-clipboard',
 			relativePath: `win-clipboard.${tag}.node`,
@@ -584,6 +604,12 @@ async function fileExists(filePath) {
 		});
 }
 
+function darwinMachOArchFromLabel(label) {
+	if (label.includes('darwin-arm64')) return 'arm64';
+	if (label.includes('darwin-x64')) return 'x86_64';
+	return null;
+}
+
 function expectedDarwinMachOArch(arch) {
 	if (arch === 'x64') return 'x86_64';
 	if (arch === 'arm64') return 'arm64';
@@ -614,17 +640,20 @@ async function darwinMachOLoadCommands(filePath) {
 
 async function verifyDarwinNativeArchitectures(platform, arch, entries, stage) {
 	if (platform !== 'darwin') return;
+	const isUniversal = arch === 'universal';
 	const expectedArch = expectedDarwinMachOArch(arch);
-	if (!expectedArch) return;
+	if (!expectedArch && !isUniversal) return;
 	const mismatches = [];
 	for (const entry of entries) {
 		if (!(await fileExists(entry.path))) continue;
+		const entryExpectedArch = isUniversal ? darwinMachOArchFromLabel(entry.label) : expectedArch;
+		if (!entryExpectedArch) continue;
 		const archs = await darwinMachOArchitectures(entry.path);
 		const fileTypes = await darwinMachOFileTypes(entry.path);
-		if (!archs.includes(expectedArch)) {
-			mismatches.push(`${entry.label}: has ${archs.join(', ') || '<none>'}; expected ${expectedArch}`);
+		if (!archs.includes(entryExpectedArch)) {
+			mismatches.push(`${entry.label}: has ${archs.join(', ') || '<none>'}; expected ${entryExpectedArch}`);
 		}
-		if (arch === 'x64' && archs.includes('x86_64h') && !archs.includes('x86_64')) {
+		if (entryExpectedArch === 'x86_64' && archs.includes('x86_64h') && !archs.includes('x86_64')) {
 			mismatches.push(`${entry.label}: has x86_64h only; expected baseline x86_64 for Intel compatibility`);
 		}
 		if (fileTypes.length === 0 || fileTypes.some((fileType) => fileType !== 'BUNDLE' && fileType !== 'DYLIB')) {
@@ -713,7 +742,7 @@ async function verifyPackagedNativeArtifacts(context) {
 			[
 				`Missing unpacked native runtime artifact(s) after packaging for ${platform}/${arch}:`,
 				...missing.map((entry) => `  - ${entry}`),
-				'Check electron-builder asarUnpack patterns and native package artifact sync.',
+				'Check electron-builder asar.unpack patterns and native package artifact sync.',
 			].join('\n'),
 		);
 	}
@@ -788,11 +817,179 @@ async function addLinuxLegacyBinarySymlink(context) {
 	}
 }
 
+async function isElfFile(filePath) {
+	const handle = await fs.open(filePath, 'r');
+	try {
+		const magic = Buffer.alloc(4);
+		const {bytesRead} = await handle.read(magic, 0, magic.length, 0);
+		return bytesRead === magic.length && magic.equals(Buffer.from([0x7f, 0x45, 0x4c, 0x46]));
+	} finally {
+		await handle.close();
+	}
+}
+
+async function findPackagedElfFiles(rootDir) {
+	const results = [];
+	async function visit(directory) {
+		const entries = await fs.readdir(directory, {withFileTypes: true});
+		for (const entry of entries) {
+			const entryPath = path.join(directory, entry.name);
+			if (entry.isDirectory()) {
+				await visit(entryPath);
+			} else if (entry.isFile() && (await isElfFile(entryPath))) {
+				results.push(entryPath);
+			}
+		}
+	}
+	await visit(rootDir);
+	return results.sort();
+}
+
+function compareGlibcVersions(left, right) {
+	for (const key of ['major', 'minor', 'patch']) {
+		if (left[key] !== right[key]) return left[key] - right[key];
+	}
+	return 0;
+}
+
+async function inspectElfGlibcRequirements(elfPath) {
+	let stdout;
+	try {
+		({stdout} = await execFileAsync('readelf', ['--version-info', '--dynamic', '--wide', elfPath], {
+			env: {...process.env, LC_ALL: 'C'},
+			maxBuffer: 16 * 1024 * 1024,
+		}));
+	} catch (error) {
+		if (error && error.code === 'ENOENT') {
+			throw new Error(`Cannot verify Linux glibc compatibility: readelf executable is not available.`);
+		}
+		const stderr = typeof error?.stderr === 'string' ? error.stderr.trim() : '';
+		throw new Error(`Cannot inspect ELF file ${elfPath}: ${stderr || error?.message || String(error)}`);
+	}
+	const versions = new Map();
+	const unsupportedRequirements = new Set();
+	const hasGlibcRequirement = /\bGLIBC_[A-Za-z0-9_.]+\b/.test(stdout);
+	let readingVersionNeeds = false;
+	let foundVersionNeeds = false;
+	let hasVersionNeedsTag = false;
+	let needsGlibc = false;
+	let usesDtRelr = false;
+	for (const line of stdout.split(/\r?\n/)) {
+		const trimmed = line.trim();
+		if (/\(VERNEED\)/.test(trimmed)) {
+			hasVersionNeedsTag = true;
+		}
+		if (/^0x0*(?:23|24|25)\s+\(/i.test(trimmed) || /\((?:RELR|RELRSZ|RELRENT)\)/.test(trimmed)) {
+			usesDtRelr = true;
+		}
+		if (/\(NEEDED\)/.test(trimmed)) {
+			const neededMatch = /\(NEEDED\)\s+Shared library: \[([^\]]+)\]/.exec(trimmed);
+			if (!neededMatch) {
+				throw new Error(`Cannot parse a required library for ELF file ${elfPath}: ${trimmed}`);
+			}
+			if (neededMatch[1] === 'libc.so.6') needsGlibc = true;
+		}
+		if (trimmed.startsWith('Version needs section ')) {
+			readingVersionNeeds = true;
+			foundVersionNeeds = true;
+			continue;
+		}
+		if (trimmed.startsWith('Version symbols section ') || trimmed.startsWith('Version definition section ')) {
+			readingVersionNeeds = false;
+			continue;
+		}
+		if (!readingVersionNeeds) continue;
+		const requirement = /\bName:\s+(\S+)/.exec(trimmed)?.[1];
+		if (!requirement?.startsWith('GLIBC_')) continue;
+		const match = /^GLIBC_(\d+)\.(\d+)(?:\.(\d+))?$/.exec(requirement);
+		if (!match) {
+			unsupportedRequirements.add(requirement);
+			continue;
+		}
+		const version = {
+			major: Number.parseInt(match[1], 10),
+			minor: Number.parseInt(match[2], 10),
+			patch: Number.parseInt(match[3] ?? '0', 10),
+			name: requirement,
+		};
+		if (![version.major, version.minor, version.patch].every(Number.isSafeInteger)) {
+			throw new Error(`readelf returned an invalid glibc version for ${elfPath}: ${requirement}`);
+		}
+		versions.set(version.name, version);
+	}
+	if ((hasGlibcRequirement || hasVersionNeedsTag) && !foundVersionNeeds) {
+		throw new Error(`Cannot verify glibc requirements for ELF file ${elfPath}: readelf omitted version needs.`);
+	}
+	if (needsGlibc && (!foundVersionNeeds || (versions.size === 0 && unsupportedRequirements.size === 0))) {
+		throw new Error(`Cannot verify glibc requirements for ELF file ${elfPath}: readelf returned no version needs.`);
+	}
+	return {
+		versions: Array.from(versions.values()),
+		unsupportedRequirements: Array.from(unsupportedRequirements).sort(),
+		usesDtRelr,
+	};
+}
+
+async function findLinuxGlibcCompatibilityViolations(elfFiles) {
+	const violations = [];
+	for (const elfPath of elfFiles) {
+		const {versions, unsupportedRequirements, usesDtRelr} = await inspectElfGlibcRequirements(elfPath);
+		const maximum = versions.sort(compareGlibcVersions).at(-1);
+		const requirements = [...unsupportedRequirements];
+		if (maximum && compareGlibcVersions(maximum, linuxGlibcBaseline) > 0) {
+			requirements.push(maximum.name);
+		}
+		if (usesDtRelr) requirements.push('DT_RELR (glibc 2.36+)');
+		if (requirements.length > 0) violations.push({elfPath, requirements});
+	}
+	return violations;
+}
+
+function throwLinuxGlibcCompatibilityError(violations, formatPath) {
+	if (violations.length === 0) return;
+	const lines = [
+		`Linux package exceeds the supported ${linuxGlibcBaseline.name} ABI baseline.`,
+		'Build Linux artifacts on Ubuntu 22.04 and keep every shipped ELF at or below that glibc requirement.',
+	];
+	for (const {elfPath, requirements} of violations) {
+		lines.push(`  - ${formatPath(elfPath)} requires ${requirements.join(', ')}`);
+	}
+	throw new Error(lines.join('\n'));
+}
+
+function linuxDistributableTargetNames(context) {
+	if (!Array.isArray(context.targets)) {
+		throw new Error('Cannot verify Linux glibc compatibility: electron-builder did not provide a target list.');
+	}
+	return context.targets.map((target) => target.name).filter((name) => name !== 'dir');
+}
+
+async function verifyLinuxGlibcCompatibility(context) {
+	if (context.electronPlatformName !== 'linux') return;
+	const distributableTargets = linuxDistributableTargetNames(context);
+	if (distributableTargets.length === 0) {
+		console.log(
+			`Skipped the ${linuxGlibcBaseline.name} ABI baseline check: this pack produces no distributable Linux artifact.`,
+		);
+		return;
+	}
+	const elfFiles = await findPackagedElfFiles(context.appOutDir);
+	if (elfFiles.length === 0) {
+		throw new Error(`Linux package output contains no ELF files: ${context.appOutDir}`);
+	}
+	const violations = await findLinuxGlibcCompatibilityViolations(elfFiles);
+	throwLinuxGlibcCompatibilityError(violations, (elfPath) => path.relative(context.appOutDir, elfPath));
+	console.log(
+		`Verified ${elfFiles.length} packaged Linux ELF files against the ${linuxGlibcBaseline.name} ABI baseline.`,
+	);
+}
+
 async function afterPack(context) {
 	await copyMissingPackagedNativeArtifacts(context);
 	await cleanupNativeBuildIntermediates(context);
 	await addLinuxLegacyBinarySymlink(context);
 	await verifyPackagedNativeArtifacts(context);
+	await verifyLinuxGlibcCompatibility(context);
 }
 
 async function listRpmPackageFiles(artifactPath) {
@@ -896,12 +1093,19 @@ async function verifyLinuxPackagesContainAppArmorProfile(buildResult) {
 async function readElfNeededLibraries(artifactPath) {
 	try {
 		const {stdout} = await execFileAsync('readelf', ['-d', artifactPath], {
+			env: {...process.env, LC_ALL: 'C'},
 			maxBuffer: 8 * 1024 * 1024,
 		});
-		return stdout
-			.split(/\r?\n/)
-			.map((line) => line.match(/\(NEEDED\)\s+Shared library: \[([^\]]+)\]/)?.[1])
-			.filter(Boolean);
+		const neededLibraries = [];
+		for (const line of stdout.split(/\r?\n/)) {
+			if (!/\(NEEDED\)/.test(line)) continue;
+			const match = /\(NEEDED\).*\[([^\]]+)\]/.exec(line);
+			if (!match) {
+				throw new Error(`Cannot parse a required library for AppImage artifact ${artifactPath}: ${line.trim()}`);
+			}
+			neededLibraries.push(match[1]);
+		}
+		return neededLibraries;
 	} catch (error) {
 		if (error && error.code === 'ENOENT') {
 			throw new Error(`Cannot inspect AppImage artifact ${artifactPath}: readelf executable is not available.`);
@@ -909,6 +1113,14 @@ async function readElfNeededLibraries(artifactPath) {
 		const stderr = typeof error?.stderr === 'string' ? error.stderr.trim() : '';
 		throw new Error(`Cannot inspect AppImage artifact ${artifactPath}: ${stderr || error?.message || String(error)}`);
 	}
+}
+
+async function verifyAppImageArtifactsGlibcCompatibility(buildResult) {
+	const appImageArtifacts = (buildResult.artifactPaths ?? []).filter(
+		(artifactPath) => path.extname(artifactPath) === '.AppImage',
+	);
+	const violations = await findLinuxGlibcCompatibilityViolations(appImageArtifacts);
+	throwLinuxGlibcCompatibilityError(violations, (artifactPath) => path.basename(artifactPath));
 }
 
 async function verifyAppImageArtifactsDoNotNeedFuse2(buildResult) {
@@ -992,7 +1204,8 @@ async function inspectAppImageLauncher(artifactPath) {
 		}
 
 		const appRunUsesNamespaceProbe = /unshare\s+(?:-Ur|--user)\s+true/.test(appRun);
-		if (!appRunUsesNamespaceProbe || !appRun.includes('NO_SANDBOX=--no-sandbox')) {
+		const appRunFallsBackToNoSandbox = /NO_SANDBOX=\(?--no-sandbox\)?/.test(appRun);
+		if (!appRunUsesNamespaceProbe || !appRunFallsBackToNoSandbox) {
 			violations.push('AppRun does not use the expected user-namespace probe before falling back to --no-sandbox');
 		}
 
@@ -1046,6 +1259,7 @@ async function verifyAppImageArtifactsUseSandboxAwareLauncher(buildResult) {
 async function verifyLinuxArtifactContracts(buildResult) {
 	await verifyRpmArtifactsDoNotOwnBuildIds(buildResult);
 	await verifyLinuxPackagesContainAppArmorProfile(buildResult);
+	await verifyAppImageArtifactsGlibcCompatibility(buildResult);
 	await verifyAppImageArtifactsDoNotNeedFuse2(buildResult);
 	await verifyAppImageArtifactsUseSandboxAwareLauncher(buildResult);
 }
@@ -1054,8 +1268,7 @@ module.exports = {
 	appId,
 	productName,
 	copyright: 'Copyright © 2026 Fluxer Platform AB',
-	// biome-ignore lint/suspicious/noTemplateCurlyInString: electron-builder placeholders, not JS template literals.
-	artifactName: '${productName}-${version}-${os}-${arch}.${ext}',
+	artifactName: `${artifactProductName}-\${version}-\${os}-\${arch}.\${ext}`,
 	directories: {
 		buildResources: 'build_resources',
 		output: 'dist-electron',
@@ -1104,64 +1317,65 @@ module.exports = {
 	],
 	asar: {
 		smartUnpack: false,
+		unpack: [
+			'**/*.node',
+			'node_modules/@fluxer/win-process-loopback/*.node',
+			...winGameCaptureTargetArchs.map(
+				(arch) => `node_modules/@fluxer/win-game-capture/win-game-capture.win32-${arch}-msvc.node`,
+			),
+			'node_modules/@fluxer/win-clipboard/*.node',
+			'node_modules/@fluxer/win-shell/*.node',
+			'node_modules/@fluxer/win-toast/*.node',
+			'node_modules/@fluxer/linux-audio-capture/*.node',
+			'node_modules/@fluxer/linux-portals/*.node',
+			'node_modules/@fluxer/linux-screen-capture/*.node',
+			'node_modules/@fluxer/linux-screen-capture/obs-vkcapture/**/*',
+			'node_modules/@fluxer/linux-notifications/*.node',
+			'node_modules/@fluxer/linux-evdev/*.node',
+			'node_modules/@fluxer/system-hunspell/*.node',
+			'node_modules/@fluxer/macos-input-hook/*.node',
+			'node_modules/@fluxer/mac-app-audio/*.node',
+			'node_modules/@fluxer/mac-screen-capture/*.node',
+			'node_modules/@fluxer/mac-clipboard/*.node',
+			'node_modules/@fluxer/mac-sysctl/*.node',
+			'node_modules/@fluxer/mac-tcc/*.node',
+			'node_modules/@fluxer/windows-input-hook/*.node',
+			'node_modules/@fluxer/linux-input-hook/*.node',
+			'node_modules/@fluxer/platform-info/*.node',
+			'node_modules/@fluxer/webauthn/*.node',
+			'node_modules/@fluxer/webauthn/*.so*',
+			'node_modules/.pnpm/@fluxer+win-process-loopback@*/node_modules/@fluxer/win-process-loopback/*.node',
+			...winGameCaptureTargetArchs.map(
+				(arch) =>
+					`node_modules/.pnpm/@fluxer+win-game-capture@*/node_modules/@fluxer/win-game-capture/win-game-capture.win32-${arch}-msvc.node`,
+			),
+			'node_modules/.pnpm/@fluxer+win-clipboard@*/node_modules/@fluxer/win-clipboard/*.node',
+			'node_modules/.pnpm/@fluxer+win-shell@*/node_modules/@fluxer/win-shell/*.node',
+			'node_modules/.pnpm/@fluxer+win-toast@*/node_modules/@fluxer/win-toast/*.node',
+			'node_modules/.pnpm/@fluxer+windows-input-hook@*/node_modules/@fluxer/windows-input-hook/*.node',
+			'node_modules/.pnpm/@fluxer+linux-audio-capture@*/node_modules/@fluxer/linux-audio-capture/*.node',
+			'node_modules/.pnpm/@fluxer+linux-portals@*/node_modules/@fluxer/linux-portals/*.node',
+			'node_modules/.pnpm/@fluxer+linux-screen-capture@*/node_modules/@fluxer/linux-screen-capture/*.node',
+			'node_modules/.pnpm/@fluxer+linux-screen-capture@*/node_modules/@fluxer/linux-screen-capture/obs-vkcapture/**/*',
+			'node_modules/.pnpm/@fluxer+linux-notifications@*/node_modules/@fluxer/linux-notifications/*.node',
+			'node_modules/.pnpm/@fluxer+linux-evdev@*/node_modules/@fluxer/linux-evdev/*.node',
+			'node_modules/.pnpm/@fluxer+linux-input-hook@*/node_modules/@fluxer/linux-input-hook/*.node',
+			'node_modules/.pnpm/@fluxer+system-hunspell@*/node_modules/@fluxer/system-hunspell/*.node',
+			'node_modules/.pnpm/@fluxer+macos-input-hook@*/node_modules/@fluxer/macos-input-hook/*.node',
+			'node_modules/.pnpm/@fluxer+mac-app-audio@*/node_modules/@fluxer/mac-app-audio/*.node',
+			'node_modules/.pnpm/@fluxer+mac-screen-capture@*/node_modules/@fluxer/mac-screen-capture/*.node',
+			'node_modules/.pnpm/@fluxer+mac-clipboard@*/node_modules/@fluxer/mac-clipboard/*.node',
+			'node_modules/.pnpm/@fluxer+mac-sysctl@*/node_modules/@fluxer/mac-sysctl/*.node',
+			'node_modules/.pnpm/@fluxer+mac-tcc@*/node_modules/@fluxer/mac-tcc/*.node',
+			'node_modules/.pnpm/@fluxer+platform-info@*/node_modules/@fluxer/platform-info/*.node',
+			'node_modules/.pnpm/@fluxer+webauthn@*/node_modules/@fluxer/webauthn/*.node',
+			'node_modules/.pnpm/@fluxer+webauthn@*/node_modules/@fluxer/webauthn/*.so*',
+		],
 	},
-	asarUnpack: [
-		'**/*.node',
-		'node_modules/@fluxer/win-process-loopback/*.node',
-		'node_modules/@fluxer/win-game-capture/*.node',
-		'node_modules/@fluxer/win-game-capture/*.dll',
-		'node_modules/@fluxer/win-game-capture/*.exe',
-		'node_modules/@fluxer/win-game-capture/*.json',
-		'node_modules/@fluxer/win-clipboard/*.node',
-		'node_modules/@fluxer/win-shell/*.node',
-		'node_modules/@fluxer/win-toast/*.node',
-		'node_modules/@fluxer/linux-audio-capture/*.node',
-		'node_modules/@fluxer/linux-portals/*.node',
-		'node_modules/@fluxer/linux-screen-capture/*.node',
-		'node_modules/@fluxer/linux-screen-capture/obs-vkcapture/**/*',
-		'node_modules/@fluxer/linux-notifications/*.node',
-		'node_modules/@fluxer/linux-evdev/*.node',
-		'node_modules/@fluxer/system-hunspell/*.node',
-		'node_modules/@fluxer/macos-input-hook/*.node',
-		'node_modules/@fluxer/mac-app-audio/*.node',
-		'node_modules/@fluxer/mac-screen-capture/*.node',
-		'node_modules/@fluxer/mac-clipboard/*.node',
-		'node_modules/@fluxer/mac-sysctl/*.node',
-		'node_modules/@fluxer/mac-tcc/*.node',
-		'node_modules/@fluxer/windows-input-hook/*.node',
-		'node_modules/@fluxer/linux-input-hook/*.node',
-		'node_modules/@fluxer/platform-info/*.node',
-		'node_modules/@fluxer/webauthn/*.node',
-		'node_modules/@fluxer/webauthn/*.so*',
-		'node_modules/.pnpm/@fluxer+win-process-loopback@*/node_modules/@fluxer/win-process-loopback/*.node',
-		'node_modules/.pnpm/@fluxer+win-game-capture@*/node_modules/@fluxer/win-game-capture/*.node',
-		'node_modules/.pnpm/@fluxer+win-game-capture@*/node_modules/@fluxer/win-game-capture/*.dll',
-		'node_modules/.pnpm/@fluxer+win-game-capture@*/node_modules/@fluxer/win-game-capture/*.exe',
-		'node_modules/.pnpm/@fluxer+win-game-capture@*/node_modules/@fluxer/win-game-capture/*.json',
-		'node_modules/.pnpm/@fluxer+win-clipboard@*/node_modules/@fluxer/win-clipboard/*.node',
-		'node_modules/.pnpm/@fluxer+win-shell@*/node_modules/@fluxer/win-shell/*.node',
-		'node_modules/.pnpm/@fluxer+win-toast@*/node_modules/@fluxer/win-toast/*.node',
-		'node_modules/.pnpm/@fluxer+windows-input-hook@*/node_modules/@fluxer/windows-input-hook/*.node',
-		'node_modules/.pnpm/@fluxer+linux-audio-capture@*/node_modules/@fluxer/linux-audio-capture/*.node',
-		'node_modules/.pnpm/@fluxer+linux-portals@*/node_modules/@fluxer/linux-portals/*.node',
-		'node_modules/.pnpm/@fluxer+linux-screen-capture@*/node_modules/@fluxer/linux-screen-capture/*.node',
-		'node_modules/.pnpm/@fluxer+linux-screen-capture@*/node_modules/@fluxer/linux-screen-capture/obs-vkcapture/**/*',
-		'node_modules/.pnpm/@fluxer+linux-notifications@*/node_modules/@fluxer/linux-notifications/*.node',
-		'node_modules/.pnpm/@fluxer+linux-evdev@*/node_modules/@fluxer/linux-evdev/*.node',
-		'node_modules/.pnpm/@fluxer+linux-input-hook@*/node_modules/@fluxer/linux-input-hook/*.node',
-		'node_modules/.pnpm/@fluxer+system-hunspell@*/node_modules/@fluxer/system-hunspell/*.node',
-		'node_modules/.pnpm/@fluxer+macos-input-hook@*/node_modules/@fluxer/macos-input-hook/*.node',
-		'node_modules/.pnpm/@fluxer+mac-app-audio@*/node_modules/@fluxer/mac-app-audio/*.node',
-		'node_modules/.pnpm/@fluxer+mac-screen-capture@*/node_modules/@fluxer/mac-screen-capture/*.node',
-		'node_modules/.pnpm/@fluxer+mac-clipboard@*/node_modules/@fluxer/mac-clipboard/*.node',
-		'node_modules/.pnpm/@fluxer+mac-sysctl@*/node_modules/@fluxer/mac-sysctl/*.node',
-		'node_modules/.pnpm/@fluxer+mac-tcc@*/node_modules/@fluxer/mac-tcc/*.node',
-		'node_modules/.pnpm/@fluxer+platform-info@*/node_modules/@fluxer/platform-info/*.node',
-		'node_modules/.pnpm/@fluxer+webauthn@*/node_modules/@fluxer/webauthn/*.node',
-		'node_modules/.pnpm/@fluxer+webauthn@*/node_modules/@fluxer/webauthn/*.so*',
-	],
 	compression: 'normal',
-	npmRebuild: false,
+	nativeModules: {
+		npmRebuild: false,
+	},
 	protocols: [
 		{
 			name: appId,
@@ -1177,25 +1391,29 @@ module.exports = {
 	},
 	mac: {
 		category: 'public.app-category.social-networking',
+		universal: {
+			x64ArchFiles: '**/@fluxer/**/*.node',
+		},
 		minimumSystemVersion: macOSMinimumSystemVersion,
 		icon: `build_resources/${iconDir}/_compiled/AppIcon.icns`,
 		darkModeSupport: true,
-		hardenedRuntime: true,
-		gatekeeperAssess: false,
 		notarize: true,
-		provisioningProfile,
-		entitlements: isCanary
-			? 'build_resources/entitlements.mac.canary.plist'
-			: 'build_resources/entitlements.mac.stable.plist',
-		entitlementsInherit: 'build_resources/entitlements.mac.inherit.plist',
+		sign: {
+			hardenedRuntime: true,
+			provisioningProfile,
+			entitlements: isCanary
+				? 'build_resources/entitlements.mac.canary.plist'
+				: 'build_resources/entitlements.mac.stable.plist',
+			entitlementsInherit: 'build_resources/entitlements.mac.inherit.plist',
+		},
 		target: [
 			{
 				target: 'dmg',
-				arch: targetArchs,
+				arch: macTargetArchs,
 			},
 			{
 				target: 'zip',
-				arch: targetArchs,
+				arch: macTargetArchs,
 			},
 		],
 		extendInfo: {
@@ -1225,11 +1443,10 @@ module.exports = {
 		target: winTargets,
 	},
 	portable: {
-		// biome-ignore lint/suspicious/noTemplateCurlyInString: electron-builder expands these placeholders.
-		artifactName: '${productName}-${version}-portable-${os}-${arch}.${ext}',
+		artifactName: `${artifactProductName}-\${version}-portable-\${os}-\${arch}.\${ext}`,
 	},
 	linux: {
-		icon: `build_resources/${iconDir}/icon.png`,
+		icon: `build_resources/${iconDir}/1024x1024.png`,
 		category: 'Network;InstantMessaging;Chat;',
 		target: [
 			{

@@ -101,7 +101,6 @@ export const RichEmbedRequest = z.object({
 	timestamp: DateTimeType.nullish().describe('ISO8601 timestamp for the embed'),
 	description: z
 		.preprocess(omitEmptyString, createStringType(1, RICH_EMBED_DESCRIPTION_MAX_LENGTH).nullish())
-		.optional()
 		.describe(`Description of the embed (1-${RICH_EMBED_DESCRIPTION_MAX_LENGTH} characters)`),
 	author: RichEmbedAuthorRequest.nullish().describe('Author information'),
 	image: RichEmbedMediaRequest.nullish().describe('Image to display in the embed'),
@@ -218,9 +217,9 @@ export const MessageSearchRequest = z.object({
 		.number()
 		.int()
 		.min(1)
-		.max(Number.MAX_SAFE_INTEGER)
+		.max(400)
 		.default(1)
-		.describe('Page number for pagination (ignored when cursor is provided)'),
+		.describe('Page number for pagination (ignored when cursor is provided). Use cursor to page beyond this.'),
 	cursor: z
 		.array(z.string())
 		.optional()
@@ -313,7 +312,6 @@ export const MessageNonceRequest = z
 			.number()
 			.int()
 			.nonnegative()
-			.safe()
 			.transform((value) => value.toString()),
 	])
 	.pipe(createStringType(1, 32))
@@ -402,7 +400,7 @@ export type MessagesQuery = z.infer<typeof MessagesQuery>;
 
 const BulkMessageFetchEntryRequest = z.object({
 	channel_id: SnowflakeType.describe('The ID of the channel to fetch messages from'),
-	limit: z.number().int().min(1).max(25).describe('Number of messages to return for this channel (1-25)'),
+	limit: z.number().int().min(1).max(50).describe('Number of messages to return for this channel (1-50)'),
 	before: SnowflakeType.optional().describe('Get messages before this message ID'),
 	after: SnowflakeType.optional().describe('Get messages after this message ID'),
 	around: SnowflakeType.optional().describe('Get messages around this message ID'),
@@ -465,7 +463,7 @@ export const ChannelPinsQuerySchema = z.object({
 		.max(50)
 		.optional()
 		.describe('Maximum number of pinned messages to return (1-50)'),
-	before: z.coerce.date().optional().describe('Get pinned messages before this timestamp'),
+	before: z.string().pipe(z.coerce.date()).optional().describe('Get pinned messages before this timestamp'),
 });
 
 export type ChannelPinsQuerySchema = z.infer<typeof ChannelPinsQuerySchema>;

@@ -35,11 +35,18 @@ fn generate_admin_api(manifest_dir: &Path, out_dir: &Path) {
     }
 
     let json_str = fs::read_to_string(&spec_path).expect("failed to read openapi-admin.json");
-    let spec: openapiv3::OpenAPI =
+    let mut spec: openapiv3::OpenAPI =
         serde_json::from_str(&json_str).expect("failed to parse openapi-admin.json");
+    adapt_progenitor_throttled_errors(&mut spec);
+    relax_guild_audit_log_schemas(&mut spec);
 
     let mut settings = progenitor::GenerationSettings::new();
     settings.with_interface(progenitor::InterfaceStyle::Positional);
+    settings.with_inner_type(
+        "reqwest::header::HeaderMap"
+            .parse()
+            .expect("valid generated client header type"),
+    );
 
     let mut generator = progenitor::Generator::new(&settings);
     let tokens = generator
@@ -52,6 +59,132 @@ fn generate_admin_api(manifest_dir: &Path, out_dir: &Path) {
 
     let output_path = out_dir.join("admin_api_generated.rs");
     fs::write(&output_path, content).expect("failed to write generated API code");
+}
+
+fn adapt_progenitor_throttled_errors(spec: &mut openapiv3::OpenAPI) {
+    let schemas = &spec
+        .components
+        .as_ref()
+        .expect("missing API components")
+        .schemas;
+    let error = serde_json::to_value(schemas.get("Error").expect("missing Error schema"))
+        .expect("failed to inspect Error schema");
+    let mut throttled = serde_json::to_value(
+        schemas
+            .get("ThrottledError")
+            .expect("missing ThrottledError schema"),
+    )
+    .expect("failed to inspect ThrottledError schema");
+    assert_eq!(
+        error["additionalProperties"],
+        serde_json::json!({}),
+        "Progenitor error adaptation requires Error to retain all additional fields"
+    );
+    let properties = throttled["properties"]
+        .as_object_mut()
+        .expect("ThrottledError must be an object schema");
+    assert_eq!(
+        properties
+            .remove("retry_after")
+            .expect("missing retry_after")["type"],
+        "number"
+    );
+    assert_eq!(
+        properties.remove("global").expect("missing global")["type"],
+        "boolean"
+    );
+    assert_eq!(
+        throttled, error,
+        "ThrottledError must extend the common Error schema"
+    );
+
+    for path in spec.paths.paths.values_mut() {
+        let openapiv3::ReferenceOr::Item(path) = path else {
+            panic!("Progenitor error adaptation requires inline API paths");
+        };
+        for operation in [
+            &mut path.get,
+            &mut path.put,
+            &mut path.post,
+            &mut path.delete,
+            &mut path.options,
+            &mut path.head,
+            &mut path.patch,
+            &mut path.trace,
+        ]
+        .into_iter()
+        .flatten()
+        {
+            let Some(response) = operation
+                .responses
+                .responses
+                .get_mut(&openapiv3::StatusCode::Code(429))
+            else {
+                continue;
+            };
+            let openapiv3::ReferenceOr::Item(response) = response else {
+                panic!("Progenitor error adaptation requires inline 429 responses");
+            };
+            let schema = &mut response
+                .content
+                .get_mut("application/json")
+                .expect("429 responses must return JSON")
+                .schema;
+            assert_eq!(
+                schema,
+                &Some(openapiv3::ReferenceOr::ref_(
+                    "#/components/schemas/ThrottledError"
+                )),
+                "Progenitor only supports one error type per operation"
+            );
+            *schema = Some(openapiv3::ReferenceOr::ref_("#/components/schemas/Error"));
+        }
+    }
+}
+
+fn relax_guild_audit_log_schemas(spec: &mut openapiv3::OpenAPI) {
+    let components = spec.components.as_mut().expect("missing API components");
+
+    let entry = object_schema_mut(components, "GuildAuditLogEntryResponse");
+    entry.additional_properties = None;
+    let openapiv3::ReferenceOr::Item(options) = entry
+        .properties
+        .get_mut("options")
+        .expect("GuildAuditLogEntryResponse has no options property")
+    else {
+        panic!("GuildAuditLogEntryResponse options must be an inline schema");
+    };
+    let openapiv3::SchemaKind::Type(openapiv3::Type::Object(options)) = &mut options.schema_kind
+    else {
+        panic!("GuildAuditLogEntryResponse options must be an object schema");
+    };
+    options.additional_properties = None;
+
+    let change = object_schema_mut(components, "AuditLogChangeSchema");
+    change.additional_properties = None;
+    for property in ["old_value", "new_value"] {
+        change.properties.insert(
+            property.to_string(),
+            openapiv3::ReferenceOr::Item(Box::new(openapiv3::Schema {
+                schema_data: openapiv3::SchemaData::default(),
+                schema_kind: openapiv3::SchemaKind::Any(openapiv3::AnySchema::default()),
+            })),
+        );
+    }
+}
+
+fn object_schema_mut<'a>(
+    components: &'a mut openapiv3::Components,
+    name: &str,
+) -> &'a mut openapiv3::ObjectType {
+    let Some(openapiv3::ReferenceOr::Item(schema)) = components.schemas.get_mut(name) else {
+        panic!("missing inline {name} schema");
+    };
+    let openapiv3::SchemaKind::Type(openapiv3::Type::Object(object)) = &mut schema.schema_kind
+    else {
+        panic!("{name} must be an object schema");
+    };
+    object
 }
 
 struct Face {

@@ -24,6 +24,7 @@ import * as InviteUtils from '@app/features/invite/utils/InviteUtils';
 import jumpLinkStyles from '@app/features/messaging/components/markdown/renderers/MessageJumpLink.module.css';
 import {MarkdownContext, type RendererProps} from '@app/features/messaging/components/markdown/renderers/RendererTypes';
 import {ExternalLinkWarningModal} from '@app/features/messaging/components/modals/ExternalLinkWarningModal';
+import {openExternalUrlWithWarning} from '@app/features/messaging/utils/ExternalLinkUtils';
 import {goToMessage} from '@app/features/messaging/utils/MessageNavigator';
 import type {LinkNode} from '@app/features/messaging/utils/markdown/parser/Nodes';
 import * as NavigationCommands from '@app/features/navigation/commands/NavigationCommands';
@@ -207,7 +208,7 @@ interface JumpLinkMentionProps {
 	channel: Channel;
 	guild: Guild | null;
 	messageId?: string;
-	returnTargetId?: string;
+	returnToMessageId?: string;
 	returnChannelId?: string;
 	url: string;
 	i18n: I18n;
@@ -263,7 +264,7 @@ const JumpLinkMention = observer(function JumpLinkMention({
 	channel,
 	guild,
 	messageId,
-	returnTargetId,
+	returnToMessageId,
 	returnChannelId,
 	url,
 	i18n,
@@ -275,11 +276,11 @@ const JumpLinkMention = observer(function JumpLinkMention({
 			return;
 		}
 		if (messageId) {
-			goToMessage(channel.id, messageId, {returnTargetId, returnChannelId});
+			goToMessage(channel.id, messageId, {returnToMessageId, returnChannelId});
 			return;
 		}
 		NavigationCommands.selectChannel(channel.guildId ?? undefined, channel.id);
-	}, [channel, messageId, returnChannelId, returnTargetId]);
+	}, [channel, messageId, returnChannelId, returnToMessageId]);
 	const handleClick = useCallback(
 		(event: React.MouseEvent<HTMLButtonElement | HTMLSpanElement>) => {
 			if (!interactive) return;
@@ -662,7 +663,7 @@ export const LinkRenderer = observer(function LinkRenderer({
 		return shouldDisableInteractions || isInlineReplyContext ? (
 			mention
 		) : (
-			<FocusRing key={id} data-flx="messaging.markdown.renderers.link-renderer.focus-ring--settings">
+			<FocusRing key={id} offset={-2} data-flx="messaging.markdown.renderers.link-renderer.focus-ring--settings">
 				{mention}
 			</FocusRing>
 		);
@@ -673,7 +674,7 @@ export const LinkRenderer = observer(function LinkRenderer({
 				channel={jumpChannel}
 				guild={jumpGuild}
 				messageId={messageJumpTarget?.messageId}
-				returnTargetId={options.messageId}
+				returnToMessageId={options.messageId}
 				returnChannelId={options.channelId}
 				url={url}
 				i18n={i18n}
@@ -684,7 +685,7 @@ export const LinkRenderer = observer(function LinkRenderer({
 		return shouldDisableInteractions || isInlineReplyContext ? (
 			mention
 		) : (
-			<FocusRing key={id} data-flx="messaging.markdown.renderers.link-renderer.focus-ring">
+			<FocusRing key={id} offset={-2} data-flx="messaging.markdown.renderers.link-renderer.focus-ring">
 				{mention}
 			</FocusRing>
 		);
@@ -701,7 +702,7 @@ export const LinkRenderer = observer(function LinkRenderer({
 		return shouldDisableInteractions || isInlineReplyContext ? (
 			mention
 		) : (
-			<FocusRing key={id} data-flx="messaging.markdown.renderers.link-renderer.focus-ring--inaccessible">
+			<FocusRing key={id} offset={-2} data-flx="messaging.markdown.renderers.link-renderer.focus-ring--inaccessible">
 				{mention}
 			</FocusRing>
 		);
@@ -827,7 +828,7 @@ export const LinkRenderer = observer(function LinkRenderer({
 								return;
 							}
 							goToMessage(targetChannelId, targetMessageId, {
-								returnTargetId: options.messageId,
+								returnToMessageId: options.messageId,
 								returnChannelId: options.channelId,
 							});
 						};
@@ -883,7 +884,7 @@ export const LinkRenderer = observer(function LinkRenderer({
 		}
 	}
 	return (
-		<FocusRing key={id} data-flx="messaging.markdown.renderers.link-renderer.focus-ring--2">
+		<FocusRing key={id} offset={-2} data-flx="messaging.markdown.renderers.link-renderer.focus-ring--2">
 			<a
 				href={url}
 				target={isInternal ? undefined : '_blank'}
@@ -898,6 +899,14 @@ export const LinkRenderer = observer(function LinkRenderer({
 						e.preventDefault();
 						void openExternalUrl(url);
 					}
+				}}
+				onAuxClick={(e) => {
+					if (e.button !== 1 || isInternal) {
+						return;
+					}
+					e.preventDefault();
+					e.stopPropagation();
+					openExternalUrlWithWarning(url);
 				}}
 				className={markupStyles.link}
 				data-flx="messaging.markdown.renderers.link-renderer.a"

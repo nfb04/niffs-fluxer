@@ -13,6 +13,7 @@ import * as MessageUtils from '@app/features/messaging/utils/MessageUtils';
 import Navigation from '@app/features/navigation/state/Navigation';
 import SelectedChannel from '@app/features/navigation/state/SelectedChannel';
 import {buildMessageNotificationBody} from '@app/features/notification/utils/MessageNotificationPreview';
+import {getNotificationIconURL} from '@app/features/notification/utils/NotificationIconURL';
 import * as NotificationUtils from '@app/features/notification/utils/NotificationUtils';
 import * as PushSubscriptionService from '@app/features/platform/push/PushSubscriptionService';
 import {IS_DEV} from '@app/features/platform/types/Env';
@@ -29,7 +30,6 @@ import {isInstalledPwa} from '@app/features/ui/utils/PwaUtils';
 import type {User} from '@app/features/user/models/User';
 import UserGuildSettings from '@app/features/user/state/UserGuildSettings';
 import Users from '@app/features/user/state/Users';
-import * as AvatarUtils from '@app/features/user/utils/AvatarUtils';
 import * as NicknameUtils from '@app/features/user/utils/NicknameUtils';
 import {FAVORITES_GUILD_ID as ME} from '@fluxer/constants/src/AppConstants';
 import {ChannelTypes, MessageFlags, MessageTypes} from '@fluxer/constants/src/ChannelConstants';
@@ -53,6 +53,10 @@ const SENT_YOU_A_FRIEND_REQUEST_DESCRIPTOR = msg({
 const IS_NOW_YOUR_FRIEND_DESCRIPTOR = msg({
 	message: '{displayName} is now your friend!',
 	comment: 'Toast title announcing a newly accepted friend request.',
+});
+const GROUP_DM_DESCRIPTOR = msg({
+	message: 'Group DM',
+	comment: 'Fallback name shown in a desktop notification for a group DM that has no custom name.',
 });
 const logger = new Logger('Notification');
 const shouldManagePushSubscriptions = (): boolean => isInstalledPwa();
@@ -223,7 +227,7 @@ class NotificationState {
 	}
 
 	private shouldNotifyBasedOnSettings(channel: Channel, messageRecord: Message, currentUser: User): boolean {
-		const level = UserGuildSettings.resolvedMessageNotifications({
+		const level = UserGuildSettings.resolveEffectiveMessageNotifications({
 			id: channel.id,
 			guildId: channel.guildId,
 			parentId: channel.parentId ?? undefined,
@@ -261,7 +265,7 @@ class NotificationState {
 			return null;
 		}
 		if (
-			UserGuildSettings.allowNoMessages({
+			UserGuildSettings.resolvesToNoMessages({
 				id: channel.id,
 				guildId: channel.guildId,
 				parentId: channel.parentId ?? undefined,
@@ -283,10 +287,7 @@ class NotificationState {
 	}
 
 	private markNotified(key: string): void {
-		const newCache = new LRUCache<string, boolean>({max: CACHE_SIZE});
-		this.notifiedMessageIds.forEach((value, k) => newCache.set(k, value));
-		newCache.set(key, true);
-		this.notifiedMessageIds = newCache;
+		this.notifiedMessageIds.set(key, true);
 	}
 
 	private claimNotification(key: string): boolean {
@@ -338,13 +339,15 @@ class NotificationState {
 					}
 				}
 				break;
-			case ChannelTypes.GROUP_DM:
+			case ChannelTypes.GROUP_DM: {
+				const groupDmName = channel.name || i18n._(GROUP_DM_DESCRIPTOR);
 				if (useMacOSNotificationPresentation) {
-					subtitle = channel.name || 'Group DM';
+					subtitle = groupDmName;
 				} else {
-					title = `${title} (${channel.name || 'Group DM'})`;
+					title = `${title} (${groupDmName})`;
 				}
 				break;
+			}
 		}
 		const body = buildMessageNotificationBody(data.messageRecord, i18n);
 		const notificationUrl =
@@ -357,7 +360,7 @@ class NotificationState {
 				title,
 				subtitle,
 				body,
-				icon: AvatarUtils.getUserNotificationAvatarURL(user),
+				icon: getNotificationIconURL(user, channel.guildId),
 				url: notificationUrl,
 				playSound: false,
 			});
@@ -447,7 +450,7 @@ class NotificationState {
 		this.unreadMessageBadgeEnabled = enabled;
 	}
 
-	handleWindowFocus({focused}: {focused: boolean}): void {
+	handleWindowFocused({focused}: {focused: boolean}): void {
 		this.focused = focused;
 		if (focused) {
 			const channelId = SelectedChannel.currentChannelId;
@@ -524,7 +527,7 @@ class NotificationState {
 			id: cacheKey,
 			title,
 			body,
-			icon: AvatarUtils.getUserNotificationAvatarURL(user),
+			icon: getNotificationIconURL(user),
 			url: Routes.ME,
 		}).catch((error) => {
 			logger.error('Failed to show relationship notification', {cacheKey}, error);

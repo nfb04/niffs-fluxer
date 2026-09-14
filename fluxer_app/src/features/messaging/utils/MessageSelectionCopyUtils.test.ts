@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import {buildMessageSelectionCopyTextForRange} from '@app/features/messaging/utils/MessageSelectionCopyUtils';
 import {afterEach, describe, expect, it} from 'vitest';
-import {buildMessageSelectionCopyTextForRange} from './MessageSelectionCopyUtils';
 
 describe('Message selection copy utils', () => {
 	afterEach(() => {
@@ -44,7 +44,7 @@ describe('Message selection copy utils', () => {
 		expect(buildMessageSelectionCopyTextForRange({rootElement: root, selectionRange: range})).toBe(tableCopyText);
 	});
 	it('does not duplicate a block message header when a bot badge is selected with the body', () => {
-		const messageContent = '## App Canary Deployed\n\nVersion: `2026.519.3`\nImage: `2026.519.3`';
+		const messageContent = 'App Canary Deployed\n\nVersion: 2026.519.3\nImage: 2026.519.3';
 		document.body.innerHTML = [
 			'<div data-message-selection-root="true">',
 			'<div data-message-id="message-1" data-is-group-start="true">',

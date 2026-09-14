@@ -13,7 +13,6 @@ import type {
 	ClipboardWriteFileResult,
 	DownloadFileResult,
 	MediaAccessType,
-	SwitchInstanceUrlOptions,
 	TrayPresenceStatus,
 } from '@electron/common/Types';
 import {hasEnabledBlinkFeature, MIDDLE_CLICK_AUTOSCROLL_BLINK_FEATURE} from '@electron/main/ChromiumRuntime';
@@ -54,6 +53,7 @@ import {openExternalDeduped} from '@electron/main/OpenExternal';
 import {getStatus as getOpenH264Status, setEnabled as setOpenH264Enabled} from '@electron/main/OpenH264Manager';
 import {registerPasskeyHandlers} from '@electron/main/Passkeys';
 import {getAppMetricsSnapshot, getDesktopInfo, getGpuInfo} from '@electron/main/PlatformInfo';
+import {requirePrivilegedRendererDocumentSender} from '@electron/main/PrivilegedRendererDocuments';
 import {getStreamerModeCaptureAppStatus} from '@electron/main/StreamerModeProcessDetection';
 import {
 	acquireStreamingPriority,
@@ -81,7 +81,6 @@ import {
 import {
 	clearSavedWindowBounds,
 	closeThemeStudioPopoutWindow,
-	desktopFirstClickPassThroughPendingRestart,
 	desktopTransparencyPendingRestart,
 	desktopUseNativeTitleBarPendingRestart,
 	focusThemeStudioPopoutWindow,
@@ -137,34 +136,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return value !== null && typeof value === 'object';
 }
 
-function isValidWellKnownPayload(payload: unknown): boolean {
-	if (!isRecord(payload)) {
-		return false;
-	}
-	if (!('endpoints' in payload)) {
-		return false;
-	}
-	const endpoints = (
-		payload as {
-			endpoints?: unknown;
-		}
-	).endpoints;
-	if (!endpoints || typeof endpoints !== 'object') {
-		return false;
-	}
-	const api = (
-		endpoints as {
-			api?: unknown;
-		}
-	).api;
-	const gateway = (
-		endpoints as {
-			gateway?: unknown;
-		}
-	).gateway;
-	return typeof api === 'string' && typeof gateway === 'string';
-}
-
 function normalizeDesktopWindowBehaviorUpdate(value: unknown): Partial<DesktopWindowBehaviorSettings> {
 	if (!isRecord(value)) {
 		return {};
@@ -193,9 +164,6 @@ function normalizeDesktopWindowBehaviorUpdate(value: unknown): Partial<DesktopWi
 	}
 	if (typeof value.middleClickAutoscroll === 'boolean') {
 		update.middleClickAutoscroll = value.middleClickAutoscroll;
-	}
-	if (typeof value.firstClickPassThroughWhenUnfocused === 'boolean') {
-		update.firstClickPassThroughWhenUnfocused = value.firstClickPassThroughWhenUnfocused;
 	}
 	return update;
 }
@@ -448,7 +416,6 @@ export function registerIpcHandlers(): void {
 	ipcMain.handle('desktop-window-behavior-pending-restart', (): boolean => {
 		return (
 			desktopTrayChangePendingRestart() ||
-			desktopFirstClickPassThroughPendingRestart() ||
 			desktopUseNativeTitleBarPendingRestart() ||
 			desktopTransparencyPendingRestart()
 		);
@@ -539,13 +506,14 @@ export function registerIpcHandlers(): void {
 		}
 		await openExternalDeduped(url);
 	});
-	ipcMain.handle('clipboard-write-text', (_event, text: string): void => {
-		clipboard.writeText(text);
+	ipcMain.handle('clipboard-write-text', async (_event, text: string): Promise<void> => {
+		await clipboard.writeText(text);
 	});
-	ipcMain.handle('clipboard-read-text', (): string => {
+	ipcMain.handle('clipboard-read-text', (): Promise<string> => {
 		return clipboard.readText();
 	});
-	ipcMain.handle('clipboard-write-file', async (_event, rawOptions: unknown): Promise<ClipboardWriteFileResult> => {
+	ipcMain.handle('clipboard-write-file', async (event, rawOptions: unknown): Promise<ClipboardWriteFileResult> => {
+		requirePrivilegedRendererDocumentSender(event, 'clipboard-write-file');
 		try {
 			return await copyRemoteFileToClipboard(parseClipboardWriteFileOptions(rawOptions));
 		} catch (error) {
@@ -553,6 +521,7 @@ export function registerIpcHandlers(): void {
 		}
 	});
 	ipcMain.handle('clipboard-paste', (event): void => {
+		requirePrivilegedRendererDocumentSender(event, 'clipboard-paste');
 		event.sender.paste();
 	});
 	ipcMain.handle(
@@ -584,6 +553,7 @@ export function registerIpcHandlers(): void {
 				defaultPath: string;
 			},
 		): Promise<DownloadFileResult> => {
+			requirePrivilegedRendererDocumentSender(event, 'download-file');
 			const win = BrowserWindow.fromWebContents(event.sender);
 			if (!win) {
 				return {success: false, error: 'No window found'};

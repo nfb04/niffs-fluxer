@@ -7,18 +7,6 @@ import {
 	DeveloperOptionRadioItems,
 	DeveloperOptionRadioSubmenu,
 } from '@app/features/channel/components/channel_header_components/developer_tools/DeveloperToolsMenuComponents';
-import * as DeveloperOptionsCommands from '@app/features/devtools/commands/DeveloperOptionsCommands';
-import DeveloperOptions from '@app/features/devtools/state/DeveloperOptions';
-import {MenuItem} from '@app/features/ui/action_menu/MenuItem';
-import {MenuItemSlider} from '@app/features/ui/action_menu/MenuItemSlider';
-import {MenuItemSubmenu} from '@app/features/ui/action_menu/MenuItemSubmenu';
-import * as ModalCommands from '@app/features/ui/commands/ModalCommands';
-import Users from '@app/features/user/state/Users';
-import {msg, plural} from '@lingui/core/macro';
-import {Trans, useLingui} from '@lingui/react/macro';
-import {PhoneIcon, TrashIcon, UsersIcon} from '@phosphor-icons/react';
-import {observer} from 'mobx-react-lite';
-import type React from 'react';
 import {
 	getCountdownTimerOptions,
 	getGiftDurationOptions,
@@ -29,8 +17,21 @@ import {
 	getRequiredActionResendOutcomeOptions,
 	getRequiredActionTabOptions,
 	getVerificationBarrierOptions,
-} from './OptionPresets';
-import {updateOption} from './ResetOptions';
+} from '@app/features/channel/components/channel_header_components/developer_tools/OptionPresets';
+import {updateOption} from '@app/features/channel/components/channel_header_components/developer_tools/ResetOptions';
+import * as DeveloperOptionsCommands from '@app/features/devtools/commands/DeveloperOptionsCommands';
+import DeveloperOptions from '@app/features/devtools/state/DeveloperOptions';
+import {remFromPx} from '@app/features/theme/layout/RemFromPx';
+import {MenuItem} from '@app/features/ui/action_menu/MenuItem';
+import {MenuItemSlider} from '@app/features/ui/action_menu/MenuItemSlider';
+import {MenuItemSubmenu} from '@app/features/ui/action_menu/MenuItemSubmenu';
+import * as ModalCommands from '@app/features/ui/commands/ModalCommands';
+import Users from '@app/features/user/state/Users';
+import {msg, plural} from '@lingui/core/macro';
+import {Trans, useLingui} from '@lingui/react/macro';
+import {PhoneIcon, TrashIcon, UsersIcon} from '@phosphor-icons/react';
+import {observer} from 'mobx-react-lite';
+import type React from 'react';
 
 const VERIFICATION_MEMBERSHIP_BARRIERS_DESCRIPTOR = msg({
 	message: 'Verification & membership barriers',
@@ -367,7 +368,7 @@ export const MockingMenu: React.FC<{onClose: () => void}> = observer(({onClose})
 					<MenuItem
 						icon={
 							<TrashIcon
-								size={16}
+								size={remFromPx(16)}
 								weight="bold"
 								data-flx="channel.channel-header-components.developer-tools-context-menu.mocking-menu.trash-icon"
 							/>
@@ -386,7 +387,7 @@ export const MockingMenu: React.FC<{onClose: () => void}> = observer(({onClose})
 								<MenuItem
 									icon={
 										<PhoneIcon
-											size={16}
+											size={remFromPx(16)}
 											weight="fill"
 											data-flx="channel.channel-header-components.developer-tools-context-menu.mocking-menu.menu-item.icon.mock-incoming-call.dm"
 										/>
@@ -399,7 +400,7 @@ export const MockingMenu: React.FC<{onClose: () => void}> = observer(({onClose})
 								<MenuItem
 									icon={
 										<UsersIcon
-											size={16}
+											size={remFromPx(16)}
 											weight="fill"
 											data-flx="channel.channel-header-components.developer-tools-context-menu.mocking-menu.menu-item.icon.mock-incoming-call.group-dm"
 										/>

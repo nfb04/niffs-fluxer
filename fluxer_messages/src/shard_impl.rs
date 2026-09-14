@@ -15,13 +15,12 @@ use crate::types::{
     MessageSnapshot, MessageStickerItem,
 };
 use crate::udt;
-use base64::Engine;
 use chrono::{DateTime, Utc};
+use fluxer_common::user_flags::{USER_FLAG_STAFF, visible_user_flags};
 use fluxer_svc::shard::ShardService;
-use fluxer_svc::transport::NatsTransport;
+use fluxer_svc::transport::Transport;
 use fluxer_svc::{postgres, postgres::BigIntBound, postgres::KeyPart};
 use futures::stream::{self, StreamExt};
-use hmac::{Hmac, KeyInit, Mac};
 #[cfg(feature = "scylla")]
 use scylla::DeserializeRow;
 #[cfg(feature = "scylla")]
@@ -31,7 +30,6 @@ use scylla::response::query_result::QueryRowsResult;
 #[cfg(feature = "scylla")]
 use scylla::statement::prepared::PreparedStatement;
 use serde::Deserialize;
-use sha2::Sha256;
 use std::collections::{HashMap, HashSet};
 #[cfg(feature = "scylla")]
 use std::sync::Arc;
@@ -42,18 +40,22 @@ const BUCKET_DURATION_MS: i64 = 864_000_000;
 const FLUXER_EPOCH_MS: i64 = 1_420_070_400_000;
 const SERVICE_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 const MESSAGE_REFERENCE_TYPE_DEFAULT: i32 = 0;
+
+fn effective_reference_type(reference: &MessageReference) -> i32 {
+    reference
+        .reference_type
+        .unwrap_or(MESSAGE_REFERENCE_TYPE_DEFAULT)
+}
 const MESSAGE_FLAG_SUPPRESS_EMBEDS: i64 = 1 << 2;
-const PUBLIC_USER_FLAGS: i64 =
-    (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (1 << 6);
 #[cfg(test)]
 const USER_FLAG_DELETED: i64 = 1_i64 << 34;
 const FLUXER_SYSTEM_USER_ID: i64 = 0;
 const FLUXER_SYSTEM_USERNAME: &str = "Fluxer";
 const FLUXER_SYSTEM_DISCRIMINATOR: &str = "0000";
-const USER_FLAG_STAFF: i64 = 1;
 const DELETED_USER_USERNAME: &str = "DeletedUser";
 const DELETED_USER_GLOBAL_NAME: &str = "Deleted User";
 const BUCKET_SCAN_CONCURRENCY: usize = 16;
+const BUCKET_SCAN_WAVE: usize = 4;
 const ENRICHMENT_QUERY_CONCURRENCY: usize = 16;
 const REACTION_MESSAGE_BATCH_SIZE: usize = 64;
 const ATTACHMENT_DECAY_BATCH_SIZE: usize = 128;
@@ -74,19 +76,24 @@ const MESSAGE_COLUMNS: &str = "\
     webhook_id, webhook_name, webhook_avatar_hash, \
     content, edited_timestamp, pinned_timestamp, flags, mention_everyone, \
     mention_users, mention_roles, mention_channels, \
-    has_reaction, version, nsfw_emojis, \
+    has_reaction, version, \
     attachments, embeds, sticker_items, message_reference, call, message_snapshots";
 
-pub struct MessagesShard {
+pub struct MessagesShard<T> {
     storage: MessagesStorage,
-    transport: NatsTransport,
+    transport: T,
 }
+
+#[cfg(test)]
+type DeletedMessageKeys = std::sync::Arc<std::sync::Mutex<Vec<(i64, i32, i64)>>>;
 
 #[derive(Clone)]
 enum MessagesStorage {
     Postgres(PostgresMessagesStorage),
     #[cfg(feature = "scylla")]
-    Scylla(ScyllaMessagesStorage),
+    Scylla(Box<ScyllaMessagesStorage>),
+    #[cfg(test)]
+    Deletions(DeletedMessageKeys),
 }
 
 #[derive(Clone)]
@@ -132,7 +139,6 @@ struct MessageDbRow {
     mention_channels: Option<std::collections::HashSet<i64>>,
     has_reaction: Option<bool>,
     version: Option<i32>,
-    nsfw_emojis: Option<std::collections::HashSet<i64>>,
     attachments: Option<Vec<udt::AttachmentUdt>>,
     embeds: Option<Vec<udt::EmbedUdt>>,
     sticker_items: Option<Vec<udt::StickerItemUdt>>,
@@ -267,10 +273,11 @@ struct ResponseContext {
 struct MessageMentionContext {
     content: MessageMentions,
     snapshots: Vec<MessageMentions>,
+    embed_users: HashSet<i64>,
 }
 
-impl MessagesShard {
-    pub fn new_postgres(kv: postgres::KvClient, transport: NatsTransport) -> anyhow::Result<Self> {
+impl<T: Transport> MessagesShard<T> {
+    pub fn new_postgres(kv: postgres::KvClient, transport: T) -> anyhow::Result<Self> {
         Ok(Self {
             storage: MessagesStorage::Postgres(PostgresMessagesStorage { kv }),
             transport,
@@ -278,7 +285,7 @@ impl MessagesShard {
     }
 
     #[cfg(feature = "scylla")]
-    pub async fn new_scylla(db: Arc<Session>, transport: NatsTransport) -> anyhow::Result<Self> {
+    pub async fn new_scylla(db: Arc<Session>, transport: T) -> anyhow::Result<Self> {
         let stmt_get_by_id = db
             .prepare(format!(
                 "SELECT {MESSAGE_COLUMNS} FROM messages WHERE channel_id = ? AND bucket = ? AND message_id = ? LIMIT 1"
@@ -334,7 +341,7 @@ impl MessagesShard {
             .await?;
 
         Ok(Self {
-            storage: MessagesStorage::Scylla(ScyllaMessagesStorage {
+            storage: MessagesStorage::Scylla(Box::new(ScyllaMessagesStorage {
                 db,
                 stmt_get_by_id,
                 stmt_get_latest,
@@ -347,25 +354,13 @@ impl MessagesShard {
                 stmt_get_attachment_decay,
                 stmt_get_attachment_decay_many,
                 stmt_delete_message,
-            }),
+            })),
             transport,
         })
     }
 
-    fn snowflake_to_bucket(snowflake: i64) -> i32 {
-        ((snowflake >> 22) / BUCKET_DURATION_MS) as i32
-    }
-
-    fn current_bucket() -> i32 {
-        let now_ms = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis() as i64;
-        epoch_millis_to_bucket(now_ms)
-    }
-
     async fn get_by_id(&self, channel_id: i64, message_id: i64) -> anyhow::Result<Option<Message>> {
-        let bucket = Self::snowflake_to_bucket(message_id);
+        let bucket = snowflake_to_bucket(message_id);
         self.storage.get_by_id(channel_id, bucket, message_id).await
     }
 
@@ -373,7 +368,7 @@ impl MessagesShard {
         if limit == 0 {
             return Ok(Vec::new());
         }
-        self.scan_indexed_buckets_desc(channel_id, 0, Self::current_bucket(), limit, None)
+        self.scan_indexed_buckets_desc(channel_id, 0, current_bucket(), limit, None)
             .await
     }
 
@@ -389,7 +384,7 @@ impl MessagesShard {
         self.scan_indexed_buckets_desc(
             channel_id,
             0,
-            Self::snowflake_to_bucket(before_id),
+            snowflake_to_bucket(before_id),
             limit,
             Some(before_id),
         )
@@ -405,8 +400,8 @@ impl MessagesShard {
         if limit == 0 {
             return Ok(Vec::new());
         }
-        let min_bucket = Self::snowflake_to_bucket(after_id);
-        let max_bucket = Self::current_bucket().max(min_bucket);
+        let min_bucket = snowflake_to_bucket(after_id);
+        let max_bucket = current_bucket().max(min_bucket);
         self.scan_indexed_buckets_asc(channel_id, min_bucket, max_bucket, limit, after_id)
             .await
     }
@@ -429,8 +424,11 @@ impl MessagesShard {
             let Some(last_bucket) = buckets.last().copied() else {
                 break;
             };
-            let results = stream::iter(buckets)
-                .map(|bucket| async move {
+            collect_bucket_waves(
+                &buckets,
+                limit as usize,
+                &mut messages,
+                |bucket| async move {
                     if let Some(before_id) = before_id {
                         self.fetch_before_bucket(channel_id, bucket, before_id, limit_i32)
                             .await
@@ -438,20 +436,16 @@ impl MessagesShard {
                         self.fetch_latest_bucket(channel_id, bucket, limit_i32)
                             .await
                     }
-                })
-                .buffer_unordered(BUCKET_SCAN_CONCURRENCY)
-                .collect::<Vec<_>>()
-                .await;
-            for result in results {
-                messages.extend(result?);
-            }
-            messages.sort_unstable_by_key(|message| std::cmp::Reverse(message.message_id));
-            messages.truncate(limit as usize);
+                },
+            )
+            .await?;
             if messages.len() >= limit as usize || last_bucket <= min_bucket {
                 break;
             }
             cursor_max = last_bucket.saturating_sub(1);
         }
+        messages.sort_unstable_by_key(|message| std::cmp::Reverse(message.message_id));
+        messages.truncate(limit as usize);
         Ok(messages)
     }
 
@@ -473,24 +467,23 @@ impl MessagesShard {
             let Some(last_bucket) = buckets.last().copied() else {
                 break;
             };
-            let results = stream::iter(buckets)
-                .map(|bucket| async move {
+            collect_bucket_waves(
+                &buckets,
+                limit as usize,
+                &mut messages,
+                |bucket| async move {
                     self.fetch_after_bucket(channel_id, bucket, after_id, limit_i32)
                         .await
-                })
-                .buffer_unordered(BUCKET_SCAN_CONCURRENCY)
-                .collect::<Vec<_>>()
-                .await;
-            for result in results {
-                messages.extend(result?);
-            }
-            messages.sort_unstable_by_key(|left| left.message_id);
-            messages.truncate(limit as usize);
+                },
+            )
+            .await?;
             if messages.len() >= limit as usize || last_bucket >= max_bucket {
                 break;
             }
             cursor_min = last_bucket.saturating_add(1);
         }
+        messages.sort_unstable_by_key(|left| left.message_id);
+        messages.truncate(limit as usize);
         Ok(messages)
     }
 
@@ -669,6 +662,7 @@ impl MessagesShard {
             return Ok(None);
         }
         if message.author_id.is_none() && message.webhook_id.is_none() {
+            self.cleanup_orphaned_messages(vec![message]).await;
             return Ok(None);
         }
         let context = self
@@ -684,11 +678,11 @@ impl MessagesShard {
         messages: Vec<Message>,
         options: ResponseBuildOptions,
     ) -> anyhow::Result<Vec<ApiMessageResponse>> {
-        let messages = messages
+        let (messages, orphaned_messages): (Vec<_>, Vec<_>) = messages
             .into_iter()
             .filter(|message| self.is_message_visible_to_requester(message.message_id, &options))
-            .filter(|message| message.author_id.is_some() || message.webhook_id.is_some())
-            .collect::<Vec<_>>();
+            .partition(|message| message.author_id.is_some() || message.webhook_id.is_some());
+        self.cleanup_orphaned_messages(orphaned_messages).await;
         let context = self
             .build_response_context(&messages, &options, true)
             .await?;
@@ -719,7 +713,7 @@ impl MessagesShard {
         let count = messages.len();
         let failures = stream::iter(messages)
             .map(|message| async move {
-                let bucket = Self::snowflake_to_bucket(message.message_id);
+                let bucket = snowflake_to_bucket(message.message_id);
                 self.storage
                     .delete_message(message.channel_id, bucket, message.message_id)
                     .await
@@ -754,8 +748,10 @@ impl MessagesShard {
         } else {
             HashMap::new()
         };
-        let mut all_messages = messages.to_vec();
-        all_messages.extend(referenced_messages.values().cloned());
+        let all_messages = messages
+            .iter()
+            .chain(referenced_messages.values())
+            .collect::<Vec<_>>();
         let mention_context = build_message_mention_context(&all_messages);
         let attachment_ids = collect_attachment_ids(&all_messages);
         let channel_ids = collect_channel_mention_ids(&all_messages, &mention_context);
@@ -763,12 +759,13 @@ impl MessagesShard {
         let reactions_future = self.fetch_reactions_for_messages(messages, options);
         let attachment_decay_future = self.fetch_attachment_decay(attachment_ids);
         let channel_mentions_future = self.resolve_channel_mentions(channel_ids, options);
-        let (reactions, attachment_decay, channel_mentions) = tokio::join!(
+        let users_future = self.fetch_user_partials(user_ids);
+        let (reactions, attachment_decay, channel_mentions, users) = tokio::join!(
             reactions_future,
             attachment_decay_future,
-            channel_mentions_future
+            channel_mentions_future,
+            users_future
         );
-        let users = self.fetch_user_partials(user_ids).await;
         let attachment_decay = attachment_decay?;
         Ok(ResponseContext {
             users,
@@ -790,7 +787,7 @@ impl MessagesShard {
             let Some(reference) = &message.message_reference else {
                 continue;
             };
-            if reference.reference_type != Some(MESSAGE_REFERENCE_TYPE_DEFAULT) {
+            if effective_reference_type(reference) != MESSAGE_REFERENCE_TYPE_DEFAULT {
                 continue;
             }
             let (Some(channel_id), Some(message_id)) = (reference.channel_id, reference.message_id)
@@ -834,7 +831,7 @@ impl MessagesShard {
             if message.has_reaction == Some(false) {
                 continue;
             }
-            let bucket = Self::snowflake_to_bucket(message.message_id);
+            let bucket = snowflake_to_bucket(message.message_id);
             groups
                 .entry((message.channel_id, bucket))
                 .or_default()
@@ -1046,11 +1043,15 @@ impl MessagesShard {
             .iter()
             .filter_map(map_sticker)
             .collect();
-        let content_mentions = context
-            .mention_context
-            .get(&message.message_id)
-            .map(|mentions| mentions.content.clone())
-            .unwrap_or_else(|| extract_mentions_from_markdown(message.content.as_deref()));
+        let fallback_mentions;
+        let message_mentions = match context.mention_context.get(&message.message_id) {
+            Some(mentions) => mentions,
+            None => {
+                fallback_mentions = build_mention_context_entry(message);
+                &fallback_mentions
+            }
+        };
+        let content_mentions = &message_mentions.content;
         let mention_roles = ids_present_in_set(&message.mention_roles, &content_mentions.roles);
         let mention_channels =
             ids_present_in_set(&message.mention_channels, &content_mentions.channels)
@@ -1058,24 +1059,9 @@ impl MessagesShard {
                 .filter_map(|id| context.channel_mentions.get(&id).cloned())
                 .collect::<Vec<_>>();
         let mut referenced_user_ids = content_mentions.users.clone();
-        for embed in message.embeds.as_deref().unwrap_or_default() {
-            collect_user_ids_from_embed(embed, &mut referenced_user_ids);
-        }
-        if let Some(snapshots) = &message.message_snapshots {
-            for (index, snapshot) in snapshots.iter().enumerate() {
-                let snapshot_mentions = context
-                    .mention_context
-                    .get(&message.message_id)
-                    .and_then(|mentions| mentions.snapshots.get(index))
-                    .cloned()
-                    .unwrap_or_else(|| extract_mentions_from_markdown(snapshot.content.as_deref()));
-                referenced_user_ids.extend(snapshot_mentions.users);
-                if let Some(embeds) = &snapshot.embeds {
-                    for embed in embeds {
-                        collect_user_ids_from_embed(embed, &mut referenced_user_ids);
-                    }
-                }
-            }
+        referenced_user_ids.extend(message_mentions.embed_users.iter().copied());
+        for snapshot_mentions in &message_mentions.snapshots {
+            referenced_user_ids.extend(snapshot_mentions.users.iter().copied());
         }
         let mentioned_user_ids = message
             .mention_users
@@ -1102,23 +1088,25 @@ impl MessagesShard {
                     Some((
                         reference.channel_id?,
                         reference.message_id?,
-                        reference.reference_type?,
+                        effective_reference_type(reference),
                     ))
                 })
                 .filter(|(_, _, reference_type)| *reference_type == MESSAGE_REFERENCE_TYPE_DEFAULT)
-                .and_then(|(channel_id, message_id, _)| {
-                    context.referenced_messages.get(&(channel_id, message_id))
-                })
-                .map(|referenced| {
-                    let mut referenced_options = options.clone();
-                    referenced_options.nonce = None;
-                    referenced_options.tts = false;
-                    Box::new(self.map_message_response(
-                        referenced,
-                        &referenced_options,
-                        context,
-                        false,
-                    ))
+                .map(|(channel_id, message_id, _)| {
+                    context
+                        .referenced_messages
+                        .get(&(channel_id, message_id))
+                        .map(|referenced| {
+                            let mut referenced_options = options.clone();
+                            referenced_options.nonce = None;
+                            referenced_options.tts = false;
+                            Box::new(self.map_message_response(
+                                referenced,
+                                &referenced_options,
+                                context,
+                                false,
+                            ))
+                        })
                 })
         } else {
             None
@@ -1143,13 +1131,6 @@ impl MessagesShard {
             embeds,
             attachments,
             stickers,
-            nsfw_emojis: (!message.nsfw_emojis.is_empty()).then(|| {
-                message
-                    .nsfw_emojis
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect()
-            }),
             reactions: context.reactions.get(&message.message_id).cloned(),
             message_reference: message
                 .message_reference
@@ -1495,6 +1476,8 @@ impl MessagesStorage {
             MessagesStorage::Scylla(storage) => {
                 storage.get_by_id(channel_id, bucket, message_id).await
             }
+            #[cfg(test)]
+            MessagesStorage::Deletions(_) => Ok(None),
         }
     }
 
@@ -1517,6 +1500,8 @@ impl MessagesStorage {
                     .list_buckets_desc(channel_id, min_bucket, max_bucket, limit)
                     .await
             }
+            #[cfg(test)]
+            MessagesStorage::Deletions(_) => Ok(Vec::new()),
         }
     }
 
@@ -1539,6 +1524,8 @@ impl MessagesStorage {
                     .list_buckets_asc(channel_id, min_bucket, max_bucket, limit)
                     .await
             }
+            #[cfg(test)]
+            MessagesStorage::Deletions(_) => Ok(Vec::new()),
         }
     }
 
@@ -1558,6 +1545,8 @@ impl MessagesStorage {
             MessagesStorage::Scylla(storage) => {
                 storage.fetch_latest_bucket(channel_id, bucket, limit).await
             }
+            #[cfg(test)]
+            MessagesStorage::Deletions(_) => Ok(Vec::new()),
         }
     }
 
@@ -1586,6 +1575,8 @@ impl MessagesStorage {
                     .fetch_before_bucket(channel_id, bucket, before_id, limit)
                     .await
             }
+            #[cfg(test)]
+            MessagesStorage::Deletions(_) => Ok(Vec::new()),
         }
     }
 
@@ -1614,6 +1605,8 @@ impl MessagesStorage {
                     .fetch_after_bucket(channel_id, bucket, after_id, limit)
                     .await
             }
+            #[cfg(test)]
+            MessagesStorage::Deletions(_) => Ok(Vec::new()),
         }
     }
 
@@ -1630,6 +1623,14 @@ impl MessagesStorage {
             #[cfg(feature = "scylla")]
             MessagesStorage::Scylla(storage) => {
                 storage.delete_message(channel_id, bucket, message_id).await
+            }
+            #[cfg(test)]
+            MessagesStorage::Deletions(deleted) => {
+                deleted
+                    .lock()
+                    .expect("deleted message keys mutex poisoned")
+                    .push((channel_id, bucket, message_id));
+                Ok(())
             }
         }
     }
@@ -1663,6 +1664,8 @@ impl MessagesStorage {
                     )
                     .await
             }
+            #[cfg(test)]
+            MessagesStorage::Deletions(_) => HashMap::new(),
         }
     }
 
@@ -1678,6 +1681,8 @@ impl MessagesStorage {
             MessagesStorage::Scylla(storage) => {
                 storage.fetch_attachment_decay_batch(attachment_ids).await
             }
+            #[cfg(test)]
+            MessagesStorage::Deletions(_) => Ok(HashMap::new()),
         }
     }
 }
@@ -2100,7 +2105,7 @@ impl ScyllaMessagesStorage {
     }
 }
 
-impl ShardService for MessagesShard {
+impl<T: Transport> ShardService for MessagesShard<T> {
     type Request = MessageRequest;
     type Response = MessageResponse;
 
@@ -2410,6 +2415,38 @@ fn bucket_page_limit(message_limit: u32) -> u32 {
     message_limit.clamp(32, BUCKET_INDEX_PAGE_SIZE)
 }
 
+fn next_bucket_wave(wave: usize) -> usize {
+    wave.saturating_mul(2).min(BUCKET_SCAN_CONCURRENCY)
+}
+
+async fn collect_bucket_waves<T, Fetch, Fut>(
+    buckets: &[i32],
+    limit: usize,
+    collected: &mut Vec<T>,
+    fetch: Fetch,
+) -> anyhow::Result<()>
+where
+    Fetch: Fn(i32) -> Fut,
+    Fut: std::future::Future<Output = anyhow::Result<Vec<T>>>,
+{
+    let mut offset = 0;
+    let mut wave = BUCKET_SCAN_WAVE;
+    while offset < buckets.len() && collected.len() < limit {
+        let end = buckets.len().min(offset + wave);
+        let results = stream::iter(buckets[offset..end].iter().copied())
+            .map(&fetch)
+            .buffer_unordered(wave)
+            .collect::<Vec<_>>()
+            .await;
+        for result in results {
+            collected.extend(result?);
+        }
+        offset = end;
+        wave = next_bucket_wave(wave);
+    }
+    Ok(())
+}
+
 fn around_window_limits(limit: u32) -> (u32, u32) {
     let newer_limit = limit / 2;
     let older_limit = limit.saturating_sub(1).saturating_sub(newer_limit);
@@ -2430,6 +2467,18 @@ fn epoch_millis_to_bucket(epoch_millis: i64) -> i32 {
     ((epoch_millis - FLUXER_EPOCH_MS) / BUCKET_DURATION_MS) as i32
 }
 
+fn snowflake_to_bucket(snowflake: i64) -> i32 {
+    ((snowflake >> 22) / BUCKET_DURATION_MS) as i32
+}
+
+fn current_bucket() -> i32 {
+    let now_ms = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as i64;
+    epoch_millis_to_bucket(now_ms)
+}
+
 fn epoch_millis_to_iso(epoch_millis: i64) -> String {
     DateTime::<Utc>::from_timestamp_millis(epoch_millis)
         .unwrap_or(DateTime::<Utc>::UNIX_EPOCH)
@@ -2444,26 +2493,33 @@ fn map_embed_field_response(field: MessageEmbedField) -> ApiEmbedFieldResponse {
     }
 }
 
-fn build_message_mention_context(messages: &[Message]) -> HashMap<i64, MessageMentionContext> {
+fn build_message_mention_context(messages: &[&Message]) -> HashMap<i64, MessageMentionContext> {
     messages
         .iter()
-        .map(|message| {
-            let snapshots = message
-                .message_snapshots
-                .as_deref()
-                .unwrap_or_default()
-                .iter()
-                .map(|snapshot| extract_mentions_from_markdown(snapshot.content.as_deref()))
-                .collect();
-            (
-                message.message_id,
-                MessageMentionContext {
-                    content: extract_mentions_from_markdown(message.content.as_deref()),
-                    snapshots,
-                },
-            )
-        })
+        .map(|message| (message.message_id, build_mention_context_entry(message)))
         .collect()
+}
+
+fn build_mention_context_entry(message: &Message) -> MessageMentionContext {
+    let message_snapshots = message.message_snapshots.as_deref().unwrap_or_default();
+    let snapshots = message_snapshots
+        .iter()
+        .map(|snapshot| extract_mentions_from_markdown(snapshot.content.as_deref()))
+        .collect();
+    let mut embed_users = HashSet::new();
+    for embed in message.embeds.as_deref().unwrap_or_default() {
+        collect_user_ids_from_embed(embed, &mut embed_users);
+    }
+    for snapshot in message_snapshots {
+        for embed in snapshot.embeds.as_deref().unwrap_or_default() {
+            collect_user_ids_from_embed(embed, &mut embed_users);
+        }
+    }
+    MessageMentionContext {
+        content: extract_mentions_from_markdown(message.content.as_deref()),
+        snapshots,
+        embed_users,
+    }
 }
 
 fn ids_present_in_set(ids: &[i64], present: &HashSet<i64>) -> Vec<String> {
@@ -2473,7 +2529,7 @@ fn ids_present_in_set(ids: &[i64], present: &HashSet<i64>) -> Vec<String> {
         .collect()
 }
 
-fn collect_attachment_ids(messages: &[Message]) -> HashSet<i64> {
+fn collect_attachment_ids(messages: &[&Message]) -> HashSet<i64> {
     let mut ids = HashSet::new();
     for message in messages {
         if let Some(attachments) = &message.attachments {
@@ -2499,7 +2555,7 @@ fn collect_attachment_ids(messages: &[Message]) -> HashSet<i64> {
 }
 
 fn collect_channel_mention_ids(
-    messages: &[Message],
+    messages: &[&Message],
     mention_context: &HashMap<i64, MessageMentionContext>,
 ) -> HashSet<i64> {
     let mut ids = HashSet::new();
@@ -2529,7 +2585,7 @@ fn collect_channel_mention_ids(
 }
 
 fn collect_user_ids(
-    messages: &[Message],
+    messages: &[&Message],
     mention_context: &HashMap<i64, MessageMentionContext>,
 ) -> HashSet<i64> {
     let mut ids = HashSet::new();
@@ -2542,11 +2598,7 @@ fn collect_user_ids(
         }
         if let Some(mentions) = mention_context.get(&message.message_id) {
             ids.extend(mentions.content.users.iter().copied());
-        }
-        if let Some(embeds) = &message.embeds {
-            for embed in embeds {
-                collect_user_ids_from_embed(embed, &mut ids);
-            }
+            ids.extend(mentions.embed_users.iter().copied());
         }
         if let Some(snapshots) = &message.message_snapshots {
             for (index, snapshot) in snapshots.iter().enumerate() {
@@ -2558,11 +2610,6 @@ fn collect_user_ids(
                     .and_then(|mentions| mentions.snapshots.get(index))
                 {
                     ids.extend(mentions.users.iter().copied());
-                }
-                if let Some(embeds) = &snapshot.embeds {
-                    for embed in embeds {
-                        collect_user_ids_from_embed(embed, &mut ids);
-                    }
                 }
             }
         }
@@ -2639,7 +2686,7 @@ fn map_user_partial(partial: UserPartialServiceResponse) -> ApiUserPartialRespon
         avatar_color: partial.avatar_color,
         bot: partial.bot.filter(|bot| *bot),
         system: partial.system.filter(|system| *system),
-        flags: flags & PUBLIC_USER_FLAGS,
+        flags: i64::from(visible_user_flags(flags)),
         mention_flags: partial.mention_flags.filter(|flags| *flags != 0),
     }
 }
@@ -2746,7 +2793,7 @@ fn map_message_reference(reference: &MessageReference) -> Option<ApiMessageRefer
         channel_id: reference.channel_id?.to_string(),
         message_id: reference.message_id?.to_string(),
         guild_id: reference.guild_id.map(|id| id.to_string()),
-        reference_type: reference.reference_type.unwrap_or_default(),
+        reference_type: effective_reference_type(reference),
     })
 }
 
@@ -2755,7 +2802,6 @@ fn map_sticker(sticker: &MessageStickerItem) -> Option<ApiMessageStickerResponse
         id: sticker.sticker_id?.to_string(),
         name: sticker.name.clone().unwrap_or_default(),
         animated: sticker.animated.unwrap_or(false),
-        nsfw: sticker.nsfw.filter(|nsfw| *nsfw),
     })
 }
 
@@ -2796,23 +2842,12 @@ fn external_media_proxy_url(input_url: &str, options: &ResponseBuildOptions) -> 
         Ok(url) => url,
         Err(_) => return input_url.to_owned(),
     };
-    let encoded =
-        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(parsed_url.as_str().as_bytes());
-    let path = format!("v2/{encoded}");
-    let signature = create_signature(&path, &options.media_proxy_secret_key);
-    format!(
-        "{}/external/{}/{}",
+    fluxer_common::external_media_path::build_external_media_proxy_url(
         options.media_endpoint.trim_end_matches('/'),
-        signature,
-        path
+        parsed_url.as_str(),
+        options.media_proxy_secret_key.as_bytes(),
     )
-}
-
-fn create_signature(input: &str, secret: &str) -> String {
-    let mut mac =
-        Hmac::<Sha256>::new_from_slice(secret.as_bytes()).expect("hmac accepts any key size");
-    mac.update(input.as_bytes());
-    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(mac.finalize().into_bytes())
+    .unwrap_or_else(|| input_url.to_owned())
 }
 
 fn dt_to_epoch_millis(dt: &DateTime<Utc>) -> i64 {
@@ -2942,7 +2977,6 @@ fn convert_sticker_item(s: udt::StickerItemUdt) -> MessageStickerItem {
         name: s.name,
         format_type: s.format_type,
         animated: s.animated,
-        nsfw: s.nsfw,
     }
 }
 
@@ -3030,10 +3064,6 @@ impl From<MessageDbRow> for Message {
                 .unwrap_or_default(),
             has_reaction: row.has_reaction,
             version: row.version.unwrap_or_default(),
-            nsfw_emojis: row
-                .nsfw_emojis
-                .map(|s| s.into_iter().collect())
-                .unwrap_or_default(),
             attachments: row
                 .attachments
                 .map(|v| v.into_iter().map(convert_attachment).collect()),
@@ -3055,6 +3085,7 @@ impl From<MessageDbRow> for Message {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fluxer_svc::transport::{InMemoryTransport, TransportSubscriber, reply_message};
     use serde_json::json;
 
     #[test]
@@ -3160,7 +3191,6 @@ mod tests {
             ]},
             "mention_roles": {"__fluxer_type": "set", "value": []},
             "mention_channels": {"__fluxer_type": "set", "value": []},
-            "nsfw_emojis": {"__fluxer_type": "set", "value": []},
             "attachments": [{
                 "attachment_id": {"__fluxer_type": "bigint", "value": "1509197195776110593"},
                 "filename": "a.png",
@@ -3197,6 +3227,44 @@ mod tests {
     }
 
     #[test]
+    fn mention_context_carries_embed_user_ids_for_message_and_snapshots() {
+        let message: Message = serde_json::from_value(json!({
+            "message_id": "10",
+            "channel_id": "20",
+            "bucket": 1,
+            "author_id": "30",
+            "type": 0,
+            "version": 0,
+            "content": "hello <@40>",
+            "mention_users": ["40"],
+            "embeds": [{
+                "title": "title <@50>",
+                "description": "description <@60>",
+                "footer": {"text": "footer <@70>"},
+                "fields": [{"name": "field <@80>", "value": "value <@90>"}]
+            }],
+            "message_snapshots": [{
+                "content": "snapshot <@100>",
+                "embeds": [{"description": "snapshot embed <@110>"}]
+            }]
+        }))
+        .unwrap();
+        let message_ref = &message;
+        let messages = std::slice::from_ref(&message_ref);
+
+        let mention_context = build_message_mention_context(messages);
+        let entry = mention_context.get(&10).unwrap();
+
+        assert_eq!(entry.content.users, HashSet::from([40]));
+        assert_eq!(entry.embed_users, HashSet::from([50, 60, 70, 80, 90, 110]));
+        assert_eq!(entry.snapshots[0].users, HashSet::from([100]));
+        assert_eq!(
+            collect_user_ids(messages, &mention_context),
+            HashSet::from([30, 40, 50, 60, 70, 80, 90, 100, 110])
+        );
+    }
+
+    #[test]
     fn postgres_reaction_decoder_maps_created_at() {
         let (message_id, reaction) = decode_postgres_reaction(json!({
             "message_id": {"__fluxer_type": "bigint", "value": "1509197195776110592"},
@@ -3226,6 +3294,97 @@ mod tests {
     }
 
     #[test]
+    fn bucket_wave_ramp_is_bounded_by_scan_concurrency() {
+        assert_eq!(next_bucket_wave(BUCKET_SCAN_WAVE), BUCKET_SCAN_WAVE * 2);
+        assert_eq!(
+            next_bucket_wave(BUCKET_SCAN_CONCURRENCY),
+            BUCKET_SCAN_CONCURRENCY
+        );
+        assert_eq!(next_bucket_wave(usize::MAX), BUCKET_SCAN_CONCURRENCY);
+    }
+
+    #[tokio::test]
+    async fn bucket_scan_stops_once_the_newest_buckets_fill_the_page() {
+        let buckets = (0..50).map(|index| 500 - index).collect::<Vec<i32>>();
+        let scanned = std::sync::Mutex::new(Vec::new());
+        let mut collected: Vec<i64> = Vec::new();
+
+        collect_bucket_waves(&buckets, 50, &mut collected, |bucket| {
+            let scanned = &scanned;
+            async move {
+                scanned.lock().expect("scan log").push(bucket);
+                let rows = (0..200)
+                    .map(|row| i64::from(bucket) * 1_000 + row)
+                    .collect::<Vec<i64>>();
+                Ok(rows)
+            }
+        })
+        .await
+        .expect("bucket scan succeeds");
+
+        let mut scanned = scanned.into_inner().expect("scan log");
+        scanned.sort_unstable_by(|left, right| right.cmp(left));
+        assert_eq!(scanned, buckets[..BUCKET_SCAN_WAVE]);
+
+        let newest_skipped_id = i64::from(buckets[BUCKET_SCAN_WAVE]) * 1_000 + 199;
+        assert!(collected.iter().all(|id| *id > newest_skipped_id));
+    }
+
+    #[tokio::test]
+    async fn bucket_scan_walks_the_whole_page_when_buckets_are_sparse() {
+        let buckets = (0..50).map(|index| 500 - index).collect::<Vec<i32>>();
+        let scanned = std::sync::Mutex::new(0_usize);
+        let mut collected: Vec<i64> = Vec::new();
+
+        collect_bucket_waves(&buckets, 50, &mut collected, |bucket| {
+            let scanned = &scanned;
+            async move {
+                *scanned.lock().expect("scan count") += 1;
+                Ok(vec![i64::from(bucket)])
+            }
+        })
+        .await
+        .expect("bucket scan succeeds");
+
+        assert_eq!(scanned.into_inner().expect("scan count"), buckets.len());
+        assert_eq!(collected.len(), buckets.len());
+    }
+
+    #[test]
+    fn reference_with_no_stored_type_is_treated_as_a_reply_everywhere() {
+        let legacy = MessageReference {
+            channel_id: Some(1),
+            message_id: Some(2),
+            guild_id: None,
+            reference_type: None,
+        };
+        let explicit = MessageReference {
+            reference_type: Some(MESSAGE_REFERENCE_TYPE_DEFAULT),
+            ..legacy.clone()
+        };
+        let forward = MessageReference {
+            reference_type: Some(MESSAGE_REFERENCE_TYPE_DEFAULT + 1),
+            ..legacy.clone()
+        };
+
+        assert_eq!(
+            effective_reference_type(&legacy),
+            MESSAGE_REFERENCE_TYPE_DEFAULT
+        );
+        assert_eq!(
+            effective_reference_type(&legacy),
+            effective_reference_type(&explicit)
+        );
+        assert_ne!(
+            effective_reference_type(&forward),
+            MESSAGE_REFERENCE_TYPE_DEFAULT
+        );
+
+        let mapped = map_message_reference(&legacy).expect("legacy reference maps");
+        assert_eq!(mapped.reference_type, MESSAGE_REFERENCE_TYPE_DEFAULT);
+    }
+
+    #[test]
     fn around_window_limits_match_reference_api() {
         assert_eq!(around_window_limits(0), (0, 0));
         assert_eq!(around_window_limits(1), (0, 0));
@@ -3240,24 +3399,15 @@ mod tests {
         let message_id = 1_509_197_195_776_110_592;
         assert_eq!(
             epoch_millis_to_bucket(snowflake_to_epoch_millis(message_id)),
-            MessagesShard::snowflake_to_bucket(message_id)
+            snowflake_to_bucket(message_id)
         );
     }
 
     #[test]
     fn snowflake_bucket_matches_existing_channel_rows() {
-        assert_eq!(
-            MessagesShard::snowflake_to_bucket(1_474_193_838_282_432_581),
-            406
-        );
-        assert_eq!(
-            MessagesShard::snowflake_to_bucket(1_488_946_116_942_273_651),
-            410
-        );
-        assert_eq!(
-            MessagesShard::snowflake_to_bucket(1_509_256_674_043_502_592),
-            416
-        );
+        assert_eq!(snowflake_to_bucket(1_474_193_838_282_432_581), 406);
+        assert_eq!(snowflake_to_bucket(1_488_946_116_942_273_651), 410);
+        assert_eq!(snowflake_to_bucket(1_509_256_674_043_502_592), 416);
     }
 
     #[test]
@@ -3310,5 +3460,318 @@ mod tests {
         assert_eq!(mapped[1].count, 2);
         assert_eq!(mapped[1].me, Some(true));
         assert_eq!(mapped[2].emoji.name, "z");
+    }
+
+    #[test]
+    fn response_context_id_collection_spans_referenced_messages() {
+        let message = decode_postgres_message(json!({
+            "channel_id": {"__fluxer_type": "bigint", "value": "10"},
+            "bucket": 416,
+            "message_id": {"__fluxer_type": "bigint", "value": "100"},
+            "author_id": {"__fluxer_type": "bigint", "value": "1"},
+            "content": "hey <@2> over in <#20>",
+            "mention_users": {"__fluxer_type": "set", "value": [
+                {"__fluxer_type": "bigint", "value": "2"}
+            ]},
+            "mention_channels": {"__fluxer_type": "set", "value": [
+                {"__fluxer_type": "bigint", "value": "20"}
+            ]},
+            "attachments": [{
+                "attachment_id": {"__fluxer_type": "bigint", "value": "1000"},
+                "filename": "a.png"
+            }]
+        }))
+        .unwrap();
+        let referenced = decode_postgres_message(json!({
+            "channel_id": {"__fluxer_type": "bigint", "value": "10"},
+            "bucket": 416,
+            "message_id": {"__fluxer_type": "bigint", "value": "99"},
+            "author_id": {"__fluxer_type": "bigint", "value": "3"},
+            "content": "look at <#21>",
+            "mention_channels": {"__fluxer_type": "set", "value": [
+                {"__fluxer_type": "bigint", "value": "21"}
+            ]},
+            "attachments": [{
+                "attachment_id": {"__fluxer_type": "bigint", "value": "1001"},
+                "filename": "b.png"
+            }]
+        }))
+        .unwrap();
+        let messages = [message];
+        let referenced_messages: HashMap<(i64, i64), Message> =
+            [((10, 99), referenced)].into_iter().collect();
+
+        let all_messages = messages
+            .iter()
+            .chain(referenced_messages.values())
+            .collect::<Vec<_>>();
+        let mention_context = build_message_mention_context(&all_messages);
+
+        assert_eq!(
+            collect_attachment_ids(&all_messages),
+            HashSet::from([1000, 1001])
+        );
+        assert_eq!(
+            collect_channel_mention_ids(&all_messages, &mention_context),
+            HashSet::from([20, 21])
+        );
+        assert_eq!(
+            collect_user_ids(&all_messages, &mention_context),
+            HashSet::from([1, 2, 3])
+        );
+    }
+
+    fn recording_shard(deleted: &DeletedMessageKeys) -> MessagesShard<InMemoryTransport> {
+        MessagesShard {
+            storage: MessagesStorage::Deletions(deleted.clone()),
+            transport: InMemoryTransport::new(),
+        }
+    }
+
+    fn build_options() -> ResponseBuildOptions {
+        ResponseBuildOptions {
+            viewer_user_id: 1,
+            source_guild_id: None,
+            message_history_cutoff_ms: None,
+            can_read_message_history: true,
+            media_endpoint: "https://media.example.com".to_owned(),
+            media_proxy_secret_key: "secret".to_owned(),
+            include_reactions: false,
+            nonce: None,
+            tts: false,
+        }
+    }
+
+    fn orphaned_message(message_id: i64) -> Message {
+        decode_postgres_message(json!({
+            "channel_id": {"__fluxer_type": "bigint", "value": "10"},
+            "bucket": 416,
+            "message_id": {"__fluxer_type": "bigint", "value": message_id.to_string()},
+            "content": "orphan"
+        }))
+        .unwrap()
+    }
+
+    fn webhook_message(message_id: i64) -> Message {
+        decode_postgres_message(json!({
+            "channel_id": {"__fluxer_type": "bigint", "value": "10"},
+            "bucket": 416,
+            "message_id": {"__fluxer_type": "bigint", "value": message_id.to_string()},
+            "webhook_id": {"__fluxer_type": "bigint", "value": "77"},
+            "webhook_name": "hook",
+            "content": "kept"
+        }))
+        .unwrap()
+    }
+
+    fn authored_message(message_id: i64) -> Message {
+        decode_postgres_message(json!({
+            "channel_id": {"__fluxer_type": "bigint", "value": "10"},
+            "bucket": 416,
+            "message_id": {"__fluxer_type": "bigint", "value": message_id.to_string()},
+            "author_id": {"__fluxer_type": "bigint", "value": "1472426752046002208"},
+            "content": "kept"
+        }))
+        .unwrap()
+    }
+
+    fn legacy_string_author_message(message_id: i64) -> Message {
+        decode_postgres_message(json!({
+            "channel_id": {"__fluxer_type": "bigint", "value": "10"},
+            "bucket": 416,
+            "message_id": {"__fluxer_type": "bigint", "value": message_id.to_string()},
+            "author_id": "1472426752046002208",
+            "content": "kept"
+        }))
+        .unwrap()
+    }
+
+    async fn stub_user_service(transport: &InMemoryTransport) -> tokio::task::JoinHandle<()> {
+        let mut subscriber = transport.subscribe("svc.users").await.unwrap();
+        let transport = transport.clone();
+        tokio::spawn(async move {
+            while let Some(message) = subscriber.next().await {
+                let _ = reply_message(&message, &transport, b"\"NotFound\"").await;
+            }
+        })
+    }
+
+    fn recorded_deletions(deleted: &DeletedMessageKeys) -> Vec<(i64, i32, i64)> {
+        deleted.lock().unwrap().clone()
+    }
+
+    #[tokio::test]
+    async fn build_path_keeps_authored_rows_from_older_releases() {
+        let deleted = DeletedMessageKeys::default();
+        let shard = recording_shard(&deleted);
+        let users = stub_user_service(&shard.transport).await;
+        let wrapped_id = 1_509_197_195_776_110_592;
+        let legacy_id = 1_509_197_195_776_110_593;
+
+        let responses = shard
+            .build_api_responses_from_messages(
+                vec![
+                    authored_message(wrapped_id),
+                    legacy_string_author_message(legacy_id),
+                ],
+                build_options(),
+            )
+            .await
+            .unwrap();
+        users.abort();
+
+        assert_eq!(responses.len(), 2);
+        assert_eq!(responses[0].id, wrapped_id.to_string());
+        assert_eq!(responses[1].id, legacy_id.to_string());
+        assert_eq!(responses[0].author.id, "1472426752046002208");
+        assert_eq!(responses[1].author.id, "1472426752046002208");
+        assert!(recorded_deletions(&deleted).is_empty());
+    }
+
+    #[tokio::test]
+    async fn build_path_reaps_orphaned_messages() {
+        let deleted = DeletedMessageKeys::default();
+        let shard = recording_shard(&deleted);
+        let orphan_id = 1_509_197_195_776_110_592;
+        let kept_id = 1_509_197_195_776_110_593;
+
+        let responses = shard
+            .build_api_responses_from_messages(
+                vec![orphaned_message(orphan_id), webhook_message(kept_id)],
+                build_options(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(responses.len(), 1);
+        assert_eq!(responses[0].id, kept_id.to_string());
+        assert_eq!(
+            recorded_deletions(&deleted),
+            vec![(10, snowflake_to_bucket(orphan_id), orphan_id)]
+        );
+    }
+
+    #[tokio::test]
+    async fn build_path_reaps_orphans_of_each_batch_separately() {
+        let deleted = DeletedMessageKeys::default();
+        let shard = recording_shard(&deleted);
+        let first_orphan_id = 1_509_197_195_776_110_592;
+        let second_orphan_id = 1_509_197_195_776_110_594;
+
+        shard
+            .build_api_responses_from_messages(
+                vec![
+                    orphaned_message(first_orphan_id),
+                    webhook_message(1_509_197_195_776_110_593),
+                ],
+                build_options(),
+            )
+            .await
+            .unwrap();
+        shard
+            .build_api_responses_from_messages(
+                vec![orphaned_message(second_orphan_id)],
+                build_options(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            recorded_deletions(&deleted),
+            vec![
+                (10, snowflake_to_bucket(first_orphan_id), first_orphan_id),
+                (10, snowflake_to_bucket(second_orphan_id), second_orphan_id),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn build_path_reaps_a_repeated_orphan_without_failing() {
+        let deleted = DeletedMessageKeys::default();
+        let shard = recording_shard(&deleted);
+        let orphan_id = 1_509_197_195_776_110_592;
+
+        for _ in 0..2 {
+            let responses = shard
+                .build_api_responses_from_messages(
+                    vec![orphaned_message(orphan_id)],
+                    build_options(),
+                )
+                .await
+                .unwrap();
+            assert!(responses.is_empty());
+        }
+
+        assert_eq!(
+            recorded_deletions(&deleted),
+            vec![
+                (10, snowflake_to_bucket(orphan_id), orphan_id),
+                (10, snowflake_to_bucket(orphan_id), orphan_id),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn build_path_leaves_orphans_the_requester_cannot_see() {
+        let deleted = DeletedMessageKeys::default();
+        let shard = recording_shard(&deleted);
+        let orphan_id = 1_509_197_195_776_110_592;
+        let options = ResponseBuildOptions {
+            can_read_message_history: false,
+            message_history_cutoff_ms: Some(snowflake_to_epoch_millis(orphan_id) + 1),
+            ..build_options()
+        };
+
+        let responses = shard
+            .build_api_responses_from_messages(vec![orphaned_message(orphan_id)], options)
+            .await
+            .unwrap();
+
+        assert!(responses.is_empty());
+        assert!(recorded_deletions(&deleted).is_empty());
+    }
+
+    #[tokio::test]
+    async fn single_build_path_reaps_an_orphaned_message() {
+        let deleted = DeletedMessageKeys::default();
+        let shard = recording_shard(&deleted);
+        let orphan_id = 1_509_197_195_776_110_592;
+        let kept_id = 1_509_197_195_776_110_593;
+
+        let orphan_response = shard
+            .build_api_response_from_message(orphaned_message(orphan_id), build_options())
+            .await
+            .unwrap();
+        let kept_response = shard
+            .build_api_response_from_message(webhook_message(kept_id), build_options())
+            .await
+            .unwrap();
+
+        assert!(orphan_response.is_none());
+        assert_eq!(kept_response.unwrap().id, kept_id.to_string());
+        assert_eq!(
+            recorded_deletions(&deleted),
+            vec![(10, snowflake_to_bucket(orphan_id), orphan_id)]
+        );
+    }
+
+    #[tokio::test]
+    async fn single_build_path_leaves_an_orphan_the_requester_cannot_see() {
+        let deleted = DeletedMessageKeys::default();
+        let shard = recording_shard(&deleted);
+        let orphan_id = 1_509_197_195_776_110_592;
+        let options = ResponseBuildOptions {
+            can_read_message_history: false,
+            message_history_cutoff_ms: Some(snowflake_to_epoch_millis(orphan_id) + 1),
+            ..build_options()
+        };
+
+        let response = shard
+            .build_api_response_from_message(orphaned_message(orphan_id), options)
+            .await
+            .unwrap();
+
+        assert!(response.is_none());
+        assert!(recorded_deletions(&deleted).is_empty());
     }
 }

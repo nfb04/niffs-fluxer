@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type {AttachmentID, ChannelID, GuildID, MemeID, PasswordResetToken, UserID} from './BrandedTypes';
-import {defineTable} from './database/CassandraTableDsl';
+import type {AttachmentID, ChannelID, GuildID, MemeID, PasswordResetToken, UserID} from '@app/api/BrandedTypes';
+import {defineTable} from '@app/api/database/CassandraTableDsl';
 import {
 	ADMIN_ARCHIVE_COLUMNS,
+	ADMIN_ARCHIVE_INDEX_COLUMNS,
 	ADMIN_AUDIT_LOG_COLUMNS,
+	type AdminArchiveIndexRow,
 	type AdminArchiveRow,
 	type AdminAuditLogRow,
 	BANNED_AVATAR_HASH_COLUMNS,
@@ -29,19 +31,19 @@ import {
 	type DisposableEmailDomainRow,
 	SUSPICIOUS_EMAIL_DOMAIN_COLUMNS,
 	type SuspiciousEmailDomainRow,
-} from './database/types/AdminArchiveTypes';
+} from '@app/api/database/types/AdminArchiveTypes';
 import {
 	ADMIN_API_KEY_BY_CREATOR_COLUMNS,
 	ADMIN_API_KEY_COLUMNS,
 	type AdminApiKeyByCreatorRow,
 	type AdminApiKeyRow,
-} from './database/types/AdminAuthTypes';
+} from '@app/api/database/types/AdminAuthTypes';
 import {
 	ATTACHMENT_UPLOAD_TRACE_BY_ATTACHMENT_COLUMNS,
 	ATTACHMENT_UPLOAD_TRACE_BY_KEY_COLUMNS,
 	type AttachmentUploadTraceByAttachmentRow,
 	type AttachmentUploadTraceByKeyRow,
-} from './database/types/AttachmentUploadTypes';
+} from '@app/api/database/types/AttachmentUploadTypes';
 import {
 	AUTH_SESSION_COLUMNS,
 	AUTH_SESSION_TOMBSTONE_COLUMNS,
@@ -75,7 +77,7 @@ import {
 	type UserSsoIdentityRow,
 	WEBAUTHN_CREDENTIAL_COLUMNS,
 	type WebAuthnCredentialRow,
-} from './database/types/AuthTypes';
+} from '@app/api/database/types/AuthTypes';
 import {
 	BILLING_ACTION_INTENT_COLUMNS,
 	BILLING_CHARGE_BY_CUSTOMER_COLUMNS,
@@ -131,7 +133,7 @@ import {
 	type BillingSubscriptionByCustomerRow,
 	type BillingSubscriptionByUserRow,
 	type BillingSubscriptionRow,
-} from './database/types/BillingTypes';
+} from '@app/api/database/types/BillingTypes';
 import {
 	CHANNEL_COLUMNS,
 	CHANNELS_BY_GUILD_COLUMNS,
@@ -145,20 +147,20 @@ import {
 	type PrivateChannelRow,
 	WEBHOOK_COLUMNS,
 	type WebhookRow,
-} from './database/types/ChannelTypes';
-import {USER_CONNECTION_COLUMNS, type UserConnectionRow} from './database/types/ConnectionTypes';
+} from '@app/api/database/types/ChannelTypes';
+import {USER_CONNECTION_STORAGE_COLUMNS, type UserConnectionStorageRow} from '@app/api/database/types/ConnectionTypes';
 import {
 	NCMEC_ATTACHMENT_SUBMISSION_COLUMNS,
 	NCMEC_USER_WORKFLOW_COLUMNS,
 	type NcmecAttachmentSubmissionRow,
 	type NcmecUserWorkflowRow,
-} from './database/types/CsamTypes';
+} from '@app/api/database/types/CsamTypes';
 import {
 	GUILD_DISCOVERY_BY_STATUS_COLUMNS,
 	GUILD_DISCOVERY_COLUMNS,
 	type GuildDiscoveryByStatusRow,
 	type GuildDiscoveryRow,
-} from './database/types/GuildDiscoveryTypes';
+} from '@app/api/database/types/GuildDiscoveryTypes';
 import {
 	GUILD_AUDIT_LOG_COLUMNS,
 	GUILD_BAN_BY_EMAIL_COLUMNS,
@@ -184,8 +186,11 @@ import {
 	type GuildRoleRow,
 	type GuildRow,
 	type GuildStickerRow,
-} from './database/types/GuildTypes';
-import {INSTANCE_CONFIGURATION_COLUMNS, type InstanceConfigurationRow} from './database/types/InstanceConfigTypes';
+} from '@app/api/database/types/GuildTypes';
+import {
+	INSTANCE_CONFIGURATION_COLUMNS,
+	type InstanceConfigurationRow,
+} from '@app/api/database/types/InstanceConfigTypes';
 import {
 	JOB_ACTIVE_COLUMNS,
 	JOB_BY_DAY_BUCKET_COLUMNS,
@@ -193,7 +198,7 @@ import {
 	type JobActiveRow,
 	type JobByDayBucketRow,
 	type JobByIdRow,
-} from './database/types/JobLedgerTypes';
+} from '@app/api/database/types/JobLedgerTypes';
 import {
 	ATTACHMENT_LOOKUP_COLUMNS,
 	type AttachmentLookupRow,
@@ -211,7 +216,7 @@ import {
 	type MessageByAuthorRow,
 	type MessageReactionRow,
 	type MessageRow,
-} from './database/types/MessageTypes';
+} from '@app/api/database/types/MessageTypes';
 import {
 	APPLICATION_COLUMNS,
 	type ApplicationByOwnerRow,
@@ -224,7 +229,7 @@ import {
 	type OAuth2AuthorizationCodeRow,
 	type OAuth2RefreshTokenByUserRow,
 	type OAuth2RefreshTokenRow,
-} from './database/types/OAuth2Types';
+} from '@app/api/database/types/OAuth2Types';
 import {
 	GIFT_CODE_BY_CREATOR_COLUMNS,
 	GIFT_CODE_BY_PAYMENT_INTENT_COLUMNS,
@@ -244,8 +249,7 @@ import {
 	type PaymentRow,
 	VISIONARY_SLOT_COLUMNS,
 	type VisionarySlotRow,
-} from './database/types/PaymentTypes';
-import {PNEUMATIC_POST_DELIVERY_COLUMNS, type PneumaticPostDeliveryRow} from './database/types/PneumaticPostTypes';
+} from '@app/api/database/types/PaymentTypes';
 import {
 	DSA_REPORT_EMAIL_VERIFICATION_COLUMNS,
 	DSA_REPORT_TICKET_COLUMNS,
@@ -255,7 +259,7 @@ import {
 	type IARSubmissionRow,
 	MESSAGE_REPORT_SUBMISSION_BY_REPORTER_COLUMNS,
 	type MessageReportSubmissionByReporterRow,
-} from './database/types/ReportTypes';
+} from '@app/api/database/types/ReportTypes';
 import {
 	INBOUND_SMS_CHALLENGE_BY_USER_COLUMNS,
 	INBOUND_SMS_CHALLENGE_COLUMNS,
@@ -289,15 +293,12 @@ import {
 	type RiskOutcomeBySubnetRow,
 	SUSPICIOUS_IP_COLUMNS,
 	type SuspiciousIpRow,
-} from './database/types/RiskTypes';
+} from '@app/api/database/types/RiskTypes';
 import {
-	EXPRESSION_PACK_COLUMNS,
-	type ExpressionPackRow,
 	FAVORITE_MEME_COLUMNS,
 	type FavoriteMemeRow,
 	NOTE_COLUMNS,
 	type NoteRow,
-	type PackInstallationRow,
 	PUSH_SUBSCRIPTION_COLUMNS,
 	type PushSubscriptionRow,
 	RECENT_MENTION_COLUMNS,
@@ -306,8 +307,6 @@ import {
 	type RelationshipRow,
 	SAVED_MESSAGE_COLUMNS,
 	type SavedMessageRow,
-	SCHEDULED_MESSAGE_COLUMNS,
-	type ScheduledMessageRow,
 	USER_BY_EMAIL_COLUMNS,
 	USER_BY_LAST_ACTIVE_IP_COLUMNS,
 	USER_BY_LAST_ACTIVE_IP_TRUST_KEY_COLUMNS,
@@ -340,8 +339,8 @@ import {
 	type UserRow,
 	type UserSettingsRow,
 	type UsersPendingDeletionRow,
-} from './database/types/UserTypes';
-import {ATTACHMENT_DECAY_COLUMNS, type AttachmentDecayRow} from './types/AttachmentDecayTypes';
+} from '@app/api/database/types/UserTypes';
+import {ATTACHMENT_DECAY_COLUMNS, type AttachmentDecayRow} from '@app/api/types/AttachmentDecayTypes';
 
 export const Users = defineTable<UserRow, 'user_id'>({
 	name: 'users',
@@ -433,14 +432,9 @@ export const UserContactChangeLogs = defineTable<UserContactChangeLogRow, 'user_
 	columns: USER_CONTACT_CHANGE_LOG_COLUMNS,
 	primaryKey: ['user_id', 'event_id'],
 });
-export const PneumaticPostDeliveries = defineTable<PneumaticPostDeliveryRow, 'user_id' | 'dispatch_key'>({
-	name: 'pneumatic_post_deliveries',
-	columns: PNEUMATIC_POST_DELIVERY_COLUMNS,
-	primaryKey: ['user_id', 'dispatch_key'],
-});
-export const UserConnections = defineTable<UserConnectionRow, 'user_id' | 'connection_type' | 'connection_id'>({
+export const UserConnections = defineTable<UserConnectionStorageRow, 'user_id' | 'connection_type' | 'connection_id'>({
 	name: 'user_connections',
-	columns: USER_CONNECTION_COLUMNS,
+	columns: USER_CONNECTION_STORAGE_COLUMNS,
 	primaryKey: ['user_id', 'connection_type', 'connection_id'],
 	partitionKey: ['user_id'],
 });
@@ -690,11 +684,6 @@ export const SavedMessages = defineTable<SavedMessageRow, 'user_id' | 'message_i
 	columns: SAVED_MESSAGE_COLUMNS,
 	primaryKey: ['user_id', 'message_id'],
 });
-export const ScheduledMessages = defineTable<ScheduledMessageRow, 'user_id' | 'scheduled_message_id'>({
-	name: 'scheduled_messages',
-	columns: SCHEDULED_MESSAGE_COLUMNS,
-	primaryKey: ['user_id', 'scheduled_message_id'],
-});
 export const PushSubscriptions = defineTable<PushSubscriptionRow, 'user_id' | 'subscription_id'>({
 	name: 'push_subscriptions',
 	columns: PUSH_SUBSCRIPTION_COLUMNS,
@@ -755,14 +744,14 @@ export const AdminArchivesBySubject = defineTable<AdminArchiveRow, 'subject_type
 	columns: ADMIN_ARCHIVE_COLUMNS,
 	primaryKey: ['subject_type', 'subject_id', 'archive_id'],
 });
-export const AdminArchivesByRequester = defineTable<AdminArchiveRow, 'requested_by' | 'archive_id'>({
+export const AdminArchivesByRequester = defineTable<AdminArchiveIndexRow, 'requested_by' | 'archive_id'>({
 	name: 'admin_archives_by_requester',
-	columns: ADMIN_ARCHIVE_COLUMNS,
+	columns: ADMIN_ARCHIVE_INDEX_COLUMNS,
 	primaryKey: ['requested_by', 'archive_id'],
 });
-export const AdminArchivesByType = defineTable<AdminArchiveRow, 'subject_type' | 'archive_id'>({
+export const AdminArchivesByType = defineTable<AdminArchiveIndexRow, 'subject_type' | 'archive_id'>({
 	name: 'admin_archives_by_type',
-	columns: ADMIN_ARCHIVE_COLUMNS,
+	columns: ADMIN_ARCHIVE_INDEX_COLUMNS,
 	primaryKey: ['subject_type', 'archive_id'],
 });
 export const AdminAuditLogs = defineTable<AdminAuditLogRow, 'log_id'>({
@@ -1016,25 +1005,6 @@ export const FavoriteMemesByMemeId = defineTable<FavoriteMemesByMemeIdRow, 'meme
 	name: 'favorite_memes_by_meme_id',
 	columns: FAVORITE_MEMES_BY_MEME_ID_COLUMNS,
 	primaryKey: ['meme_id', 'user_id'],
-});
-export const ExpressionPacks = defineTable<ExpressionPackRow, 'pack_id'>({
-	name: 'expression_packs',
-	columns: EXPRESSION_PACK_COLUMNS,
-	primaryKey: ['pack_id'],
-});
-export const ExpressionPacksByCreator = defineTable<ExpressionPackRow, 'creator_id' | 'pack_id'>({
-	name: 'expression_packs_by_creator',
-	columns: EXPRESSION_PACK_COLUMNS,
-	primaryKey: ['creator_id', 'pack_id'],
-	partitionKey: ['creator_id'],
-});
-const PACK_INSTALLATION_COLUMNS = ['user_id', 'pack_id', 'pack_type', 'installed_at'] as const satisfies ReadonlyArray<
-	keyof PackInstallationRow
->;
-export const PackInstallations = defineTable<PackInstallationRow, 'user_id' | 'pack_id'>({
-	name: 'pack_installations',
-	columns: PACK_INSTALLATION_COLUMNS,
-	primaryKey: ['user_id', 'pack_id'],
 });
 
 interface InvitesByChannelRow {

@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import Accessibility from '@app/features/accessibility/state/Accessibility';
-import {CUSTOM_SOUND_MAX_SIZE_LABEL} from '@app/features/app/config/I18nDisplayConstants';
+import {CUSTOM_SOUND_MAX_SIZE_BYTES} from '@app/features/app/config/I18nDisplayConstants';
+import {formatFileSize} from '@app/features/messaging/utils/FileUtils';
 import type * as CustomSoundDB from '@app/features/notification/utils/CustomSoundDB';
 import {type SoundType, SoundType as SoundTypes} from '@app/features/notification/utils/SoundUtils';
+import {remFromPx} from '@app/features/theme/layout/RemFromPx';
 import {Accordion} from '@app/features/ui/accordion/Accordion';
 import {Switch} from '@app/features/ui/components/form/FormSwitch';
 import {Slider} from '@app/features/ui/components/Slider';
 import {SwitchGroup, SwitchGroupCustomItem} from '@app/features/ui/components/SwitchGroup';
 import {SliderResetIconButton} from '@app/features/ui/components/slider/SliderResetIconButton';
 import type {SoundSettings} from '@app/features/ui/state/Sound';
-import {formatRoundedPercentage, roundPercentage} from '@app/features/ui/utils/PercentageFormatting';
+import {formatRoundedPercentage} from '@app/features/ui/utils/PercentageFormatting';
 import styles from '@app/features/user/components/modals/tabs/notifications_tab/NotificationsTabSounds.module.css';
 import {msg} from '@lingui/core/macro';
 import {Trans, useLingui} from '@lingui/react/macro';
@@ -19,7 +21,7 @@ import {clsx} from 'clsx';
 import {AnimatePresence, motion} from 'framer-motion';
 import {observer} from 'mobx-react-lite';
 import type React from 'react';
-import {useEffect, useId, useRef, useState} from 'react';
+import {useCallback, useEffect, useId, useRef, useState} from 'react';
 
 const MASTER_VOLUME_DESCRIPTOR = msg({
 	message: 'Master volume',
@@ -80,8 +82,9 @@ const SET_CUSTOM_VOLUMES_FOR_INDIVIDUAL_SOUNDS_SOUNDS_WITHOUT_DESCRIPTOR = msg({
 	comment: 'Description text in the sounds.',
 });
 const FOLLOWING_MASTER_DESCRIPTOR = msg({
-	message: 'Following master • {effectiveValue}%',
-	comment: 'Label in the sounds. Preserve {effectiveValue}; it is inserted by code.',
+	message: 'Following master • {effectiveValue}',
+	comment:
+		'Label in the sounds, shown on a sound row that has no volume override. Preserve {effectiveValue}; it is inserted by code and already holds the locale-formatted percentage, including the percent sign.',
 });
 const RESET_TO_MASTER_VOLUME_DESCRIPTOR = msg({
 	message: 'Reset {label} to master volume',
@@ -149,6 +152,10 @@ export const Sounds: React.FC<SoundsProps> = observer(
 		onAllOverridesReset,
 	}) => {
 		const {i18n} = useLingui();
+		const formatPercentage = useCallback(
+			(value: number) => formatRoundedPercentage(i18n.locale, value),
+			[i18n, i18n.locale],
+		);
 		const masterVolume = soundSettings.masterVolume ?? DEFAULT_MASTER;
 		const soundOverrides = soundSettings.soundOverrides ?? {};
 		const overrideCount = Object.keys(soundOverrides).length;
@@ -205,7 +212,7 @@ export const Sounds: React.FC<SoundsProps> = observer(
 							data-flx="user.notifications-tab.sounds.icon-button.upload-click"
 						>
 							<UploadIcon
-								size={16}
+								size={remFromPx(16)}
 								className={styles.uploadIcon}
 								data-flx="user.notifications-tab.sounds.upload-icon"
 							/>
@@ -220,7 +227,7 @@ export const Sounds: React.FC<SoundsProps> = observer(
 								data-flx="user.notifications-tab.sounds.icon-button.custom-sound-delete"
 							>
 								<TrashIcon
-									size={16}
+									size={remFromPx(16)}
 									className={styles.deleteIcon}
 									data-flx="user.notifications-tab.sounds.delete-icon"
 								/>
@@ -267,8 +274,8 @@ export const Sounds: React.FC<SoundsProps> = observer(
 							step={1}
 							markers={[0, 50, 100, 150, 200]}
 							disabled={allDisabled}
-							onMarkerRender={formatRoundedPercentage}
-							onValueRender={formatRoundedPercentage}
+							onMarkerRender={formatPercentage}
+							onValueRender={formatPercentage}
 							onValueChange={onMasterVolumeChange}
 							data-flx="user.notifications-tab.sounds.slider"
 						/>
@@ -282,7 +289,7 @@ export const Sounds: React.FC<SoundsProps> = observer(
 					/>
 					<div className={styles.hint} data-flx="user.notifications-tab.sounds.hint">
 						{i18n._(CLICK_THE_UPLOAD_ICON_NEXT_TO_ANY_SOUND_DESCRIPTOR, {
-							customSoundMaxSizeLabel: CUSTOM_SOUND_MAX_SIZE_LABEL,
+							customSoundMaxSizeLabel: formatFileSize(i18n.locale, CUSTOM_SOUND_MAX_SIZE_BYTES),
 						})}
 					</div>
 					<div
@@ -335,7 +342,11 @@ export const Sounds: React.FC<SoundsProps> = observer(
 									transition={soundListTransition}
 									data-flx="user.notifications-tab.sounds.reveal-chevron"
 								>
-									<CaretDownIcon size={16} weight="bold" data-flx="user.notifications-tab.sounds.caret-down-icon" />
+									<CaretDownIcon
+										size={remFromPx(16)}
+										weight="bold"
+										data-flx="user.notifications-tab.sounds.caret-down-icon"
+									/>
 								</motion.span>
 							</button>
 						</div>
@@ -358,7 +369,7 @@ export const Sounds: React.FC<SoundsProps> = observer(
 								const override = soundOverrides[type];
 								const hasOverride = override !== undefined;
 								const effectiveValue = hasOverride ? (override as number) : masterVolume;
-								const effectiveValueLabel = formatRoundedPercentage(effectiveValue);
+								const effectiveValueLabel = formatPercentage(effectiveValue);
 								const soundEnabled = isSoundEnabled(type);
 								const rowDisabled = allDisabled || !soundEnabled;
 								const SoundToggleIcon = soundEnabled ? SpeakerHighIcon : SpeakerXIcon;
@@ -382,7 +393,7 @@ export const Sounds: React.FC<SoundsProps> = observer(
 												data-flx="user.notifications-tab.sounds.sound-toggle-button.toggle-sound"
 											>
 												<SoundToggleIcon
-													size={14}
+													size={remFromPx(14)}
 													weight="fill"
 													data-flx="user.notifications-tab.sounds.sound-toggle-icon"
 												/>
@@ -390,7 +401,7 @@ export const Sounds: React.FC<SoundsProps> = observer(
 											<span className={styles.overrideStatus} data-flx="user.notifications-tab.sounds.override-status">
 												{hasOverride
 													? effectiveValueLabel
-													: i18n._(FOLLOWING_MASTER_DESCRIPTOR, {effectiveValue: roundPercentage(effectiveValue)})}
+													: i18n._(FOLLOWING_MASTER_DESCRIPTOR, {effectiveValue: effectiveValueLabel})}
 											</span>
 											<SliderResetIconButton
 												canReset={!rowDisabled && hasOverride}
@@ -409,7 +420,7 @@ export const Sounds: React.FC<SoundsProps> = observer(
 											step={1}
 											disabled={rowDisabled}
 											className={styles.overrideSlider}
-											onValueRender={formatRoundedPercentage}
+											onValueRender={formatPercentage}
 											onValueChange={(value) => onSoundOverrideChange(type, value)}
 											data-flx="user.notifications-tab.sounds.slider--2"
 										/>

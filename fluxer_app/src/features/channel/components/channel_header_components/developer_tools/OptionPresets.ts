@@ -5,12 +5,15 @@ import {
 	type RadioMenuOption,
 	USE_ACTUAL_VALUE_DESCRIPTOR,
 } from '@app/features/channel/components/channel_header_components/developer_tools/DeveloperToolsShared';
+import {
+	formatDurationMs,
+	NO_TIMER_DESCRIPTOR,
+} from '@app/features/channel/components/channel_header_components/developer_tools/FormatHelpers';
 import type {DeveloperOptionsState} from '@app/features/devtools/state/DeveloperOptions';
 import {EMAIL_DESCRIPTOR} from '@app/features/i18n/utils/CommonMessageDescriptors';
 import {UserPremiumTypes} from '@fluxer/constants/src/UserConstants';
 import type {I18n} from '@lingui/core';
 import {msg} from '@lingui/core/macro';
-import {formatDurationMs, NO_TIMER_DESCRIPTOR} from './FormatHelpers';
 
 export const SUBSCRIPTION_DESCRIPTOR = msg({
 	message: 'Subscription',
@@ -195,15 +198,4 @@ export const getGiftDurationOptions = (): Array<RadioMenuOption<DeveloperOptions
 	{value: 6, label: MESSAGE_6_MONTHS_DESCRIPTOR},
 	{value: 12, label: MESSAGE_12_MONTHS_1_YEAR_DESCRIPTOR},
 	{value: 0, label: LIFETIME_DESCRIPTOR},
-];
-export const INJECT_METHOD_AUTOMATIC_DESCRIPTOR = msg({
-	message: 'Automatic',
-	comment: 'Developer tools debug menu label. Internal-only surface for developers; translators may keep this terse.',
-});
-export const getGameCaptureInjectionMethodOptions = (): Array<
-	RadioMenuOption<DeveloperOptionsState['gameCaptureInjectionMethod']>
-> => [
-	{value: 'auto', label: INJECT_METHOD_AUTOMATIC_DESCRIPTOR},
-	{value: 'remote-thread', label: 'CreateRemoteThread'},
-	{value: 'set-windows-hook', label: 'SetWindowsHookEx'},
 ];

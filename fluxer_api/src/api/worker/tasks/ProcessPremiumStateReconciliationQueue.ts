@@ -1,23 +1,23 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import {PremiumFlags, UserPremiumTypes} from '@fluxer/constants/src/UserConstants';
-import type {WorkerTaskHandler} from '@pkgs/worker/src/contracts/WorkerTask';
-import type Stripe from 'stripe';
-import type {UserID} from '../../BrandedTypes';
-import {Config} from '../../Config';
-import type {UserRow} from '../../database/types/UserTypes';
-import {Logger} from '../../Logger';
-import {getBillingRepository} from '../../middleware/ServiceRegistry';
-import type {User} from '../../models/User';
-import {canProvisionPremiumFromSubscriptionStatus} from '../../stripe/StripeSubscriptionAccessPolicy';
+import type {UserID} from '@app/api/BrandedTypes';
+import {Config} from '@app/api/Config';
+import type {UserRow} from '@app/api/database/types/UserTypes';
+import {Logger} from '@app/api/Logger';
+import {getBillingRepository} from '@app/api/middleware/ServiceRegistry';
+import type {User} from '@app/api/models/User';
+import {canProvisionPremiumFromSubscriptionStatus} from '@app/api/stripe/StripeSubscriptionAccessPolicy';
 import {
 	getPrimarySubscriptionItem,
 	getSubscriptionPremiumPeriodEnd,
 	getSubscriptionStartDate,
-} from '../../stripe/StripeSubscriptionPeriod';
-import {createPremiumClearPatch, getEffectivePremiumUntil} from '../../user/UserHelpers';
-import {mapUserToPrivateResponse} from '../../user/UserMappers';
-import {getWorkerDependencies} from '../WorkerContext';
+} from '@app/api/stripe/StripeSubscriptionPeriod';
+import {createPremiumClearPatch, getEffectivePremiumUntil} from '@app/api/user/UserHelpers';
+import {mapUserToPrivateResponse} from '@app/api/user/UserMappers';
+import {getWorkerDependencies} from '@app/api/worker/WorkerContext';
+import {PremiumFlags, UserPremiumTypes} from '@fluxer/constants/src/UserConstants';
+import type {WorkerTaskHandler} from '@pkgs/worker/src/contracts/WorkerTask';
+import type Stripe from 'stripe';
 
 interface ReconcileResult {
 	status: 'patched' | 'no_change' | 'skipped' | 'no_active_subscription' | 'stripped_no_subscription' | 'missing_user';
@@ -26,6 +26,7 @@ interface ReconcileResult {
 
 const MAX_USERS_PER_RUN = 250;
 const RETRY_DELAY_MS = 5 * 60 * 1000;
+const CLAIM_LEASE_MS = 10 * 60 * 1000;
 
 function getStripeSubscriptionCustomerId(subscription: Stripe.Subscription): string | null {
 	if (!subscription.customer) {
@@ -128,19 +129,39 @@ function chooseEffectiveSubscription(user: User, subscriptions: Array<Stripe.Sub
 	return sorted[0]!;
 }
 
+function trackMostRecentTerminalSubscription(
+	current: Stripe.Subscription | null,
+	candidate: Stripe.Subscription,
+): Stripe.Subscription | null {
+	if (!candidate.ended_at) {
+		return current;
+	}
+	if (!current || (current.ended_at ?? 0) < candidate.ended_at) {
+		return candidate;
+	}
+	return current;
+}
+
 async function getEffectiveActiveStripeSubscription(
 	stripe: Stripe,
 	user: User,
 ): Promise<{
 	subscription: Stripe.Subscription | null;
 	activeCount: number;
+	mostRecentTerminalSubscription: Stripe.Subscription | null;
 }> {
 	const subscriptionsById = new Map<string, Stripe.Subscription>();
+	let mostRecentTerminalSubscription: Stripe.Subscription | null = null;
 	if (user.stripeSubscriptionId) {
 		try {
 			const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
 			if (canProvisionPremiumFromSubscriptionStatus(subscription.status)) {
 				subscriptionsById.set(subscription.id, subscription);
+			} else {
+				mostRecentTerminalSubscription = trackMostRecentTerminalSubscription(
+					mostRecentTerminalSubscription,
+					subscription,
+				);
 			}
 		} catch (error) {
 			Logger.warn(
@@ -162,6 +183,10 @@ async function getEffectiveActiveStripeSubscription(
 			});
 			for (const subscription of subscriptions.data) {
 				if (!canProvisionPremiumFromSubscriptionStatus(subscription.status)) {
+					mostRecentTerminalSubscription = trackMostRecentTerminalSubscription(
+						mostRecentTerminalSubscription,
+						subscription,
+					);
 					continue;
 				}
 				subscriptionsById.set(subscription.id, subscription);
@@ -182,11 +207,13 @@ async function getEffectiveActiveStripeSubscription(
 		return {
 			subscription: null,
 			activeCount: 0,
+			mostRecentTerminalSubscription,
 		};
 	}
 	return {
 		subscription: chooseEffectiveSubscription(user, activeSubscriptions),
 		activeCount: activeSubscriptions.length,
+		mostRecentTerminalSubscription,
 	};
 }
 
@@ -203,15 +230,29 @@ async function reconcileUserPremiumStateFromStripe(params: {userId: UserID; stri
 	if (!user.stripeSubscriptionId && !user.stripeCustomerId) {
 		return {status: 'skipped', patchedFields: []};
 	}
-	const {subscription, activeCount} = await getEffectiveActiveStripeSubscription(stripe, user);
+	const {subscription, activeCount, mostRecentTerminalSubscription} = await getEffectiveActiveStripeSubscription(
+		stripe,
+		user,
+	);
 	if (!subscription) {
 		const hasStalePremium = user.premiumType === UserPremiumTypes.SUBSCRIPTION;
 		const hasNonStripePremium = Config.instance.selfHosted || (user.premiumFlags & PremiumFlags.ENABLED_OVERRIDE) !== 0;
 		if (hasStalePremium && !hasNonStripePremium) {
-			const effectivePremiumUntil = getEffectivePremiumUntil(user);
+			const patch: Partial<UserRow> = {};
+			let effectivePremiumUntil = getEffectivePremiumUntil(user);
+			if (mostRecentTerminalSubscription?.ended_at && user.premiumUntil) {
+				const subscriptionEndedAt = new Date(mostRecentTerminalSubscription.ended_at * 1000);
+				if (subscriptionEndedAt.getTime() < user.premiumUntil.getTime()) {
+					patch.premium_until = subscriptionEndedAt;
+					patch.premium_grace_ends_at = subscriptionEndedAt;
+					effectivePremiumUntil = getEffectivePremiumUntil({
+						premiumUntil: subscriptionEndedAt,
+						premiumGiftExtensionEndsAt: user.premiumGiftExtensionEndsAt,
+					});
+				}
+			}
 			const hasFutureLocalEntitlement = effectivePremiumUntil != null && Date.now() <= effectivePremiumUntil.getTime();
 			if (hasFutureLocalEntitlement) {
-				const patch: Partial<UserRow> = {};
 				if (user.premiumWillCancel !== true) {
 					patch.premium_will_cancel = true;
 				}
@@ -265,14 +306,18 @@ const processPremiumStateReconciliationQueue: WorkerTaskHandler = async (_payloa
 	let strippedNoSubscriptionCount = 0;
 	let failedCount = 0;
 	let requeuedCount = 0;
+	let claimedElsewhereCount = 0;
 	for (const userId of readyUserIds) {
+		const claimedAt = Date.now();
+		let claimed = false;
 		try {
-			await premiumStateReconciliationQueueService.removeUser(userId);
+			claimed = await premiumStateReconciliationQueueService.claimUser(userId, claimedAt, claimedAt + CLAIM_LEASE_MS);
 		} catch (error) {
-			Logger.warn(
-				{error, userId: userId.toString()},
-				'Failed to remove user from premium reconciliation queue before processing',
-			);
+			Logger.warn({error, userId: userId.toString()}, 'Failed to claim premium reconciliation queue entry');
+		}
+		if (!claimed) {
+			claimedElsewhereCount += 1;
+			continue;
 		}
 		try {
 			const result = await reconcileUserPremiumStateFromStripe({
@@ -304,6 +349,7 @@ const processPremiumStateReconciliationQueue: WorkerTaskHandler = async (_payloa
 			} else {
 				skippedCount += 1;
 			}
+			await premiumStateReconciliationQueueService.removeUser(userId);
 		} catch (error) {
 			failedCount += 1;
 			Logger.error(
@@ -331,6 +377,7 @@ const processPremiumStateReconciliationQueue: WorkerTaskHandler = async (_payloa
 			strippedNoSubscriptionCount,
 			failedCount,
 			requeuedCount,
+			claimedElsewhereCount,
 		},
 		'Finished processing premium reconciliation queue',
 	);

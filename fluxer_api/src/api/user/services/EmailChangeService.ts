@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {randomUUID} from 'node:crypto';
+import type {ApiContext} from '@app/api/ApiContext';
+import {EMAIL_CLEARABLE_SUSPICIOUS_ACTIVITY_FLAGS} from '@app/api/auth/AuthEmail';
+import * as AuthPassword from '@app/api/auth/AuthPassword';
+import type {User} from '@app/api/models/User';
+import type {EmailChangeRepository} from '@app/api/user/repositories/auth/EmailChangeRepository';
 import {
 	assertChangeCooldown,
 	checkChangeRateLimit,
@@ -11,10 +16,6 @@ import {ValidationErrorCodes} from '@fluxer/constants/src/ValidationErrorCodes';
 import {AccessDeniedError} from '@fluxer/errors/src/domains/core/AccessDeniedError';
 import {InputValidationError} from '@fluxer/errors/src/domains/core/InputValidationError';
 import {ms} from 'itty-time';
-import type {ApiContext} from '../../ApiContext';
-import {EMAIL_CLEARABLE_SUSPICIOUS_ACTIVITY_FLAGS} from '../../auth/AuthEmail';
-import type {User} from '../../models/User';
-import type {EmailChangeRepository} from '../repositories/auth/EmailChangeRepository';
 
 interface StartEmailChangeResult {
 	ticket: string;
@@ -158,6 +159,7 @@ export class EmailChangeService {
 		ticket: string,
 		newEmail: string,
 		originalProof: string,
+		newPassword?: string,
 	): Promise<RequestNewEmailResult> {
 		const {email, emailDnsValidation, users, rateLimit} = this.apiContext.services;
 		const row = await getActiveChangeTicketForUser(this.repo, ticket, user.id);
@@ -176,11 +178,14 @@ export class EmailChangeService {
 		}
 		const hasValidDns = await emailDnsValidation.hasValidDnsRecords(trimmedEmail);
 		if (!hasValidDns) {
-			throw InputValidationError.fromCode('new_email', ValidationErrorCodes.INVALID_EMAIL_ADDRESS);
+			throw InputValidationError.fromCode('new_email', ValidationErrorCodes.EMAIL_DOMAIN_CANNOT_RECEIVE_MAIL);
 		}
 		const existing = await users.findByEmail(trimmedEmail.toLowerCase());
 		if (existing && existing.id !== user.id) {
 			throw InputValidationError.fromCode('new_email', ValidationErrorCodes.EMAIL_ALREADY_IN_USE);
+		}
+		if (newPassword != null && (await AuthPassword.isPasswordPwned(this.apiContext, newPassword))) {
+			throw InputValidationError.fromCode('new_password', ValidationErrorCodes.PASSWORD_IS_TOO_COMMON);
 		}
 		assertChangeCooldown(row.new_code_sent_at, this.RESEND_COOLDOWN_MS);
 		await checkChangeRateLimit(rateLimit, {

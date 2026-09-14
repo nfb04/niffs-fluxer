@@ -6,7 +6,7 @@ import Keybind, {
 	type KeyCombo,
 } from '@app/features/input/state/InputKeybind';
 import {replaceTextRange, setTextSelectionSoon} from '@app/features/messaging/utils/TextInputEditUtils';
-import {ComponentDispatch} from '@app/features/platform/utils/ComponentBus';
+import {ComponentBus} from '@app/features/platform/utils/ComponentBus';
 import type React from 'react';
 import {type KeyboardEvent, useCallback, useEffect} from 'react';
 
@@ -108,7 +108,8 @@ export const doesEventMatchShortcut = (event: ShortcutKeyEvent, target: Partial<
 };
 const shouldPreserveConflictingAction = (action: KeybindCommand, options: MarkdownKeybindScopeOptions): boolean => {
 	if (!options.preserveEditableFocusActions) return false;
-	return Keybind.getDefaultByAction(action)?.editableFocusBehavior === 'allow';
+	const behavior = Keybind.getDefaultByAction(action)?.editableFocusBehavior;
+	return behavior === 'allow' || behavior === 'allow_when_empty';
 };
 const getConflictingKeybindActions = (options: MarkdownKeybindScopeOptions = {}): Set<KeybindCommand> => {
 	const actions = new Set<KeybindCommand>();
@@ -183,7 +184,7 @@ export const useMarkdownFormattingShortcut = ({
 	value: string;
 	setValue: React.Dispatch<React.SetStateAction<string>>;
 	handleTextChange: (newValue: string, oldValue: string) => void;
-	previousValueRef: React.MutableRefObject<string>;
+	previousValueRef: React.RefObject<string>;
 }): ((event: KeyboardEvent<HTMLTextAreaElement>) => void) => {
 	return useCallback(
 		(event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -197,7 +198,7 @@ export const useMarkdownFormattingShortcut = ({
 			if (doesEventMatchShortcut(event, inboxCombo) && selectionStart === selectionEnd && value.trim().length === 0) {
 				event.preventDefault();
 				event.stopPropagation();
-				ComponentDispatch.dispatch('INBOX_OPEN');
+				ComponentBus.dispatch('INBOX_OPEN');
 				return;
 			}
 			for (const {combo: shortcutCombo, wrapper} of MARKDOWN_FORMATTING_SHORTCUTS) {

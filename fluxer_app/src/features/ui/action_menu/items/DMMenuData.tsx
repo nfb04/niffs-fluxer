@@ -103,7 +103,7 @@ import {
 	FAILED_TO_PIN_GROUP_DM_DESCRIPTOR,
 	FAILED_TO_UNPIN_DM_DESCRIPTOR,
 	FAILED_TO_UNPIN_GROUP_DM_DESCRIPTOR,
-	INVITE_SENT_TO_DESCRIPTOR,
+	INVITE_SENT_FOR_DESCRIPTOR,
 	PINNED_GROUP_DM_DESCRIPTOR,
 	UNPINNED_GROUP_DM_DESCRIPTOR,
 	USER_ID_COPIED_DESCRIPTOR,
@@ -328,7 +328,7 @@ export function useDMMenuData(
 					if (result) {
 						ToastCommands.createToast({
 							type: 'success',
-							children: i18n._(INVITE_SENT_TO_DESCRIPTOR, {guildName}),
+							children: i18n._(INVITE_SENT_FOR_DESCRIPTOR, {guildName}),
 						});
 					}
 				} catch (error) {
@@ -401,7 +401,7 @@ export function useDMMenuData(
 				<ConfirmModal
 					title={i18n._(CLOSE_DM_DESCRIPTOR)}
 					description={i18n._(ARE_YOU_SURE_YOU_WANT_TO_CLOSE_YOUR_DESCRIPTOR, {
-						recipientUsername: recipient ? NicknameUtils.getNickname(recipient) : '',
+						recipientUsername: recipient ? NicknameUtils.getNickname(recipient, null) : '',
 					})}
 					primaryText={i18n._(CLOSE_DM_DESCRIPTOR)}
 					primaryVariant="danger"

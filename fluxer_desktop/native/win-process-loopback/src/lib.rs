@@ -37,15 +37,14 @@ fn retain_screen_audio_sink_handle(
             "ProcessLoopback.setScreenAudioSink received an empty native external sink handle",
         ));
     }
-    let handle = unsafe {
-        NativeScreenFrameSinkHandle::retain_from_raw(data.cast::<NativeScreenFrameSinkHandle>())
-    }
-    .ok_or_else(|| {
-        Error::new(
-            Status::InvalidArg,
-            "ProcessLoopback.setScreenAudioSink received an invalid native sink handle",
-        )
-    })?;
+    let handle = unsafe { data.cast::<NativeScreenFrameSinkHandle>().as_ref() }
+        .and_then(NativeScreenFrameSinkHandle::retain_ref)
+        .ok_or_else(|| {
+            Error::new(
+                Status::InvalidArg,
+                "ProcessLoopback.setScreenAudioSink received an invalid native sink handle",
+            )
+        })?;
     Ok(Arc::new(handle))
 }
 
@@ -341,7 +340,7 @@ impl Callbacks {
             FrameSamples::Owned(owned) => owned.as_slice(),
         };
         let channels = u32::from(audio_contract::TARGET_CHANNELS);
-        if channels == 0 || samples.is_empty() || samples.len() % (channels as usize) != 0 {
+        if channels == 0 || samples.is_empty() || !samples.len().is_multiple_of(channels as usize) {
             return true;
         }
         let frames = samples.len() as u32 / channels;
@@ -1071,6 +1070,7 @@ mod platform {
 
     const BACKSLASH_UTF16: &[u16] = &[b'\\' as u16, 0];
     const PROCESS_LOOPBACK_PROBE_TIMEOUT_MS: u32 = 1_500;
+    const PROCESS_LOOPBACK_PROBE_COUNT: u64 = 2;
     const SESSION_MIXER_REFRESH_INTERVAL: Duration = Duration::from_millis(1_000);
     const SESSION_MIXER_WAIT_TIMEOUT_MS: u32 = 250;
     const MAX_SESSION_MIXER_CAPTURES: usize = 48;
@@ -2197,7 +2197,7 @@ mod platform {
             });
 
         match rx.recv_timeout(std::time::Duration::from_millis(
-            u64::from(PROCESS_LOOPBACK_PROBE_TIMEOUT_MS) + 500,
+            u64::from(PROCESS_LOOPBACK_PROBE_TIMEOUT_MS) * PROCESS_LOOPBACK_PROBE_COUNT + 500,
         )) {
             Ok((include_result, exclude_result)) => ProcessLoopbackRuntimeProbe {
                 include_supported: include_result.is_ok(),

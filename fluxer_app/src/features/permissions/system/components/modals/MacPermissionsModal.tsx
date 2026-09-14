@@ -18,6 +18,7 @@ import {
 	openNativePermissionSettings,
 	requestNativePermission,
 } from '@app/features/permissions/system/utils/NativePermissions';
+import {remFromPx} from '@app/features/theme/layout/RemFromPx';
 import {Button} from '@app/features/ui/button/Button';
 import * as ModalCommands from '@app/features/ui/commands/ModalCommands';
 import {msg} from '@lingui/core/macro';
@@ -240,13 +241,15 @@ export const MacPermissionsModal: React.FC<MacPermissionsModalProps> = observer(
 										>
 											{status === 'granted' && (
 												<CheckIcon
-													size={16}
+													size={remFromPx(16)}
 													weight="bold"
 													aria-hidden="true"
 													data-flx="permissions.system.mac-permissions-modal.check-icon"
 												/>
 											)}
-											{i18n._(statusDescriptorForStatus(status))}
+											<flx-i18n data-flx="permissions.system.mac-permissions-modal.flx-i18n">
+												{i18n._(statusDescriptorForStatus(status))}
+											</flx-i18n>
 										</div>
 										{hasAction && (
 											<div className={styles.action} data-flx="permissions.mac-permissions-modal.action">

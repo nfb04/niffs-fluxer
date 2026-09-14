@@ -1,30 +1,31 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import styles from '@app/features/app/components/dialogs/components/plutonium/GiftInventoryBanner.module.css';
-import {ComponentDispatch} from '@app/features/platform/utils/ComponentBus';
+import {ComponentBus} from '@app/features/platform/utils/ComponentBus';
 import {shouldShowPremiumFeatures} from '@app/features/premium/utils/PremiumUtils';
 import {Button} from '@app/features/ui/button/Button';
 import type {User} from '@app/features/user/models/User';
-import {plural} from '@lingui/core/macro';
-import {Trans} from '@lingui/react/macro';
+import {msg} from '@lingui/core/macro';
+import {Trans, useLingui} from '@lingui/react/macro';
 import {GiftIcon} from '@phosphor-icons/react';
 import {observer} from 'mobx-react-lite';
 import type React from 'react';
+
+const GIFT_CODES_WAITING_DESCRIPTOR = msg({
+	message:
+		'{count, plural, one {You have a new gift code waiting for you!} other {You have # new gift codes waiting for you!}}',
+	comment: 'Banner headline in the Plutonium dialog when gifts are unclaimed. {count} is the unread gift count.',
+});
 
 interface GiftInventoryBannerProps {
 	currentUser: User;
 }
 
 export const GiftInventoryBanner: React.FC<GiftInventoryBannerProps> = observer(({currentUser}) => {
+	const {i18n} = useLingui();
 	if (!currentUser.hasUnreadGiftInventory || !shouldShowPremiumFeatures()) return null;
 	const count = currentUser.unreadGiftInventoryCount ?? 1;
-	const giftMessage = plural(
-		{count},
-		{
-			one: 'You have a new gift code waiting for you!',
-			other: 'You have # new gift codes waiting for you!',
-		},
-	);
+	const giftMessage = i18n._(GIFT_CODES_WAITING_DESCRIPTOR, {count});
 	return (
 		<div className={styles.banner} data-flx="app.plutonium.gift-inventory-banner.banner">
 			<div className={styles.content} data-flx="app.plutonium.gift-inventory-banner.content">
@@ -37,7 +38,7 @@ export const GiftInventoryBanner: React.FC<GiftInventoryBannerProps> = observer(
 				<Button
 					variant="secondary"
 					small
-					onClick={() => ComponentDispatch.dispatch('USER_SETTINGS_TAB_SELECT', {tab: 'gift_inventory'})}
+					onClick={() => ComponentBus.dispatch('USER_SETTINGS_TAB_SELECT', {tab: 'gift_inventory'})}
 					data-flx="app.plutonium.gift-inventory-banner.button.dispatch"
 				>
 					<Trans>View gifts</Trans>

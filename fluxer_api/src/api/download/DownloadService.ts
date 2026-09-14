@@ -1,7 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import {createHash} from 'node:crypto';
 import {posix} from 'node:path';
 import {Readable} from 'node:stream';
+import {Config} from '@app/api/Config';
+import {
+	parseDesktopArtifactScope,
+	parseDesktopReleaseDescriptor,
+	parseDesktopReleaseReadiness,
+} from '@app/api/download/DesktopReleaseContract';
+import {
+	type IStorageService,
+	StorageObjectListingOverflowError,
+	StorageObjectRangeNotSatisfiableError,
+} from '@app/api/infrastructure/IStorageService';
+import {Logger} from '@app/api/Logger';
+import {isJsonRecord, parseJsonRecord} from '@app/api/utils/JsonBoundaryUtils';
 import {S3ServiceException} from '@aws-sdk/client-s3';
 import type {
 	DesktopArch,
@@ -9,9 +23,6 @@ import type {
 	DesktopFormat,
 	DesktopPlatform,
 } from '@fluxer/schema/src/domains/download/DownloadSchemas';
-import {Config} from '../Config';
-import type {IStorageService} from '../infrastructure/IStorageService';
-import {isJsonRecord, parseJsonUnknown} from '../utils/JsonBoundaryUtils';
 
 export const DOWNLOAD_PREFIX = '/dl';
 export const DESKTOP_REDIRECT_PREFIX = `${DOWNLOAD_PREFIX}/desktop`;
@@ -39,16 +50,52 @@ function isStorageNotFoundError(error: unknown): boolean {
 }
 
 function isUnsatisfiableRangeError(error: unknown): boolean {
+	if (error instanceof StorageObjectRangeNotSatisfiableError) {
+		return true;
+	}
 	return (
 		error instanceof S3ServiceException && (error.name === 'InvalidRange' || error.$metadata?.httpStatusCode === 416)
 	);
 }
+const MAX_DESKTOP_OBJECTS_PER_PREFIX = 10_000;
+const MAX_DESKTOP_RELEASE_CANDIDATES = 10;
 const DESKTOP_BUCKET_PREFIX = 'desktop';
 const DESKTOP_TEST_BUCKET_PREFIX = 'desktop-test';
-const DEFAULT_API_CLIENT_BASE_URL = 'https://api.fluxer.app';
+const DOWNLOAD_KEY_ALLOWED_PREFIXES = [`${DESKTOP_BUCKET_PREFIX}/`, `${DESKTOP_TEST_BUCKET_PREFIX}/`];
+const GITHUB_RELEASE_DOWNLOAD_BASE_URL = 'https://github.com/fluxerapp/fluxer/releases/download';
+const GITHUB_RELEASE_MARKER_DIRECTORY = 'github-releases';
 
 function desktopBucketPrefix(test?: boolean): string {
 	return test ? DESKTOP_TEST_BUCKET_PREFIX : DESKTOP_BUCKET_PREFIX;
+}
+
+const MUTABLE_DOWNLOAD_CACHE_CONTROL = 'public, max-age=300';
+const VERSIONED_ARTIFACT_CACHE_CONTROL = 'public, max-age=31536000';
+
+function isDesktopReleaseFeedFilename(filename: string): boolean {
+	return (
+		filename === 'manifest.json' ||
+		filename.endsWith('.yml') ||
+		filename.endsWith('.yaml') ||
+		filename.startsWith('RELEASES') ||
+		(filename.startsWith('releases') && filename.endsWith('.json')) ||
+		(filename.startsWith('assets') && filename.endsWith('.json'))
+	);
+}
+
+function isVersionedDesktopArtifactKey(key: string): boolean {
+	if (!key.startsWith(`${DESKTOP_BUCKET_PREFIX}/`)) {
+		return false;
+	}
+	const filename = key.split('/').pop() ?? '';
+	if (filename.length === 0) {
+		return false;
+	}
+	return !isDesktopReleaseFeedFilename(filename);
+}
+
+export function downloadCacheControlForKey(key: string): string {
+	return isVersionedDesktopArtifactKey(key) ? VERSIONED_ARTIFACT_CACHE_CONTROL : MUTABLE_DOWNLOAD_CACHE_CONTROL;
 }
 
 function desktopArtifactPrefix(params: {
@@ -56,7 +103,7 @@ function desktopArtifactPrefix(params: {
 	plat: DesktopPlatform;
 	arch: DesktopArch;
 	test?: boolean;
-}): string | null {
+}): string {
 	return `${desktopBucketPrefix(params.test)}/${params.channel}/${params.plat}/${params.arch}`;
 }
 
@@ -82,8 +129,8 @@ type FormatMapping = {
 
 const FORMAT_MAPPINGS: Record<DesktopFormat, Partial<Record<DesktopPlatform, FormatMapping>>> = {
 	setup: {win32: {ext: '.exe', arch: {x64: 'x64', arm64: 'arm64'}}},
-	dmg: {darwin: {ext: '.dmg', arch: {x64: 'x64', arm64: 'arm64'}}},
-	zip: {darwin: {ext: '.zip', arch: {x64: 'x64', arm64: 'arm64'}}},
+	dmg: {darwin: {ext: '.dmg', arch: {x64: ['universal', 'x64'], arm64: ['universal', 'arm64']}}},
+	zip: {darwin: {ext: '.zip', arch: {x64: ['universal', 'x64'], arm64: ['universal', 'arm64']}}},
 	appimage: {linux: {ext: '.AppImage', arch: {x64: 'x86_64', arm64: ['aarch64', 'arm64']}}},
 	deb: {linux: {ext: '.deb', arch: {x64: 'amd64', arm64: 'arm64'}}},
 	rpm: {linux: {ext: '.rpm', arch: {x64: 'x86_64', arm64: 'aarch64'}}},
@@ -108,6 +155,7 @@ type VersionInfo = {
 	files: Record<string, VersionFile>;
 };
 export type DesktopChecksumFile = {
+	key: string;
 	filename: string;
 	sha256: string;
 	body: string;
@@ -146,8 +194,64 @@ interface ManifestFilenameResolutionParams extends LatestFilenameLookupParams {
 	filename: string;
 }
 
+export type GitHubDesktopReleaseResolution =
+	| {kind: 'not_current'}
+	| {kind: 'awaiting_release'}
+	| {kind: 'ready'; location: string};
+
+type DesktopReleaseState = {kind: 'untracked'} | {kind: 'unpublished'} | {kind: 'published'; descriptorText: string};
+
+type ListedDesktopVersion = {
+	version: string;
+	pub_date: Date;
+	files: Map<DesktopFormat, {filename: string; sha256Key: string | null}>;
+};
+
 export class DownloadService {
 	constructor(private readonly storageService: IStorageService) {}
+
+	async resolveGitHubDesktopRelease(key: string): Promise<GitHubDesktopReleaseResolution> {
+		const scope = parseDesktopArtifactScope(key);
+		if (!scope) {
+			return {kind: 'not_current'};
+		}
+		const manifestKey = `${DESKTOP_BUCKET_PREFIX}/${scope.channel}/${scope.plat}/${scope.arch}/manifest.json`;
+		const manifest = await this.readOptionalJsonObjectFromStorage(manifestKey);
+		if (
+			!isDesktopManifest(manifest) ||
+			manifest.channel !== scope.channel ||
+			manifest.platform !== scope.plat ||
+			manifest.arch !== scope.arch
+		) {
+			return {kind: 'not_current'};
+		}
+		const release = await this.readDesktopReleaseState(scope.channel, manifest.version);
+		if (release.kind === 'untracked') {
+			return {kind: 'not_current'};
+		}
+		if (release.kind === 'unpublished') {
+			return {kind: 'awaiting_release'};
+		}
+		const descriptor = parseDesktopReleaseDescriptor(parseJsonRecord(release.descriptorText));
+		if (
+			!descriptor ||
+			descriptor.channel !== scope.channel ||
+			descriptor.version !== manifest.version ||
+			descriptor.release_tag !== `fluxer-desktop-${scope.channel}@${manifest.version}`
+		) {
+			throw new Error(
+				`Invalid GitHub desktop release descriptor: ${DESKTOP_BUCKET_PREFIX}/${scope.channel}/${GITHUB_RELEASE_MARKER_DIRECTORY}/${manifest.version}.json`,
+			);
+		}
+		const releaseAsset = descriptor.assets.find((asset) => asset.storage_key === key);
+		if (!releaseAsset) {
+			return {kind: 'not_current'};
+		}
+		return {
+			kind: 'ready',
+			location: `${GITHUB_RELEASE_DOWNLOAD_BASE_URL}/${encodeURIComponent(descriptor.release_tag)}/${encodeURIComponent(releaseAsset.release_asset)}`,
+		};
+	}
 
 	async resolveLatestDesktopKey(params: {
 		channel: DesktopChannel;
@@ -157,22 +261,23 @@ export class DownloadService {
 		test?: boolean;
 	}): Promise<string | null> {
 		const prefix = desktopArtifactPrefix(params);
-		if (!prefix) {
-			return null;
-		}
 		const manifestKey = `${prefix}/manifest.json`;
+		const releasability = new Map<string, boolean>();
 		try {
 			const manifest = await this.readJsonObjectFromStorage(manifestKey);
-			if (!isDesktopManifest(manifest)) {
-				return this.resolveLatestDesktopKeyFromObjects(params);
+			if (
+				!isDesktopManifest(manifest) ||
+				!(await this.isReleasableDesktopVersion(params, manifest.version, releasability))
+			) {
+				return this.resolveLatestDesktopKeyFromObjects(params, releasability);
 			}
 			const entry = manifest.files[params.format];
 			if (!entry) {
-				return this.resolveLatestDesktopKeyFromObjects(params);
+				return this.resolveLatestDesktopKeyFromObjects(params, releasability);
 			}
 			const filename = this.extractFilename(entry);
 			if (filename.trim().length === 0) {
-				return this.resolveLatestDesktopKeyFromObjects(params);
+				return this.resolveLatestDesktopKeyFromObjects(params, releasability);
 			}
 			const resolvedFilename = await this.resolveManifestFilename({
 				channel: params.channel,
@@ -183,7 +288,11 @@ export class DownloadService {
 				test: params.test,
 			});
 			if (!resolvedFilename) {
-				return this.resolveLatestDesktopKeyFromObjects(params);
+				return this.resolveLatestDesktopKeyFromObjects(params, releasability);
+			}
+			const parsed = this.parseVersionFromFilename(resolvedFilename, params.channel, params.plat, params.arch);
+			if (parsed && parsed.version !== manifest.version) {
+				return this.resolveLatestDesktopKeyFromObjects(params, releasability);
 			}
 			return this.buildDesktopArtifactKey({
 				channel: params.channel,
@@ -193,8 +302,8 @@ export class DownloadService {
 				test: params.test,
 			});
 		} catch (error) {
-			if (error instanceof S3ServiceException && (error.name === 'NoSuchKey' || error.name === 'NotFound')) {
-				return this.resolveLatestDesktopKeyFromObjects(params);
+			if (isStorageNotFoundError(error)) {
+				return this.resolveLatestDesktopKeyFromObjects(params, releasability);
 			}
 			throw error;
 		}
@@ -208,26 +317,27 @@ export class DownloadService {
 		test?: boolean;
 	}): Promise<VersionInfo | null> {
 		const prefix = desktopArtifactPrefix(params);
-		if (!prefix) {
-			return null;
-		}
 		const manifestKey = `${prefix}/manifest.json`;
+		const releasability = new Map<string, boolean>();
 		try {
 			const manifest = await this.readJsonObjectFromStorage(manifestKey);
-			if (!isDesktopManifest(manifest)) {
-				return this.getLatestDesktopVersionFromObjects(params);
+			if (
+				!isDesktopManifest(manifest) ||
+				!(await this.isReleasableDesktopVersion(params, manifest.version, releasability))
+			) {
+				return this.getLatestDesktopVersionFromObjects(params, releasability);
 			}
 			const result = await this.getLatestDesktopVersionFromManifest(params, manifest);
 			if (result) {
 				return result;
 			}
 		} catch (error) {
-			if (error instanceof S3ServiceException && (error.name === 'NoSuchKey' || error.name === 'NotFound')) {
-				return this.getLatestDesktopVersionFromObjects(params);
+			if (isStorageNotFoundError(error)) {
+				return this.getLatestDesktopVersionFromObjects(params, releasability);
 			}
 			throw error;
 		}
-		return this.getLatestDesktopVersionFromObjects(params);
+		return this.getLatestDesktopVersionFromObjects(params, releasability);
 	}
 
 	async listDesktopVersions(params: {
@@ -243,161 +353,17 @@ export class DownloadService {
 		versions: Array<VersionInfo>;
 		hasMore: boolean;
 	}> {
-		const basePrefix = desktopArtifactPrefix(params);
-		if (!basePrefix) {
-			return {versions: [], hasMore: false};
+		let listedVersions = await this.listDesktopVersionFiles(params);
+		if (params.before) {
+			listedVersions = listedVersions.filter((entry) => this.compareVersions(entry.version, params.before ?? '') > 0);
 		}
-		const prefix = `${basePrefix}/`;
-		try {
-			const objects = await this.storageService.listObjects({
-				bucket: Config.s3.buckets.downloads,
-				prefix,
-			});
-			if (!objects || objects.length === 0) {
-				return {versions: [], hasMore: false};
-			}
-			const versionMap = new Map<
-				string,
-				{
-					pub_date: Date;
-					files: Map<
-						DesktopFormat,
-						{
-							filename: string;
-							sha256Key: string | null;
-						}
-					>;
-				}
-			>();
-			const sha256Files = new Set<string>();
-			for (const obj of objects) {
-				if (obj.key.endsWith('.sha256')) {
-					sha256Files.add(obj.key);
-				}
-			}
-			for (const obj of objects) {
-				const filename = obj.key.slice(prefix.length);
-				if (filename.includes('/') || filename.endsWith('.sha256') || filename === 'manifest.json') {
-					continue;
-				}
-				const parsed = this.parseVersionFromFilename(filename, params.channel, params.plat, params.arch);
-				if (!parsed) {
-					continue;
-				}
-				const {version, format} = parsed;
-				const sha256Key = sha256Files.has(`${obj.key}.sha256`) ? `${obj.key}.sha256` : null;
-				if (!versionMap.has(version)) {
-					versionMap.set(version, {
-						pub_date: obj.lastModified ?? new Date(),
-						files: new Map(),
-					});
-				}
-				const entry = versionMap.get(version);
-				if (entry) {
-					if (!entry.files.has(format)) {
-						entry.files.set(format, {filename, sha256Key});
-					}
-					if (obj.lastModified && obj.lastModified > entry.pub_date) {
-						entry.pub_date = obj.lastModified;
-					}
-				}
-			}
-			const sortedVersions = Array.from(versionMap.keys()).sort(this.compareVersions);
-			let filteredVersions = sortedVersions;
-			if (params.before) {
-				filteredVersions = filteredVersions.filter((v) => this.compareVersions(v, params.before ?? '') > 0);
-			}
-			if (params.after) {
-				filteredVersions = filteredVersions.filter((v) => this.compareVersions(v, params.after ?? '') < 0);
-			}
-			const hasMore = filteredVersions.length > params.limit;
-			const paginatedVersions = filteredVersions.slice(0, params.limit);
-			const sha256Promises: Array<
-				Promise<{
-					key: string;
-					hash: string | null;
-				}>
-			> = [];
-			for (const version of paginatedVersions) {
-				const entry = versionMap.get(version);
-				if (!entry) {
-					continue;
-				}
-				for (const [, fileInfo] of entry.files) {
-					if (fileInfo.sha256Key) {
-						sha256Promises.push(
-							(async () => {
-								try {
-									const streamResult = await this.storageService.streamObject({
-										bucket: Config.s3.buckets.downloads,
-										key: fileInfo.sha256Key as string,
-									});
-									if (streamResult) {
-										const body = Readable.toWeb(streamResult.body);
-										const text = await new Response(body as ReadableStream).text();
-										return {key: fileInfo.sha256Key as string, hash: text.trim().split(/\s+/u)[0]};
-									}
-								} catch {
-									return {key: fileInfo.sha256Key as string, hash: null};
-								}
-								return {key: fileInfo.sha256Key as string, hash: null};
-							})(),
-						);
-					}
-				}
-			}
-			const sha256Results = await Promise.all(sha256Promises);
-			const sha256Map = new Map<string, string | null>();
-			for (const result of sha256Results) {
-				sha256Map.set(result.key, result.hash);
-			}
-			const versions: Array<VersionInfo> = [];
-			for (const version of paginatedVersions) {
-				const entry = versionMap.get(version);
-				if (!entry) {
-					continue;
-				}
-				const files: Record<string, VersionFile> = {};
-				for (const [format, fileInfo] of entry.files) {
-					const sha256 = fileInfo.sha256Key ? (sha256Map.get(fileInfo.sha256Key) ?? null) : null;
-					const validSha256 = sha256 && this.isValidSha256(sha256) ? sha256 : null;
-					files[format] = {
-						url: this.buildDesktopVersionUrl({
-							channel: params.channel,
-							plat: params.plat,
-							arch: params.arch,
-							version,
-							format,
-							baseUrl: params.baseUrl,
-							test: params.test,
-						}),
-						sha256: validSha256,
-						checksum_url: validSha256
-							? this.buildDesktopVersionChecksumUrl({
-									channel: params.channel,
-									plat: params.plat,
-									arch: params.arch,
-									version,
-									format,
-									baseUrl: params.baseUrl,
-									test: params.test,
-								})
-							: null,
-					};
-				}
-				versions.push({
-					version,
-					pub_date: entry.pub_date.toISOString(),
-					files,
-				});
-			}
-			return {versions, hasMore};
-		} catch (error) {
-			if (error instanceof S3ServiceException && (error.name === 'NoSuchKey' || error.name === 'NotFound')) {
-				return {versions: [], hasMore: false};
-			}
-			throw error;
+		if (params.after) {
+			listedVersions = listedVersions.filter((entry) => this.compareVersions(entry.version, params.after ?? '') < 0);
 		}
+		return {
+			versions: await this.buildListedDesktopVersions(params, listedVersions.slice(0, params.limit)),
+			hasMore: listedVersions.length > params.limit,
+		};
 	}
 
 	async resolveVersionedDesktopKey(params: {
@@ -423,9 +389,6 @@ export class DownloadService {
 			return null;
 		}
 		const prefix = desktopArtifactPrefix(params);
-		if (!prefix) {
-			return null;
-		}
 		const s3Prefix = `${prefix}/`;
 		for (const filename of filenames) {
 			const key = `${s3Prefix}${filename}`;
@@ -435,7 +398,7 @@ export class DownloadService {
 					return key;
 				}
 			} catch (error) {
-				if (error instanceof S3ServiceException && (error.name === 'NoSuchKey' || error.name === 'NotFound')) {
+				if (isStorageNotFoundError(error)) {
 					continue;
 				}
 				throw error;
@@ -453,15 +416,15 @@ export class DownloadService {
 	}): Promise<DesktopChecksumFile | null> {
 		const version = await this.getLatestDesktopVersion(params);
 		const file = version?.files[params.format];
-		if (!file?.sha256 || !this.isValidSha256(file.sha256)) {
+		if (!version || !file?.sha256 || !this.isValidSha256(file.sha256)) {
 			return null;
 		}
-		const key = await this.resolveLatestDesktopKey(params);
+		const key = await this.resolveVersionedDesktopKey({...params, version: version.version});
 		if (!key) {
 			return null;
 		}
 		const filename = this.filenameFromKey(key);
-		return this.buildDesktopChecksumFile(filename, file.sha256);
+		return this.buildDesktopChecksumFile(key, filename, file.sha256);
 	}
 
 	async resolveVersionedDesktopChecksumFile(params: {
@@ -479,14 +442,19 @@ export class DownloadService {
 		const filename = this.filenameFromKey(key);
 		const objectSha256 = await this.readDesktopSha256ForArtifactKey(key);
 		if (objectSha256) {
-			return this.buildDesktopChecksumFile(filename, objectSha256);
+			return this.buildDesktopChecksumFile(key, filename, objectSha256);
 		}
-		const latest = await this.getLatestDesktopVersion(params);
-		const file = latest?.version === params.version ? latest.files[params.format] : undefined;
+		const prefix = desktopArtifactPrefix(params);
+		const manifest = await this.readOptionalJsonObjectFromStorage(`${prefix}/manifest.json`);
+		const versionInfo =
+			isDesktopManifest(manifest) && manifest.version === params.version
+				? await this.getLatestDesktopVersionFromManifest(params, manifest)
+				: null;
+		const file = versionInfo?.files[params.format];
 		if (!file?.sha256 || !this.isValidSha256(file.sha256)) {
 			return null;
 		}
-		return this.buildDesktopChecksumFile(filename, file.sha256);
+		return this.buildDesktopChecksumFile(key, filename, file.sha256);
 	}
 
 	async resolveDownloadKey(params: {path: string; test?: boolean}): Promise<string | null> {
@@ -505,7 +473,7 @@ export class DownloadService {
 					return candidateKey;
 				}
 			} catch (error) {
-				if (error instanceof S3ServiceException && (error.name === 'NoSuchKey' || error.name === 'NotFound')) {
+				if (isStorageNotFoundError(error)) {
 					continue;
 				}
 				throw error;
@@ -531,6 +499,28 @@ export class DownloadService {
 			}
 			throw error;
 		}
+	}
+
+	isPresignedDownloadEnabled(): boolean {
+		return Config.presignedDownloadsEnabled;
+	}
+
+	async getPresignedDownloadRedirect(params: {
+		key: string;
+		filename: string;
+		expiresIn: number;
+	}): Promise<string | null> {
+		const metadata = await this.getDownloadMetadata({key: params.key});
+		if (!metadata) {
+			return null;
+		}
+		return this.storageService.getPresignedDownloadURL({
+			bucket: Config.s3.buckets.downloads,
+			key: params.key,
+			expiresIn: params.expiresIn,
+			responseContentType: metadata.contentType ?? 'application/octet-stream',
+			responseContentDisposition: `attachment; filename="${encodeURIComponent(params.filename)}"`,
+		});
 	}
 
 	async getDownloadMetadata(params: {key: string}): Promise<{
@@ -559,11 +549,7 @@ export class DownloadService {
 	}
 
 	private buildBaseUrl(baseUrl?: string): string {
-		const configuredBaseUrl = (baseUrl ?? Config.endpoints.apiClient).trim();
-		if (configuredBaseUrl.length > 0) {
-			return configuredBaseUrl.replace(/\/+$/u, '');
-		}
-		return DEFAULT_API_CLIENT_BASE_URL;
+		return (baseUrl ?? Config.endpoints.apiClient).trim().replace(/\/+$/u, '');
 	}
 
 	private buildDesktopVersionUrl(params: {
@@ -607,6 +593,11 @@ export class DownloadService {
 	}
 
 	private async readJsonObjectFromStorage(key: string): Promise<unknown | null> {
+		const text = await this.readTextFromStorage(key);
+		return text == null ? null : parseJsonRecord(text);
+	}
+
+	private async readTextFromStorage(key: string): Promise<string | null> {
 		const streamResult = await this.storageService.streamObject({
 			bucket: Config.s3.buckets.downloads,
 			key,
@@ -615,8 +606,100 @@ export class DownloadService {
 			return null;
 		}
 		const body = Readable.toWeb(streamResult.body);
-		const text = await new Response(body as ReadableStream).text();
-		return parseJsonUnknown(text);
+		return new Response(body as ReadableStream).text();
+	}
+
+	private async readOptionalJsonObjectFromStorage(key: string): Promise<unknown | null> {
+		try {
+			return await this.readJsonObjectFromStorage(key);
+		} catch (error) {
+			if (isStorageNotFoundError(error)) {
+				return null;
+			}
+			throw error;
+		}
+	}
+
+	private async readOptionalTextFromStorage(key: string): Promise<string | null> {
+		try {
+			return await this.readTextFromStorage(key);
+		} catch (error) {
+			if (isStorageNotFoundError(error)) {
+				return null;
+			}
+			throw error;
+		}
+	}
+
+	private async readDesktopReleaseState(channel: DesktopChannel, version: string): Promise<DesktopReleaseState> {
+		const descriptorKey = `${DESKTOP_BUCKET_PREFIX}/${channel}/${GITHUB_RELEASE_MARKER_DIRECTORY}/${version}.json`;
+		const markerKey = `${DESKTOP_BUCKET_PREFIX}/${channel}/${GITHUB_RELEASE_MARKER_DIRECTORY}/${version}.ready.json`;
+		const [descriptorText, markerText] = await Promise.all([
+			this.readOptionalTextFromStorage(descriptorKey),
+			this.readOptionalTextFromStorage(markerKey),
+		]);
+		if (descriptorText == null) {
+			return {kind: 'untracked'};
+		}
+		if (markerText == null) {
+			return {kind: 'unpublished'};
+		}
+		const readiness = parseDesktopReleaseReadiness(parseJsonRecord(markerText));
+		if (
+			!readiness ||
+			readiness.channel !== channel ||
+			readiness.version !== version ||
+			readiness.release_tag !== `fluxer-desktop-${channel}@${version}` ||
+			readiness.descriptor_sha256 !== createHash('sha256').update(descriptorText).digest('hex')
+		) {
+			Logger.error({key: markerKey}, 'Invalid GitHub desktop release readiness marker');
+			return {kind: 'unpublished'};
+		}
+		return {kind: 'published', descriptorText};
+	}
+
+	private async isReleasableDesktopVersion(
+		params: {channel: DesktopChannel; test?: boolean},
+		version: string,
+		releasability: Map<string, boolean>,
+	): Promise<boolean> {
+		if (params.test || Config.instance.selfHosted) {
+			return true;
+		}
+		const checked = releasability.get(version);
+		if (checked !== undefined) {
+			return checked;
+		}
+		let releasable = true;
+		try {
+			releasable = (await this.readDesktopReleaseState(params.channel, version)).kind !== 'unpublished';
+		} catch (error) {
+			Logger.error({error, channel: params.channel, version}, 'Failed to read desktop release readiness');
+		}
+		releasability.set(version, releasable);
+		return releasable;
+	}
+
+	private async findNewestReleasableDesktopVersion<T extends {version: string}>(
+		params: {channel: DesktopChannel; test?: boolean},
+		candidates: ReadonlyArray<T>,
+		releasability: Map<string, boolean>,
+	): Promise<T | null> {
+		const newestCandidates = candidates.slice(0, MAX_DESKTOP_RELEASE_CANDIDATES);
+		for (const candidate of newestCandidates) {
+			if (await this.isReleasableDesktopVersion(params, candidate.version, releasability)) {
+				return candidate;
+			}
+		}
+		const [newest] = newestCandidates;
+		if (!newest) {
+			return null;
+		}
+		Logger.error(
+			{channel: params.channel, version: newest.version},
+			'No recent desktop version has a published release',
+		);
+		return newest;
 	}
 
 	private isValidSha256(value: string): boolean {
@@ -640,7 +723,29 @@ export class DownloadService {
 		) {
 			return manifestFilename;
 		}
-		return this.findLatestFilenameForRequestedArch(params);
+		for (const entry of await this.listDesktopVersionFiles(params)) {
+			const file = entry.files.get(params.format);
+			if (file) {
+				return file.filename;
+			}
+		}
+		return null;
+	}
+
+	private async listDesktopArtifacts(prefix: string): Promise<ReadonlyArray<{key: string; lastModified?: Date}>> {
+		try {
+			return await this.storageService.listObjects({
+				bucket: Config.s3.buckets.downloads,
+				prefix,
+				maxObjects: MAX_DESKTOP_OBJECTS_PER_PREFIX,
+			});
+		} catch (error) {
+			if (error instanceof StorageObjectListingOverflowError) {
+				Logger.warn({prefix, maxObjects: error.maxObjects}, 'Desktop artifact prefix outgrew its listing cap');
+				return [];
+			}
+			throw error;
+		}
 	}
 
 	private isFilenameCompatibleWithRequestedArch(params: ManifestFilenameResolutionParams): boolean {
@@ -661,47 +766,141 @@ export class DownloadService {
 		return params.filename.toLowerCase().endsWith('.exe');
 	}
 
-	private async findLatestFilenameForRequestedArch(params: LatestFilenameLookupParams): Promise<string | null> {
-		const basePrefix = desktopArtifactPrefix(params);
-		if (!basePrefix) {
-			return null;
+	private async listDesktopVersionFiles(params: {
+		channel: DesktopChannel;
+		plat: DesktopPlatform;
+		arch: DesktopArch;
+		test?: boolean;
+	}): Promise<Array<ListedDesktopVersion>> {
+		const prefix = `${desktopArtifactPrefix(params)}/`;
+		try {
+			const objects = await this.listDesktopArtifacts(prefix);
+			const versionMap = new Map<string, ListedDesktopVersion>();
+			const sha256Files = new Set<string>();
+			for (const obj of objects) {
+				if (obj.key.endsWith('.sha256')) {
+					sha256Files.add(obj.key);
+				}
+			}
+			for (const obj of objects) {
+				const filename = obj.key.slice(prefix.length);
+				if (filename.includes('/') || filename.endsWith('.sha256') || filename === 'manifest.json') {
+					continue;
+				}
+				const parsed = this.parseVersionFromFilename(filename, params.channel, params.plat, params.arch);
+				if (!parsed) {
+					continue;
+				}
+				const {version, format} = parsed;
+				const sha256Key = sha256Files.has(`${obj.key}.sha256`) ? `${obj.key}.sha256` : null;
+				if (!versionMap.has(version)) {
+					versionMap.set(version, {
+						version,
+						pub_date: obj.lastModified ?? new Date(),
+						files: new Map(),
+					});
+				}
+				const entry = versionMap.get(version);
+				if (entry) {
+					if (!entry.files.has(format)) {
+						entry.files.set(format, {filename, sha256Key});
+					}
+					if (obj.lastModified && obj.lastModified > entry.pub_date) {
+						entry.pub_date = obj.lastModified;
+					}
+				}
+			}
+			return Array.from(versionMap.values()).sort((left, right) => this.compareVersions(left.version, right.version));
+		} catch (error) {
+			if (isStorageNotFoundError(error)) {
+				return [];
+			}
+			throw error;
 		}
-		const prefix = `${basePrefix}/`;
-		const objects = await this.storageService.listObjects({
-			bucket: Config.s3.buckets.downloads,
-			prefix,
-		});
-		if (!objects || objects.length === 0) {
-			return null;
+	}
+
+	private async buildListedDesktopVersions(
+		params: {
+			channel: DesktopChannel;
+			plat: DesktopPlatform;
+			arch: DesktopArch;
+			baseUrl?: string;
+			test?: boolean;
+		},
+		listedVersions: ReadonlyArray<ListedDesktopVersion>,
+	): Promise<Array<VersionInfo>> {
+		const sha256Promises: Array<
+			Promise<{
+				key: string;
+				hash: string | null;
+			}>
+		> = [];
+		for (const entry of listedVersions) {
+			for (const [, fileInfo] of entry.files) {
+				if (fileInfo.sha256Key) {
+					sha256Promises.push(
+						(async () => {
+							try {
+								const streamResult = await this.storageService.streamObject({
+									bucket: Config.s3.buckets.downloads,
+									key: fileInfo.sha256Key as string,
+								});
+								if (streamResult) {
+									const body = Readable.toWeb(streamResult.body);
+									const text = await new Response(body as ReadableStream).text();
+									return {key: fileInfo.sha256Key as string, hash: text.trim().split(/\s+/u)[0]};
+								}
+							} catch {
+								return {key: fileInfo.sha256Key as string, hash: null};
+							}
+							return {key: fileInfo.sha256Key as string, hash: null};
+						})(),
+					);
+				}
+			}
 		}
-		let latestFilename: string | null = null;
-		let latestVersion: string | null = null;
-		for (const obj of objects) {
-			const filename = obj.key.slice(prefix.length);
-			if (filename.length === 0) {
-				continue;
-			}
-			if (
-				filename.includes('/') ||
-				filename.endsWith('.sha256') ||
-				filename.endsWith('.blockmap') ||
-				filename.endsWith('.yml') ||
-				filename === 'manifest.json' ||
-				filename === 'RELEASES.json' ||
-				filename === 'releases.json'
-			) {
-				continue;
-			}
-			const parsed = this.parseVersionFromFilename(filename, params.channel, params.plat, params.arch);
-			if (!parsed || parsed.format !== params.format) {
-				continue;
-			}
-			if (!latestVersion || this.compareVersions(parsed.version, latestVersion) < 0) {
-				latestVersion = parsed.version;
-				latestFilename = filename;
-			}
+		const sha256Results = await Promise.all(sha256Promises);
+		const sha256Map = new Map<string, string | null>();
+		for (const result of sha256Results) {
+			sha256Map.set(result.key, result.hash);
 		}
-		return latestFilename;
+		const versions: Array<VersionInfo> = [];
+		for (const entry of listedVersions) {
+			const files: Record<string, VersionFile> = {};
+			for (const [format, fileInfo] of entry.files) {
+				const sha256 = fileInfo.sha256Key ? (sha256Map.get(fileInfo.sha256Key) ?? null) : null;
+				const validSha256 = sha256 && this.isValidSha256(sha256) ? sha256 : null;
+				files[format] = {
+					url: this.buildDesktopVersionUrl({
+						channel: params.channel,
+						plat: params.plat,
+						arch: params.arch,
+						version: entry.version,
+						format,
+						baseUrl: params.baseUrl,
+						test: params.test,
+					}),
+					sha256: validSha256,
+					checksum_url: validSha256
+						? this.buildDesktopVersionChecksumUrl({
+								channel: params.channel,
+								plat: params.plat,
+								arch: params.arch,
+								version: entry.version,
+								format,
+								baseUrl: params.baseUrl,
+								test: params.test,
+							})
+						: null,
+				};
+			}
+			versions.push({
+				version: entry.version,
+				pub_date: entry.pub_date.toISOString(),
+				files,
+			});
+		}
+		return versions;
 	}
 
 	private escapeRegex(str: string): string {
@@ -722,9 +921,11 @@ export class DownloadService {
 		const {ext, arch: archMap} = mapping;
 		const filenames = new Set<string>();
 		for (const archSuffix of this.getArchTokens(archMap[arch as 'x64' | 'arm64'])) {
-			const modernFilename = this.buildModernArtifactFilename(channel, version, plat, archSuffix, ext);
-			if (modernFilename) {
-				filenames.add(modernFilename);
+			for (const productName of this.getModernProductNames(channel)) {
+				filenames.add(`${productName}-${version}-${MODERN_PLATFORM_TOKENS[plat]}-${archSuffix}${ext}`);
+				if (format === 'portable') {
+					filenames.add(`${productName}-${version}-portable-${MODERN_PLATFORM_TOKENS[plat]}-${archSuffix}${ext}`);
+				}
 			}
 			if (format === 'setup') {
 				filenames.add(`fluxer-${channel}-${version}-${archSuffix}-setup${ext}`);
@@ -732,9 +933,6 @@ export class DownloadService {
 				filenames.add(`fluxer-${version}-${archSuffix}-setup${ext}`);
 				filenames.add(`Fluxer-${version}-${archSuffix}-Setup${ext}`);
 			} else if (format === 'portable') {
-				filenames.add(
-					`${this.getModernProductName(channel)}-${version}-portable-${MODERN_PLATFORM_TOKENS[plat]}-${archSuffix}${ext}`,
-				);
 				filenames.add(`fluxer-${channel}-${version}-portable-${archSuffix}${ext}`);
 				filenames.add(`Fluxer-${version}-portable-${archSuffix}${ext}`);
 			} else {
@@ -764,7 +962,6 @@ export class DownloadService {
 			}
 			const {ext, arch: archMap} = mapping;
 			const escapedExt = this.escapeRegex(ext);
-			const escapedModernFilenamePrefix = this.escapeRegex(this.getModernProductName(channel));
 			const modernPlatformToken = MODERN_PLATFORM_TOKENS[plat];
 			for (const archSuffix of this.getArchTokens(archMap[arch as 'x64' | 'arm64'])) {
 				const patterns = [
@@ -776,18 +973,23 @@ export class DownloadService {
 						`^[Ff]luxer-(\\d+\\.\\d+\\.\\d+)-${this.escapeRegex(archSuffix)}(?:-[Ss]etup)?${escapedExt}$`,
 						'u',
 					),
-					new RegExp(
-						`^${escapedModernFilenamePrefix}-(\\d+\\.\\d+\\.\\d+)-${this.escapeRegex(modernPlatformToken)}-${this.escapeRegex(archSuffix)}${escapedExt}$`,
-						'iu',
-					),
 				];
-				if (format === 'portable') {
+				for (const productName of this.getModernProductNames(channel)) {
+					const escapedProductName = this.escapeRegex(productName);
 					patterns.push(
 						new RegExp(
-							`^${escapedModernFilenamePrefix}-(\\d+\\.\\d+\\.\\d+)-portable-${this.escapeRegex(modernPlatformToken)}-${this.escapeRegex(archSuffix)}${escapedExt}$`,
+							`^${escapedProductName}-(\\d+\\.\\d+\\.\\d+)-${this.escapeRegex(modernPlatformToken)}-${this.escapeRegex(archSuffix)}${escapedExt}$`,
 							'iu',
 						),
 					);
+					if (format === 'portable') {
+						patterns.push(
+							new RegExp(
+								`^${escapedProductName}-(\\d+\\.\\d+\\.\\d+)-portable-${this.escapeRegex(modernPlatformToken)}-${this.escapeRegex(archSuffix)}${escapedExt}$`,
+								'iu',
+							),
+						);
+					}
 				}
 				for (const pattern of patterns) {
 					const match = filename.match(pattern);
@@ -800,18 +1002,8 @@ export class DownloadService {
 		return null;
 	}
 
-	private getModernProductName(channel: DesktopChannel): string {
-		return channel === 'canary' ? 'Fluxer Canary' : 'Fluxer';
-	}
-
-	private buildModernArtifactFilename(
-		channel: DesktopChannel,
-		version: string,
-		plat: DesktopPlatform,
-		archToken: string,
-		ext: string,
-	): string {
-		return `${this.getModernProductName(channel)}-${version}-${MODERN_PLATFORM_TOKENS[plat]}-${archToken}${ext}`;
+	private getModernProductNames(channel: DesktopChannel): Array<string> {
+		return channel === 'canary' ? ['Fluxer-Canary', 'Fluxer Canary'] : ['Fluxer'];
 	}
 
 	private getArchTokens(archToken: string | Array<string>): Array<string> {
@@ -847,7 +1039,13 @@ export class DownloadService {
 				return null;
 			}
 		}
-		return normalized.length > 0 ? normalized : null;
+		if (normalized.length === 0) {
+			return null;
+		}
+		if (!DOWNLOAD_KEY_ALLOWED_PREFIXES.some((prefix) => normalized.startsWith(prefix))) {
+			return null;
+		}
+		return normalized;
 	}
 
 	private normalizePlatformArchKey(key: string): string | null {
@@ -869,16 +1067,25 @@ export class DownloadService {
 		return key;
 	}
 
-	private async resolveLatestDesktopKeyFromObjects(params: LatestFilenameLookupParams): Promise<string | null> {
-		const filename = await this.findLatestFilenameForRequestedArch(params);
-		if (!filename) {
+	private async resolveLatestDesktopKeyFromObjects(
+		params: LatestFilenameLookupParams,
+		releasability: Map<string, boolean>,
+	): Promise<string | null> {
+		const listedVersions = await this.listDesktopVersionFiles(params);
+		const latest = await this.findNewestReleasableDesktopVersion(
+			params,
+			listedVersions.filter((entry) => entry.files.has(params.format)),
+			releasability,
+		);
+		const file = latest?.files.get(params.format);
+		if (!file) {
 			return null;
 		}
 		return this.buildDesktopArtifactKey({
 			channel: params.channel,
 			plat: params.plat,
 			arch: params.arch,
-			filename,
+			filename: file.filename,
 			test: params.test,
 		});
 	}
@@ -892,9 +1099,6 @@ export class DownloadService {
 		test?: boolean;
 	}): Promise<string | null> {
 		const prefix = desktopArtifactPrefix(params);
-		if (!prefix) {
-			return null;
-		}
 		const manifestKey = `${prefix}/manifest.json`;
 		try {
 			const manifest = await this.readJsonObjectFromStorage(manifestKey);
@@ -931,7 +1135,7 @@ export class DownloadService {
 				test: params.test,
 			});
 		} catch (error) {
-			if (error instanceof S3ServiceException && (error.name === 'NoSuchKey' || error.name === 'NotFound')) {
+			if (isStorageNotFoundError(error)) {
 				return null;
 			}
 			throw error;
@@ -1028,22 +1232,23 @@ export class DownloadService {
 		};
 	}
 
-	private async getLatestDesktopVersionFromObjects(params: {
-		channel: DesktopChannel;
-		plat: DesktopPlatform;
-		arch: DesktopArch;
-		baseUrl?: string;
-		test?: boolean;
-	}): Promise<VersionInfo | null> {
-		const {versions} = await this.listDesktopVersions({
-			channel: params.channel,
-			plat: params.plat,
-			arch: params.arch,
-			limit: 1,
-			baseUrl: params.baseUrl,
-			test: params.test,
-		});
-		return versions[0] ?? null;
+	private async getLatestDesktopVersionFromObjects(
+		params: {
+			channel: DesktopChannel;
+			plat: DesktopPlatform;
+			arch: DesktopArch;
+			baseUrl?: string;
+			test?: boolean;
+		},
+		releasability: Map<string, boolean>,
+	): Promise<VersionInfo | null> {
+		const listedVersions = await this.listDesktopVersionFiles(params);
+		const latest = await this.findNewestReleasableDesktopVersion(params, listedVersions, releasability);
+		if (!latest) {
+			return null;
+		}
+		const [versionInfo] = await this.buildListedDesktopVersions(params, [latest]);
+		return versionInfo ?? null;
 	}
 
 	private async resolveDesktopFileSha256(params: {
@@ -1068,9 +1273,6 @@ export class DownloadService {
 			filename: params.resolvedFilename,
 			test: params.test,
 		});
-		if (!key) {
-			return null;
-		}
 		return this.readDesktopSha256ForArtifactKey(key);
 	}
 
@@ -1100,14 +1302,11 @@ export class DownloadService {
 		test?: boolean;
 	}): Promise<boolean> {
 		const key = this.buildDesktopArtifactKey(params);
-		if (!key) {
-			return false;
-		}
 		try {
 			const metadata = await this.storageService.getObjectMetadata(Config.s3.buckets.downloads, key);
 			return metadata != null;
 		} catch (error) {
-			if (error instanceof S3ServiceException && (error.name === 'NoSuchKey' || error.name === 'NotFound')) {
+			if (isStorageNotFoundError(error)) {
 				return false;
 			}
 			throw error;
@@ -1120,17 +1319,17 @@ export class DownloadService {
 		arch: DesktopArch;
 		filename: string;
 		test?: boolean;
-	}): string | null {
-		const prefix = desktopArtifactPrefix(params);
-		return prefix ? `${prefix}/${params.filename}` : null;
+	}): string {
+		return `${desktopArtifactPrefix(params)}/${params.filename}`;
 	}
 
 	private filenameFromKey(key: string): string {
 		return key.split('/').pop() ?? 'download';
 	}
 
-	private buildDesktopChecksumFile(filename: string, sha256: string): DesktopChecksumFile {
+	private buildDesktopChecksumFile(key: string, filename: string, sha256: string): DesktopChecksumFile {
 		return {
+			key,
 			filename,
 			sha256,
 			body: `${sha256}  ${filename}\n`,

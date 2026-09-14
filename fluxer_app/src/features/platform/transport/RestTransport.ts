@@ -15,7 +15,10 @@ import type {
 } from '@app/features/platform/types/TransportTypes';
 import {Logger} from '@app/features/platform/utils/AppLogger';
 import {APIErrorCodes} from '@fluxer/constants/src/ApiErrorCodes';
+import {i18n} from '@lingui/core';
+import {msg} from '@lingui/core/macro';
 
+const TOO_MANY_REQUESTS_DESCRIPTOR = msg({message: 'Too many requests. Try again later.'});
 const log = new Logger('RestClient');
 const RETRY_BACKOFF_BASE_MS = 1000;
 const RETRY_BACKOFF_CAP_MS = 30_000;
@@ -78,6 +81,65 @@ type AttemptDecision =
 	| {next: 'retry-after'; delayMs: number; mode: 'backoff' | 'fixed'}
 	| {next: 'fail'; error: unknown};
 
+interface OnlineWaiter {
+	resolve: () => void;
+	signal: AbortSignal | undefined;
+	onAbort: () => void;
+}
+
+const strippedAuthorizationOrigins = new Set<string>();
+
+const onlineWaiters = new Set<OnlineWaiter>();
+let onlineListenerActive = false;
+
+function createRequestAbortError(): DOMException {
+	return new DOMException('Request aborted', 'AbortError');
+}
+
+function removeOnlineListener(): void {
+	if (!onlineListenerActive) return;
+	window.removeEventListener('online', resolveOnlineWaiters);
+	onlineListenerActive = false;
+}
+
+function releaseOnlineWaiter(waiter: OnlineWaiter): boolean {
+	if (!onlineWaiters.delete(waiter)) return false;
+	waiter.signal?.removeEventListener('abort', waiter.onAbort);
+	if (onlineWaiters.size === 0) removeOnlineListener();
+	return true;
+}
+
+function resolveOnlineWaiters(): void {
+	const pending = Array.from(onlineWaiters);
+	onlineWaiters.clear();
+	removeOnlineListener();
+	for (const waiter of pending) {
+		waiter.signal?.removeEventListener('abort', waiter.onAbort);
+		waiter.resolve();
+	}
+}
+
+function waitUntilOnline(signal?: AbortSignal): Promise<void> {
+	if (signal?.aborted) return Promise.reject(createRequestAbortError());
+	if (navigator.onLine) return Promise.resolve();
+	return new Promise<void>((resolve, reject) => {
+		const waiter: OnlineWaiter = {
+			resolve,
+			signal,
+			onAbort: () => {
+				if (releaseOnlineWaiter(waiter)) reject(createRequestAbortError());
+			},
+		};
+		onlineWaiters.add(waiter);
+		if (signal) signal.addEventListener('abort', waiter.onAbort, {once: true});
+		if (!onlineListenerActive) {
+			window.addEventListener('online', resolveOnlineWaiters);
+			onlineListenerActive = true;
+		}
+		if (navigator.onLine) queueMicrotask(resolveOnlineWaiters);
+	});
+}
+
 export class RestClient {
 	private readonly state: RuntimeState = {
 		baseUrl: '/api',
@@ -108,6 +170,10 @@ export class RestClient {
 	installHooks(hooks: RestClientHooks): void {
 		this.state.prepare = hooks.prepareRequest;
 		this.state.globalIntercept = hooks.intercept;
+	}
+
+	carriesAuthorization(): boolean {
+		return !isOffOrigin(resolveUrl(this.state, '/', undefined));
 	}
 
 	dispatch<T = unknown>(method: HttpMethod, path: string, options: RestRequestOptions = {}): Promise<RestResponse<T>> {
@@ -216,6 +282,7 @@ async function runRetryLoop<T>(
 	attempt: number,
 ): Promise<RestResponse<T>> {
 	const plan = composePlan(state, method, path, options, sudoApplied);
+	if (plan.retries > 0) await waitUntilOnline(plan.signal);
 	const pacingHit = consultPacing(state.pacing, plan.rateLimitKey);
 	if (pacingHit) {
 		if (plan.mode === 'auto-retry') {
@@ -240,7 +307,11 @@ async function runRetryLoop<T>(
 				return finalizeAfterRetriesExhausted<T>(state, plan, outcome);
 			}
 			const wait = decision.mode === 'backoff' ? computeBackoffMs(attempt) : decision.delayMs;
-			await delay(wait, plan.signal);
+			if (outcome.status === 'transport-error' && !navigator.onLine) {
+				await waitUntilOnline(plan.signal);
+			} else {
+				await delay(wait, plan.signal);
+			}
 			return runRetryLoop<T>(state, method, path, options, sudoApplied, attempt + 1);
 		}
 		case 'fail':
@@ -257,7 +328,12 @@ function composePlan(
 ): Plan {
 	const url = resolveUrl(state, path, options.query);
 	const body = encodeBody(options);
-	const sameOrigin = !looksAbsolute(path) && !isOffOrigin(url);
+	const targetsApiBase = !looksAbsolute(path);
+	const apiOrigin = targetsApiBase ? originOf(url) : null;
+	const sameOrigin = targetsApiBase && (apiOrigin === null || apiOrigin === window.location.origin);
+	if (apiOrigin !== null && !sameOrigin) {
+		reportStrippedAuthorization(state, apiOrigin, options.auth);
+	}
 	const headers = assembleHeaders({
 		state,
 		callerHeaders: options.headers,
@@ -303,12 +379,24 @@ function looksAbsolute(path: string): boolean {
 	return path.startsWith('//') || /^[a-z][a-z0-9+.-]*:\/\//i.test(path);
 }
 
-function isOffOrigin(url: string): boolean {
+function originOf(url: string): string | null {
 	try {
-		return new URL(url).origin !== window.location.origin;
+		return new URL(url).origin;
 	} catch {
-		return false;
+		return null;
 	}
+}
+
+function isOffOrigin(url: string): boolean {
+	const origin = originOf(url);
+	return origin !== null && origin !== window.location.origin;
+}
+
+function reportStrippedAuthorization(state: RuntimeState, apiOrigin: string, auth: RestAuthMode | undefined): void {
+	if (auth === 'none' || strippedAuthorizationOrigins.has(apiOrigin)) return;
+	if (!state.authProvider()) return;
+	strippedAuthorizationOrigins.add(apiOrigin);
+	log.warn(`authorization withheld from off-origin api base: ${apiOrigin} (page ${window.location.origin})`);
 }
 
 function encodeBody(options: RestRequestOptions): BodyShape {
@@ -442,7 +530,7 @@ function synthesizePacingReply<T>(_plan: Plan, hit: {until: number; note?: strin
 		'content-type': 'application/json',
 	};
 	const payload = {
-		message: hit.note ?? 'You are being rate limited.',
+		message: hit.note ?? i18n._(TOO_MANY_REQUESTS_DESCRIPTOR),
 		retry_after: remaining / 1000,
 		global: false,
 	};

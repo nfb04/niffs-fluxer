@@ -1,17 +1,27 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import crypto from 'node:crypto';
+import {createTestAccount, type TestAccount} from '@app/api/auth/tests/AuthTestUtils';
+import {createUserID} from '@app/api/BrandedTypes';
+import {Config} from '@app/api/Config';
+import {setupSyncStripeWebhookWorker} from '@app/api/stripe/tests/StripeWebhookTestUtils';
+import {type ApiTestHarness, createApiTestHarness} from '@app/api/test/ApiTestHarness';
+import {
+	createMockWebhookPayload,
+	createStripeApiHandlers,
+	type StripeWebhookEventData,
+} from '@app/api/test/msw/handlers/StripeApiHandlers';
+import {server} from '@app/api/test/msw/server';
+import {createBuilder} from '@app/api/test/TestRequestBuilder';
+import {UserRepository} from '@app/api/user/repositories/UserRepository';
 import {APIErrorCodes} from '@fluxer/constants/src/ApiErrorCodes';
+import {PremiumFlags} from '@fluxer/constants/src/UserConstants';
 import type {
 	SelfServeRefundEligibilityResponse,
 	SelfServeRefundResponse,
 } from '@fluxer/schema/src/domains/premium/PremiumSchemas';
 import {HttpResponse, http} from 'msw';
 import {afterAll, afterEach, beforeAll, beforeEach, describe, expect, test} from 'vitest';
-import {createTestAccount, type TestAccount} from '../../auth/tests/AuthTestUtils';
-import {type ApiTestHarness, createApiTestHarness} from '../../test/ApiTestHarness';
-import {createStripeApiHandlers} from '../../test/msw/handlers/StripeApiHandlers';
-import {server} from '../../test/msw/server';
-import {createBuilder} from '../../test/TestRequestBuilder';
 
 const MOCK_CUSTOMER_ID = 'cus_self_serve_refund';
 const MOCK_SUBSCRIPTION_ID = 'sub_self_serve_refund';
@@ -22,7 +32,7 @@ interface MockStripeInvoice {
 	id: string;
 	object: 'invoice';
 	customer: string;
-	subscription: string | null;
+	parent: {subscription_details: {subscription: string}} | null;
 	amount_due: number;
 	amount_paid: number;
 	currency: string;
@@ -66,7 +76,7 @@ function buildInvoice(opts: {
 		id: opts.id,
 		object: 'invoice',
 		customer: customerId,
-		subscription: subscriptionId,
+		parent: subscriptionId == null ? null : {subscription_details: {subscription: subscriptionId}},
 		amount_due: 2500,
 		amount_paid: 2500,
 		currency: 'usd',
@@ -105,18 +115,31 @@ function invoiceListHandler(invoices: ReadonlyArray<MockStripeInvoice>) {
 	});
 }
 
-function refundCreateHandler() {
+function refundCreateHandler(opts?: {
+	refundId?: string;
+	status?: 'succeeded' | 'pending' | 'failed';
+	failureReason?: string;
+	onRequest?: (idempotencyKey: string | null) => void;
+}) {
 	return http.post(`${STRIPE_API_BASE}/v1/refunds`, async ({request}) => {
+		opts?.onRequest?.(request.headers.get('idempotency-key'));
 		const formData = await request.formData();
 		const params = Object.fromEntries(formData.entries());
+		const metadata: Record<string, string> = {};
+		for (const [key, value] of Object.entries(params)) {
+			const match = key.match(/^metadata\[(.+)\]$/);
+			if (match) metadata[match[1]] = value as string;
+		}
 		return HttpResponse.json({
-			id: 're_test_self_serve',
+			id: opts?.refundId ?? 're_test_self_serve',
 			object: 'refund',
 			amount: Number.parseInt((params.amount as string) ?? '0', 10),
 			currency: 'usd',
-			status: 'succeeded',
+			status: opts?.status ?? 'succeeded',
+			failure_reason: opts?.failureReason ?? null,
 			payment_intent: params.payment_intent ?? null,
 			charge: params.charge ?? null,
+			metadata,
 		});
 	});
 }
@@ -143,7 +166,27 @@ describe('StripeRefundService self-serve refund', () => {
 	let harness: ApiTestHarness;
 	beforeAll(async () => {
 		harness = await createApiTestHarness();
+		setupSyncStripeWebhookWorker();
 	});
+	function createWebhookSignature(payload: string, timestamp: number, secret: string): string {
+		const signedPayload = `${timestamp}.${payload}`;
+		const signature = crypto.createHmac('sha256', secret).update(signedPayload).digest('hex');
+		return `t=${timestamp},v1=${signature}`;
+	}
+	async function sendWebhook(eventData: StripeWebhookEventData): Promise<{
+		received: boolean;
+	}> {
+		const {payload, timestamp} = createMockWebhookPayload(eventData);
+		const signature = createWebhookSignature(payload, timestamp, Config.stripe.webhookSecret!);
+		return createBuilder<{
+			received: boolean;
+		}>(harness, '')
+			.post('/stripe/webhook')
+			.header('stripe-signature', signature)
+			.header('content-type', 'application/json')
+			.body(payload)
+			.execute();
+	}
 	beforeEach(async () => {
 		await harness.reset();
 	});
@@ -225,6 +268,22 @@ describe('StripeRefundService self-serve refund', () => {
 			expect(response.refunded_amount_cents).toBe(2500);
 			expect(response.subscription_id).toBeNull();
 		});
+		test('requests one cent under the captured amount when the underlying charge was paid via PIX', async () => {
+			server.use(
+				...createStripeApiHandlers({charges: {ch_in_recent: {payment_method_details: {type: 'pix'}}}}).handlers,
+			);
+			server.use(
+				invoiceListHandler([buildInvoice({id: 'in_recent', paidAtSecondsAgo: SECONDS_PER_DAY, subscriptionId: null})]),
+				refundCreateHandler(),
+			);
+			const account = await createTestAccount(harness);
+			await setStripeIds(harness, account, {stripe_customer_id: MOCK_CUSTOMER_ID});
+			const response = await createBuilder<SelfServeRefundResponse>(harness, account.token)
+				.post('/premium/refund-latest')
+				.execute();
+			expect(response.invoice_amount_paid_cents).toBe(2500);
+			expect(response.refunded_amount_cents).toBe(2499);
+		});
 		test('refunds latest invoice and cancels subscription when present', async () => {
 			server.use(...createStripeApiHandlers().handlers);
 			server.use(
@@ -273,6 +332,159 @@ describe('StripeRefundService self-serve refund', () => {
 				.post('/premium/refund-latest')
 				.expect(400, APIErrorCodes.STRIPE_NO_PURCHASE_HISTORY)
 				.execute();
+		});
+		test('does not finalize cooldown or cancel the subscription while the refund is still pending at the provider', async () => {
+			server.use(...createStripeApiHandlers().handlers);
+			server.use(
+				invoiceListHandler([buildInvoice({id: 'in_recent', paidAtSecondsAgo: SECONDS_PER_DAY})]),
+				refundCreateHandler({status: 'pending'}),
+			);
+			const account = await createTestAccount(harness);
+			await setStripeIds(harness, account, {
+				stripe_customer_id: MOCK_CUSTOMER_ID,
+				stripe_subscription_id: MOCK_SUBSCRIPTION_ID,
+			});
+			const response = await createBuilder<SelfServeRefundResponse>(harness, account.token)
+				.post('/premium/refund-latest')
+				.execute();
+			expect(response.status).toBe('pending');
+			expect(response.refunded_amount_cents).toBe(0);
+			expect(response.subscription_id).toBeNull();
+			const {UserRepository} = await import('@app/api/user/repositories/UserRepository');
+			const updatedUser = await new UserRepository().findUnique(createUserID(BigInt(account.userId)));
+			expect(updatedUser!.firstRefundAt).toBeNull();
+		});
+		test('does not finalize cooldown or cancel the subscription when the refund fails at the provider', async () => {
+			server.use(...createStripeApiHandlers().handlers);
+			server.use(
+				invoiceListHandler([buildInvoice({id: 'in_recent', paidAtSecondsAgo: SECONDS_PER_DAY})]),
+				refundCreateHandler({status: 'failed', failureReason: 'unknown'}),
+			);
+			const account = await createTestAccount(harness);
+			await setStripeIds(harness, account, {
+				stripe_customer_id: MOCK_CUSTOMER_ID,
+				stripe_subscription_id: MOCK_SUBSCRIPTION_ID,
+			});
+			const response = await createBuilder<SelfServeRefundResponse>(harness, account.token)
+				.post('/premium/refund-latest')
+				.execute();
+			expect(response.status).toBe('failed');
+			expect(response.refunded_amount_cents).toBe(0);
+			expect(response.subscription_id).toBeNull();
+			const {UserRepository} = await import('@app/api/user/repositories/UserRepository');
+			const updatedUser = await new UserRepository().findUnique(createUserID(BigInt(account.userId)));
+			expect(updatedUser!.firstRefundAt).toBeNull();
+		});
+		test('counts one self-serve refund once even when charge.refunded arrives afterwards and is retried', async () => {
+			server.use(...createStripeApiHandlers().handlers);
+			const invoice = buildInvoice({
+				id: 'in_cross_path',
+				paidAtSecondsAgo: SECONDS_PER_DAY,
+				subscriptionId: null,
+			});
+			server.use(invoiceListHandler([invoice]), refundCreateHandler({refundId: 're_cross_path'}));
+			const account = await createTestAccount(harness);
+			const userId = createUserID(BigInt(account.userId));
+			await setStripeIds(harness, account, {stripe_customer_id: MOCK_CUSTOMER_ID});
+			const response = await createBuilder<SelfServeRefundResponse>(harness, account.token)
+				.post('/premium/refund-latest')
+				.execute();
+			expect(response.refund_id).toBe('re_cross_path');
+			expect(response.status).toBe('succeeded');
+			const userRepository = new UserRepository();
+			const afterSelfServe = await userRepository.findUnique(userId);
+			expect(afterSelfServe!.firstRefundAt).not.toBeNull();
+			expect(afterSelfServe!.premiumFlags & PremiumFlags.PURCHASE_DISABLED).toBe(0);
+			const chargeEvent = {
+				type: 'charge.refunded' as const,
+				data: {
+					object: {
+						id: invoice.chargeId,
+						payment_intent: invoice.paymentIntentId,
+						customer: MOCK_CUSTOMER_ID,
+						amount_refunded: 2500,
+						refunds: {
+							object: 'list',
+							has_more: false,
+							url: `/v1/charges/${invoice.chargeId}/refunds`,
+							data: [
+								{
+									id: 're_cross_path',
+									object: 'refund',
+									charge: invoice.chargeId,
+									payment_intent: invoice.paymentIntentId,
+									amount: 2500,
+									currency: 'usd',
+									status: 'succeeded',
+									created: Math.floor(Date.now() / 1000),
+									metadata: {
+										refund_kind: 'self_serve',
+										user_id: account.userId,
+										invoice_id: invoice.id,
+									},
+								},
+							],
+						},
+					},
+				},
+			};
+			await sendWebhook({...chargeEvent, id: 'evt_cross_path_1'});
+			await sendWebhook({...chargeEvent, id: 'evt_cross_path_2'});
+			const afterWebhook = await userRepository.findUnique(userId);
+			expect(afterWebhook!.firstRefundAt!.getTime()).toBe(afterSelfServe!.firstRefundAt!.getTime());
+			expect(afterWebhook!.premiumFlags & PremiumFlags.PURCHASE_DISABLED).toBe(0);
+		});
+		test('counts one self-serve refund once even when refund.updated confirms it after the endpoint already did', async () => {
+			server.use(...createStripeApiHandlers().handlers);
+			const invoice = buildInvoice({
+				id: 'in_double_confirm',
+				paidAtSecondsAgo: SECONDS_PER_DAY,
+				subscriptionId: null,
+			});
+			server.use(invoiceListHandler([invoice]), refundCreateHandler({refundId: 're_double_confirm'}));
+			const account = await createTestAccount(harness);
+			const userId = createUserID(BigInt(account.userId));
+			await setStripeIds(harness, account, {stripe_customer_id: MOCK_CUSTOMER_ID});
+			await createBuilder<SelfServeRefundResponse>(harness, account.token).post('/premium/refund-latest').execute();
+			const userRepository = new UserRepository();
+			const afterSelfServe = await userRepository.findUnique(userId);
+			expect(afterSelfServe!.firstRefundAt).not.toBeNull();
+			await sendWebhook({
+				id: 'evt_double_confirm_1',
+				type: 'refund.updated',
+				data: {
+					object: {
+						id: 're_double_confirm',
+						object: 'refund',
+						status: 'succeeded',
+						amount: 2500,
+						currency: 'usd',
+						metadata: {
+							refund_kind: 'self_serve',
+							user_id: account.userId,
+							invoice_id: invoice.id,
+						},
+					},
+				},
+			});
+			const afterWebhook = await userRepository.findUnique(userId);
+			expect(afterWebhook!.firstRefundAt!.getTime()).toBe(afterSelfServe!.firstRefundAt!.getTime());
+			expect(afterWebhook!.premiumFlags & PremiumFlags.PURCHASE_DISABLED).toBe(0);
+		});
+		test('retries with a fresh idempotency key once a prior attempt has failed at the provider', async () => {
+			server.use(...createStripeApiHandlers().handlers);
+			server.use(invoiceListHandler([buildInvoice({id: 'in_recent', paidAtSecondsAgo: SECONDS_PER_DAY})]));
+			const account = await createTestAccount(harness);
+			await setStripeIds(harness, account, {stripe_customer_id: MOCK_CUSTOMER_ID});
+			const idempotencyKeys: Array<string | null> = [];
+			server.use(refundCreateHandler({status: 'failed', onRequest: (key) => idempotencyKeys.push(key)}));
+			await createBuilder<SelfServeRefundResponse>(harness, account.token).post('/premium/refund-latest').execute();
+			await createBuilder<SelfServeRefundResponse>(harness, account.token).post('/premium/refund-latest').execute();
+			expect(idempotencyKeys).toHaveLength(2);
+			expect(idempotencyKeys[0]).not.toBeNull();
+			expect(idempotencyKeys[1]).not.toBeNull();
+			expect(idempotencyKeys[1]).not.toBe(idempotencyKeys[0]);
+			expect(idempotencyKeys[1]).toContain('retry-1');
 		});
 	});
 });

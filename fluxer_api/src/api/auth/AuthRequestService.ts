@@ -1,5 +1,24 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import type {ApiContext} from '@app/api/ApiContext';
+import * as AuthEmail from '@app/api/auth/AuthEmail';
+import * as AuthEmailRevert from '@app/api/auth/AuthEmailRevert';
+import * as AuthLogin from '@app/api/auth/AuthLogin';
+import * as AuthMfa from '@app/api/auth/AuthMfa';
+import * as AuthPassword from '@app/api/auth/AuthPassword';
+import * as AuthRegistration from '@app/api/auth/AuthRegistration';
+import * as AuthSession from '@app/api/auth/AuthSession';
+import type {DesktopHandoffService} from '@app/api/auth/services/DesktopHandoffService';
+import type {SsoService} from '@app/api/auth/services/SsoService';
+import {createUserID, type UserID} from '@app/api/BrandedTypes';
+import type {RequestCache} from '@app/api/middleware/RequestCacheMiddleware';
+import {getInstanceConfigRepository} from '@app/api/middleware/ServiceSingletons';
+import type {User} from '@app/api/models/User';
+import {mapUserToPartialResponse} from '@app/api/user/UserMappers';
+import {lookupGeoip} from '@app/api/utils/IpUtils';
+import {parseJsonRecord} from '@app/api/utils/JsonBoundaryUtils';
+import {resolveSessionClientInfo} from '@app/api/utils/SessionClientIdentity';
+import {generateUsernameSuggestions} from '@app/api/utils/UsernameSuggestionUtils';
 import {ValidationErrorCodes} from '@fluxer/constants/src/ValidationErrorCodes';
 import {InputValidationError} from '@fluxer/errors/src/domains/core/InputValidationError';
 import {UnauthorizedError} from '@fluxer/errors/src/domains/core/UnauthorizedError';
@@ -30,24 +49,6 @@ import type {
 	WebAuthnMfaRequest,
 } from '@fluxer/schema/src/domains/auth/AuthSchemas';
 import type {UserPartialResponse} from '@fluxer/schema/src/domains/user/UserResponseSchemas';
-import type {ApiContext} from '../ApiContext';
-import {createUserID, type UserID} from '../BrandedTypes';
-import type {RequestCache} from '../middleware/RequestCacheMiddleware';
-import type {User} from '../models/User';
-import {mapUserToPartialResponse} from '../user/UserMappers';
-import {lookupGeoip} from '../utils/IpUtils';
-import {parseJsonRecord} from '../utils/JsonBoundaryUtils';
-import {resolveSessionClientInfo} from '../utils/UserAgentUtils';
-import {generateUsernameSuggestions} from '../utils/UsernameSuggestionUtils';
-import * as AuthEmail from './AuthEmail';
-import * as AuthEmailRevert from './AuthEmailRevert';
-import * as AuthLogin from './AuthLogin';
-import * as AuthMfa from './AuthMfa';
-import * as AuthPassword from './AuthPassword';
-import * as AuthRegistration from './AuthRegistration';
-import * as AuthSession from './AuthSession';
-import type {DesktopHandoffService} from './services/DesktopHandoffService';
-import type {SsoService} from './services/SsoService';
 
 interface AuthRegisterRequest {
 	data: RegisterRequest;
@@ -83,13 +84,11 @@ interface AuthLoginMfaRequest {
 }
 
 interface AuthLogoutRequest {
-	authorizationHeader?: string;
 	authToken?: string;
 }
 
 interface AuthHandoffCompleteRequest {
 	data: HandoffCompleteRequest;
-	request: Request;
 	clientIp: string;
 	authToken?: string;
 }
@@ -122,9 +121,7 @@ interface AuthLogoutAuthSessionsRequest {
 }
 
 interface AuthHandoffInitiateRequest {
-	userAgent?: string;
-	clientIp: string;
-	clientPlatform?: string;
+	request: Request;
 }
 
 interface AuthHandoffInfoRequest {
@@ -135,6 +132,12 @@ interface AuthHandoffInfoRequest {
 interface AuthHandoffStatusRequest {
 	code: string;
 	clientIp: string;
+	pollSecret?: string;
+}
+
+interface AuthHandoffCancelRequest {
+	code: string;
+	pollSecret: string;
 }
 
 export class AuthRequestService {
@@ -183,10 +186,9 @@ export class AuthRequestService {
 		return await this.toAuthTokenResponse(result);
 	}
 
-	async logout({authorizationHeader, authToken}: AuthLogoutRequest): Promise<void> {
-		const token = authorizationHeader ?? authToken;
-		if (token) {
-			await AuthSession.revokeToken(this.apiContext, token);
+	async logout({authToken}: AuthLogoutRequest): Promise<void> {
+		if (authToken) {
+			await AuthSession.revokeToken(this.apiContext, authToken);
 		}
 	}
 
@@ -226,8 +228,8 @@ export class AuthRequestService {
 		return await this.toAuthLoginResponse(result);
 	}
 
-	getAuthSessions(userId: UserID): Promise<AuthSessionsResponse> {
-		return AuthSession.getAuthSessions(this.apiContext, userId);
+	getAuthSessions(userId: UserID, currentSessionIdHash?: Uint8Array): Promise<AuthSessionsResponse> {
+		return AuthSession.getAuthSessions(this.apiContext, userId, currentSessionIdHash);
 	}
 
 	async logoutAuthSessions({user, data}: AuthLogoutAuthSessionsRequest): Promise<void> {
@@ -263,7 +265,7 @@ export class AuthRequestService {
 				user: await this.getUserPartial(parsed.user_id),
 			};
 		}
-		const ticketPayload = await cache.get(`ip-auth-ticket:${ticket}`);
+		const ticketPayload = await cache.get(AuthLogin.getTicketCacheKey(ticket));
 		if (!ticketPayload) {
 			throw InputValidationError.fromCode('ticket', ValidationErrorCodes.INVALID_OR_EXPIRED_AUTHORIZATION_TICKET);
 		}
@@ -276,7 +278,10 @@ export class AuthRequestService {
 
 	async authenticateWebAuthnDiscoverable({data, request}: AuthWebAuthnAuthenticateRequest) {
 		const user = await AuthMfa.verifyWebAuthnAuthenticationDiscoverable(this.apiContext, data.response, data.challenge);
-		const [token] = await AuthSession.createAuthSession(this.apiContext, {user, request});
+		const [token] = await AuthSession.createAuthSession(this.apiContext, {
+			user,
+			origin: AuthSession.resolveSessionOrigin(this.apiContext, request),
+		});
 		return {token, user_id: user.id.toString(), user: mapUserToPartialResponse(user)};
 	}
 
@@ -298,33 +303,34 @@ export class AuthRequestService {
 		return {suggestions: generateUsernameSuggestions(globalName)};
 	}
 
-	async initiateHandoff({
-		userAgent,
-		clientIp,
-		clientPlatform,
-	}: AuthHandoffInitiateRequest): Promise<HandoffInitiateResponse> {
-		const result = await this.desktopHandoffService.initiateHandoff({userAgent, clientIp, clientPlatform});
+	async initiateHandoff({request}: AuthHandoffInitiateRequest): Promise<HandoffInitiateResponse> {
+		const origin = AuthSession.resolveSessionOrigin(this.apiContext, request);
+		const result = await this.desktopHandoffService.initiateHandoff({origin});
 		return {
 			code: result.code,
 			expires_at: result.expiresAt.toISOString(),
+			poll_secret: result.pollSecret,
 		};
 	}
 
 	async getHandoffInfo({code, clientIp}: AuthHandoffInfoRequest): Promise<HandoffInfoResponse> {
 		const info = await this.desktopHandoffService.getHandoffInfo(code, clientIp);
-		if (info.status === 'expired' || !info.clientIp) {
+		if (info.status === 'expired' || !info.origin) {
 			return {status: info.status, client_info: null};
 		}
-		const geo = await lookupGeoip(info.clientIp);
-		const {clientOs, clientPlatform} = resolveSessionClientInfo({
-			userAgent: info.userAgent ?? null,
-			isDesktopClient: info.clientPlatform === 'desktop',
+		const geo = await lookupGeoip(info.origin.ip);
+		const {branding} = await getInstanceConfigRepository().getAppPublicConfig();
+		const resolved = resolveSessionClientInfo({
+			userAgent: info.origin.userAgent,
+			reportedOs: info.origin.clientOs,
+			productName: branding.product_name,
 		});
 		return {
 			status: 'pending',
 			client_info: {
-				platform: clientPlatform,
-				os: clientOs,
+				platform: resolved.platform,
+				os: resolved.os,
+				device: resolved.device,
 				location: {
 					city: geo.city,
 					region: geo.region,
@@ -334,25 +340,25 @@ export class AuthRequestService {
 		};
 	}
 
-	async completeHandoff({data, request, clientIp, authToken}: AuthHandoffCompleteRequest): Promise<void> {
+	async completeHandoff({data, clientIp, authToken}: AuthHandoffCompleteRequest): Promise<void> {
 		const sessionToken = data.token ?? authToken;
 		if (!sessionToken) {
 			throw new UnauthorizedError();
 		}
 		await this.desktopHandoffService.completeHandoff(
 			data.code,
-			() =>
+			(origin) =>
 				AuthSession.createAdditionalAuthSessionFromToken(this.apiContext, {
 					token: sessionToken,
 					expectedUserId: data.user_id,
-					request,
+					origin,
 				}),
 			clientIp,
 		);
 	}
 
-	async getHandoffStatus({code, clientIp}: AuthHandoffStatusRequest): Promise<HandoffStatusResponse> {
-		const result = await this.desktopHandoffService.getHandoffStatus(code, clientIp);
+	async getHandoffStatus({code, clientIp, pollSecret}: AuthHandoffStatusRequest): Promise<HandoffStatusResponse> {
+		const result = await this.desktopHandoffService.getHandoffStatus(code, clientIp, pollSecret);
 		return {
 			status: result.status,
 			token: result.token,
@@ -361,8 +367,8 @@ export class AuthRequestService {
 		};
 	}
 
-	async cancelHandoff({code}: {code: string}): Promise<void> {
-		await this.desktopHandoffService.cancelHandoff(code);
+	async cancelHandoff({code, pollSecret}: AuthHandoffCancelRequest): Promise<void> {
+		await this.desktopHandoffService.cancelHandoff(code, pollSecret);
 	}
 
 	private async getUserPartial(userId: string): Promise<UserPartialResponse> {

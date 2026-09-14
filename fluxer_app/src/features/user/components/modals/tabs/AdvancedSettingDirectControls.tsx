@@ -3,6 +3,7 @@
 import {
 	MiddleClickAutoscrollControl,
 	SmoothScrollingControl,
+	StayInteractiveUnfocusedControl,
 	TextSelectionControl,
 	VideoSeekThumbnailsControl,
 } from '@app/features/user/components/modals/tabs/advanced_settings_tab/AdvancedAccessibilityControls';
@@ -19,6 +20,7 @@ import {
 	ExpressionAutocompleteControl,
 	HideMutedChannelsByDefaultControl,
 	InputButtonsControl,
+	KeepAttachmentsOnEmptyEditAdvancedControl,
 	MediaButtonsControl,
 	MessageActionBarControl,
 	PreuploadMessageAttachmentsControl,
@@ -34,17 +36,19 @@ import {
 } from '@app/features/user/components/modals/tabs/advanced_settings_tab/AdvancedChatControls';
 import {DeveloperModeControl} from '@app/features/user/components/modals/tabs/advanced_settings_tab/AdvancedClientDeveloperControls';
 import {
-	FirstClickPassThroughControl,
 	HardwareAccelerationControl,
 	NativeTitleBarControl,
-	StayInteractiveUnfocusedControl,
 } from '@app/features/user/components/modals/tabs/advanced_settings_tab/AdvancedDesktopControls';
-import {UnreadBadgeCustomizationControl} from '@app/features/user/components/modals/tabs/advanced_settings_tab/AdvancedExperimentalControls';
 import {
-	EmulatedDecodeCodecCapControl,
+	ExpressionCloneShortcutsControl,
+	UnreadBadgeCustomizationControl,
+} from '@app/features/user/components/modals/tabs/advanced_settings_tab/AdvancedExperimentalControls';
+import {
 	OpenH264Control,
+	ScreenShareAv1OptInControl,
 	ScreenShareCodecControl,
 	ScreenShareEncoderControls,
+	ScreenShareHevcOptInControl,
 	ScreenSharePreviewBehaviorControl,
 } from '@app/features/user/components/modals/tabs/advanced_settings_tab/AdvancedVideoControls';
 import {
@@ -76,6 +80,7 @@ export const DIRECT_CONTROL_ITEM_IDS = new Set([
 	'chat-settings-expression-autocomplete',
 	'chat-settings-input-buttons',
 	'chat-settings-convert-emoticons',
+	'chat-settings-keep-attachments-on-empty-edit',
 	'chat-settings-preupload-attachments',
 	'chat-settings-sequential-file-send',
 	'chat-settings-scroll-to-bottom-on-send',
@@ -84,21 +89,21 @@ export const DIRECT_CONTROL_ITEM_IDS = new Set([
 	'voice-video-new-device-alerts',
 	'voice-video-connection-volume-controls',
 	'voice-video-screen-share-codec',
-	'voice-video-emulated-decode-codec-cap',
+	'voice-video-screen-share-av1-opt-in',
+	'voice-video-screen-share-hevc-opt-in',
 	'voice-video-openh264-codec',
 	'voice-video-screen-share-preview-behavior',
 	'voice-video-screen-share-encoder-controls',
 	'advanced-unread-badge-customization',
+	'advanced-expression-clone-shortcuts',
 	'client-developer-mode',
-	'advanced-stay-interactive-unfocused',
-	'first-click-pass-through',
+	'accessibility-stay-interactive-unfocused',
 	'advanced-native-title-bar',
 	'advanced-hardware-acceleration',
 ]);
 
 export const FULL_WIDTH_CONTROL_ITEM_IDS = new Set([
 	'appearance-voice-channel-join-behavior',
-	'voice-video-screen-share-codec',
 	'voice-video-screen-share-preview-behavior',
 ]);
 
@@ -116,6 +121,7 @@ export const COMPACT_SWITCH_CONTROL_ITEM_IDS = new Set([
 	'chat-settings-strip-tracking',
 	'chat-settings-trust-domains',
 	'chat-settings-convert-emoticons',
+	'chat-settings-keep-attachments-on-empty-edit',
 	'chat-settings-preupload-attachments',
 	'chat-settings-sequential-file-send',
 	'chat-settings-scroll-to-bottom-on-send',
@@ -124,10 +130,12 @@ export const COMPACT_SWITCH_CONTROL_ITEM_IDS = new Set([
 	'voice-video-new-device-alerts',
 	'voice-video-connection-volume-controls',
 	'voice-video-openh264-codec',
+	'voice-video-screen-share-av1-opt-in',
+	'voice-video-screen-share-hevc-opt-in',
 	'advanced-unread-badge-customization',
+	'advanced-expression-clone-shortcuts',
 	'client-developer-mode',
-	'advanced-stay-interactive-unfocused',
-	'first-click-pass-through',
+	'accessibility-stay-interactive-unfocused',
 	'advanced-native-title-bar',
 	'advanced-hardware-acceleration',
 ]);
@@ -239,6 +247,10 @@ export const AdvancedSettingControl = observer(({item}: {item: SearchableSetting
 			return (
 				<ConvertEmoticonsAdvancedControl data-flx="user.advanced-setting-direct-controls.advanced-setting-control.convert-emoticons-advanced-control" />
 			);
+		case 'chat-settings-keep-attachments-on-empty-edit':
+			return (
+				<KeepAttachmentsOnEmptyEditAdvancedControl data-flx="user.advanced-setting-direct-controls.advanced-setting-control.keep-attachments-on-empty-edit-advanced-control" />
+			);
 		case 'chat-settings-preupload-attachments':
 			return (
 				<PreuploadMessageAttachmentsControl data-flx="user.advanced-setting-direct-controls.advanced-setting-control.preupload-message-attachments-control" />
@@ -271,9 +283,13 @@ export const AdvancedSettingControl = observer(({item}: {item: SearchableSetting
 			return (
 				<ScreenShareCodecControl data-flx="user.advanced-setting-direct-controls.advanced-setting-control.screen-share-codec-control" />
 			);
-		case 'voice-video-emulated-decode-codec-cap':
+		case 'voice-video-screen-share-av1-opt-in':
 			return (
-				<EmulatedDecodeCodecCapControl data-flx="user.advanced-setting-direct-controls.advanced-setting-control.emulated-decode-codec-cap-control" />
+				<ScreenShareAv1OptInControl data-flx="user.advanced-setting-direct-controls.advanced-setting-control.screen-share-av1-opt-in-control" />
+			);
+		case 'voice-video-screen-share-hevc-opt-in':
+			return (
+				<ScreenShareHevcOptInControl data-flx="user.advanced-setting-direct-controls.advanced-setting-control.screen-share-hevc-opt-in-control" />
 			);
 		case 'voice-video-openh264-codec':
 			return (
@@ -294,17 +310,17 @@ export const AdvancedSettingControl = observer(({item}: {item: SearchableSetting
 			return (
 				<UnreadBadgeCustomizationControl data-flx="user.advanced-setting-direct-controls.advanced-setting-control.unread-badge-customization-control" />
 			);
+		case 'advanced-expression-clone-shortcuts':
+			return (
+				<ExpressionCloneShortcutsControl data-flx="user.advanced-setting-direct-controls.advanced-setting-control.expression-clone-shortcuts-control" />
+			);
 		case 'client-developer-mode':
 			return (
 				<DeveloperModeControl data-flx="user.advanced-setting-direct-controls.advanced-setting-control.developer-mode-control" />
 			);
-		case 'advanced-stay-interactive-unfocused':
+		case 'accessibility-stay-interactive-unfocused':
 			return (
 				<StayInteractiveUnfocusedControl data-flx="user.advanced-setting-direct-controls.advanced-setting-control.stay-interactive-unfocused-control" />
-			);
-		case 'first-click-pass-through':
-			return (
-				<FirstClickPassThroughControl data-flx="user.advanced-setting-direct-controls.advanced-setting-control.first-click-pass-through-control" />
 			);
 		case 'advanced-native-title-bar':
 			return (

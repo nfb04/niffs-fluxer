@@ -25,6 +25,7 @@ import {formatFileSize} from '@app/features/messaging/utils/FileUtils';
 import Permission from '@app/features/permissions/state/Permission';
 import {Logger} from '@app/features/platform/utils/AppLogger';
 import {failureValidationErrors} from '@app/features/platform/utils/ResponseInspection';
+import {remFromPx} from '@app/features/theme/layout/RemFromPx';
 import * as ModalCommands from '@app/features/ui/commands/ModalCommands';
 import {modal} from '@app/features/ui/commands/ModalCommands';
 import {Input} from '@app/features/ui/components/form/FormInput';
@@ -178,7 +179,7 @@ const GuildEmojiTab: React.FC<{guildId: string}> = observer(function GuildEmojiT
 	}, [filteredEmojis]);
 	const maxEmojis = guild?.maxEmojis ?? MAX_GUILD_EMOJIS;
 	const currentEmojiCount = emojis.length;
-	const emojiMaxSizeLabel = formatFileSize(GlobalLimits.getEmojiMaxSize());
+	const emojiMaxSizeLabel = formatFileSize(i18n.locale, GlobalLimits.getEmojiMaxSize());
 	const canModifyEmoji = useCallback(
 		(emoji: GuildEmojiWithUser): boolean => {
 			if (canManageExpressions) return true;
@@ -291,7 +292,7 @@ const GuildEmojiTab: React.FC<{guildId: string}> = observer(function GuildEmojiT
 			const preparedEmojis: Array<{name: string; image: string; file: File}> = [];
 			const preparationFailures: Array<EmojiUploadFailure> = [];
 			const maxEmojiSize = GlobalLimits.getEmojiMaxSize();
-			const maxEmojiSizeLabel = formatFileSize(maxEmojiSize);
+			const maxEmojiSizeLabel = formatFileSize(i18n.locale, maxEmojiSize);
 			for (const file of filesWithinSlots) {
 				try {
 					const base64Image = await ImageCropUtils.optimizeEmojiImage(file, maxEmojiSize, 128);
@@ -306,7 +307,7 @@ const GuildEmojiTab: React.FC<{guildId: string}> = observer(function GuildEmojiT
 										? EMOJI_PROCESSED_FILE_TOO_LARGE_DESCRIPTOR
 										: EMOJI_SOURCE_FILE_TOO_LARGE_DESCRIPTOR,
 									{
-										fileSize: formatFileSize(error.actualSizeBytes),
+										fileSize: formatFileSize(i18n.locale, error.actualSizeBytes),
 										maxSize: maxEmojiSizeLabel,
 									},
 								)
@@ -423,7 +424,7 @@ const GuildEmojiTab: React.FC<{guildId: string}> = observer(function GuildEmojiT
 					onChange={(e) => setSearchQuery(e.target.value)}
 					leftIcon={
 						<MagnifyingGlassIcon
-							size={16}
+							size={remFromPx(16)}
 							weight="bold"
 							data-flx="guild.guild-tabs.guild-emoji-tab.magnifying-glass-icon"
 						/>
@@ -436,7 +437,7 @@ const GuildEmojiTab: React.FC<{guildId: string}> = observer(function GuildEmojiT
 				<div className={styles.notice} data-flx="guild.guild-tabs.guild-emoji-tab.notice">
 					<p className={styles.noticeText} data-flx="guild.guild-tabs.guild-emoji-tab.notice-text">
 						<WarningCircleIcon
-							size={32}
+							size={remFromPx(32)}
 							weight="fill"
 							data-flx="guild.guild-tabs.guild-emoji-tab.warning-circle-icon"
 						/>

@@ -4,6 +4,7 @@ import * as Modal from '@app/features/app/components/dialogs/Modal';
 import {useCursorAtEnd} from '@app/features/app/hooks/useCursorAtEnd';
 import Guilds from '@app/features/guild/state/Guilds';
 import {CANCEL_DESCRIPTOR, FOLDER_SETTINGS_DESCRIPTOR} from '@app/features/i18n/utils/CommonMessageDescriptors';
+import {remFromPx} from '@app/features/theme/layout/RemFromPx';
 import {Button} from '@app/features/ui/button/Button';
 import * as ModalCommands from '@app/features/ui/commands/ModalCommands';
 import {ColorPickerField} from '@app/features/ui/components/form/ColorPickerField';
@@ -31,6 +32,7 @@ import {
 	ShieldIcon,
 	StarIcon,
 } from '@phosphor-icons/react';
+import {formatListWithConfig} from '@pkgs/list_utils/src/ListFormatting';
 import {observer} from 'mobx-react-lite';
 import type {ReactNode} from 'react';
 import {useCallback, useMemo, useState} from 'react';
@@ -92,23 +94,33 @@ const SAVE_DESCRIPTOR = msg({
 });
 const FOLDER_ICON_MAP: Record<GuildFolderIcon, ReactNode> = {
 	[GuildFolderIcons.FOLDER]: (
-		<FolderIcon weight="fill" size={18} data-flx="guild.guild-folder-settings-modal.folder-icon" />
+		<FolderIcon weight="fill" size={remFromPx(18)} data-flx="guild.guild-folder-settings-modal.folder-icon" />
 	),
-	[GuildFolderIcons.STAR]: <StarIcon weight="fill" size={18} data-flx="guild.guild-folder-settings-modal.star-icon" />,
+	[GuildFolderIcons.STAR]: (
+		<StarIcon weight="fill" size={remFromPx(18)} data-flx="guild.guild-folder-settings-modal.star-icon" />
+	),
 	[GuildFolderIcons.HEART]: (
-		<HeartIcon weight="fill" size={18} data-flx="guild.guild-folder-settings-modal.heart-icon" />
+		<HeartIcon weight="fill" size={remFromPx(18)} data-flx="guild.guild-folder-settings-modal.heart-icon" />
 	),
 	[GuildFolderIcons.BOOKMARK]: (
-		<BookmarkSimpleIcon weight="fill" size={18} data-flx="guild.guild-folder-settings-modal.bookmark-simple-icon" />
+		<BookmarkSimpleIcon
+			weight="fill"
+			size={remFromPx(18)}
+			data-flx="guild.guild-folder-settings-modal.bookmark-simple-icon"
+		/>
 	),
 	[GuildFolderIcons.GAME_CONTROLLER]: (
-		<GameControllerIcon weight="fill" size={18} data-flx="guild.guild-folder-settings-modal.game-controller-icon" />
+		<GameControllerIcon
+			weight="fill"
+			size={remFromPx(18)}
+			data-flx="guild.guild-folder-settings-modal.game-controller-icon"
+		/>
 	),
 	[GuildFolderIcons.SHIELD]: (
-		<ShieldIcon weight="fill" size={18} data-flx="guild.guild-folder-settings-modal.shield-icon" />
+		<ShieldIcon weight="fill" size={remFromPx(18)} data-flx="guild.guild-folder-settings-modal.shield-icon" />
 	),
 	[GuildFolderIcons.MUSIC_NOTE]: (
-		<MusicNoteIcon weight="fill" size={18} data-flx="guild.guild-folder-settings-modal.music-note-icon" />
+		<MusicNoteIcon weight="fill" size={remFromPx(18)} data-flx="guild.guild-folder-settings-modal.music-note-icon" />
 	),
 };
 
@@ -127,8 +139,8 @@ export const GuildFolderSettingsModal = observer(({folderId}: GuildFolderSetting
 			.slice(0, 3)
 			.map((guildId) => Guilds.getGuild(guildId)?.name)
 			.filter((name): name is string => name != null);
-		return guildNames.join(', ');
-	}, [folder]);
+		return formatListWithConfig(guildNames, {locale: i18n.locale, style: 'narrow', type: 'conjunction'});
+	}, [folder, i18n.locale]);
 	const [name, setName] = useState(folder?.name ?? '');
 	const nameRef = useCursorAtEnd<HTMLInputElement>();
 	const [color, setColor] = useState(folder?.color ?? 0);
@@ -172,7 +184,7 @@ export const GuildFolderSettingsModal = observer(({folderId}: GuildFolderSetting
 	const renderIconOption = useCallback(
 		(option: ComboboxOption<GuildFolderIcon>, _isSelected: boolean) => (
 			<span
-				style={{display: 'flex', alignItems: 'center', gap: 8}}
+				style={{display: 'flex', alignItems: 'center', gap: remFromPx(8)}}
 				data-flx="guild.guild-folder-settings-modal.render-icon-option.span"
 			>
 				{FOLDER_ICON_MAP[option.value]}

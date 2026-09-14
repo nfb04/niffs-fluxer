@@ -365,20 +365,12 @@ fn format_calver(instant: DateTime<Utc>) -> String {
     )
 }
 
-fn month_day_segment(instant: DateTime<Utc>) -> String {
+pub(crate) fn month_day_segment(instant: DateTime<Utc>) -> String {
     format!("{}{:02}", instant.month(), instant.day())
 }
 
-fn micro_segment(instant: DateTime<Utc>) -> String {
-    format!(
-        "{:02}{:02}{:02}",
-        instant.hour(),
-        instant.minute(),
-        instant.second()
-    )
-    .parse::<u32>()
-    .expect("HHMMSS time segment should parse")
-    .to_string()
+pub(crate) fn micro_segment(instant: DateTime<Utc>) -> String {
+    (instant.hour() * 10_000 + instant.minute() * 100 + instant.second()).to_string()
 }
 
 pub(crate) fn parse_version_instant(version: &str) -> Result<DateTime<Utc>> {
@@ -465,25 +457,6 @@ where
     println!(
         "Append-only upload complete for s3://{bucket}/{prefix}: uploaded {}, skipped existing {}",
         stats.uploaded, stats.skipped_existing
-    );
-    Ok(())
-}
-
-pub(crate) async fn upload_directory_to_s3_overwrite<F>(
-    client: &S3Client,
-    bucket: &str,
-    prefix: &str,
-    root: &Path,
-    include: F,
-) -> Result<()>
-where
-    F: Fn(&Path) -> bool,
-{
-    let plan = directory_upload_plan(prefix, root, include)?;
-    let stats = upload_s3_plan_overwrite(client, bucket, plan).await?;
-    println!(
-        "Overwrite upload complete for s3://{bucket}/{prefix}: uploaded {}",
-        stats.uploaded
     );
     Ok(())
 }
@@ -1088,7 +1061,7 @@ pub(crate) async fn download_s3_prefix(
         if relative.is_empty() {
             continue;
         }
-        let output = target.join(relative);
+        let output = safe_download_target(target, relative)?;
         if let Some(parent) = output.parent() {
             tokio::fs::create_dir_all(parent)
                 .await
@@ -1267,6 +1240,17 @@ pub(crate) fn path_to_s3_key(path: &Path) -> String {
         .join("/")
 }
 
+fn safe_download_target(target: &Path, relative: &str) -> Result<PathBuf> {
+    let candidate = Path::new(relative);
+    for component in candidate.components() {
+        ensure!(
+            matches!(component, std::path::Component::Normal(_)),
+            "Refusing to write S3 object outside download target: {relative}"
+        );
+    }
+    Ok(target.join(candidate))
+}
+
 pub(crate) async fn download_file(url: &str, path: &Path) -> Result<()> {
     let bytes = Client::new()
         .get(url)
@@ -1320,13 +1304,13 @@ pub(crate) fn collect_files(root: &Path) -> Result<Vec<PathBuf>> {
     if !root.exists() {
         return Ok(Vec::new());
     }
-    let mut files = WalkDir::new(root)
-        .into_iter()
-        .collect::<std::result::Result<Vec<_>, _>>()?
-        .into_iter()
-        .filter(|entry| entry.file_type().is_file())
-        .map(|entry| entry.into_path())
-        .collect::<Vec<_>>();
+    let mut files = Vec::new();
+    for entry in WalkDir::new(root) {
+        let entry = entry?;
+        if entry.file_type().is_file() {
+            files.push(entry.into_path());
+        }
+    }
     files.sort();
     Ok(files)
 }
@@ -1336,13 +1320,13 @@ pub(crate) fn count_files(root: &Path) -> Result<usize> {
 }
 
 pub(crate) fn count_files_min_depth(root: &Path, min_depth: usize) -> Result<usize> {
-    Ok(WalkDir::new(root)
-        .min_depth(min_depth)
-        .into_iter()
-        .collect::<std::result::Result<Vec<_>, _>>()?
-        .into_iter()
-        .filter(|entry| entry.file_type().is_file())
-        .count())
+    let mut count = 0;
+    for entry in WalkDir::new(root).min_depth(min_depth) {
+        if entry?.file_type().is_file() {
+            count += 1;
+        }
+    }
+    Ok(count)
 }
 
 pub(crate) fn title_case(value: &str) -> String {

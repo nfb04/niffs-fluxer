@@ -20,6 +20,7 @@ import MentionFeed from '@app/features/notification/state/MentionFeed';
 import Permission from '@app/features/permissions/state/Permission';
 import Presence from '@app/features/presence/state/Presence';
 import QuickSwitcher from '@app/features/search/state/QuickSwitcher';
+import UserProfile from '@app/features/user/state/UserProfile';
 import MediaEngine from '@app/features/voice/engine/MediaEngineFacade';
 import Webhooks from '@app/features/webhook/state/Webhooks';
 import type {Guild} from '@fluxer/schema/src/domains/guild/GuildResponseSchemas';
@@ -34,6 +35,7 @@ export function handleGuildDelete(data: GuildDeletePayload, _context: GatewayHan
 	GuildAvailability.handleGuildAvailability(data.id, data.unavailable, data.unavailable_hidden);
 	Guilds.handleGuildDelete({guildId: data.id, unavailable: data.unavailable});
 	GuildList.handleGuildDelete(data.id, data.unavailable);
+	MemberSearch.handleGuildDelete(data.id);
 	GuildMembers.handleGuildDelete(data.id);
 	GuildCount.handleGuildDelete(data.id);
 	ChannelMemberCount.handleGuildDelete(data.id);
@@ -51,6 +53,6 @@ export function handleGuildDelete(data: GuildDeletePayload, _context: GatewayHan
 	Messages.handleGuildUnavailable(data.id, data.unavailable ?? false);
 	Messages.handleCleanup();
 	MentionFeed.handleGuildDelete(data.id);
-	MemberSearch.handleGuildDelete(data.id);
+	UserProfile.handleGuildDelete(data.unavailable);
 	QuickSwitcher.recomputeIfOpen();
 }
