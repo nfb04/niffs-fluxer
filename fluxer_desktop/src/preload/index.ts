@@ -50,6 +50,7 @@ import type {
 	SpellcheckState,
 	StreamerModeCaptureAppStatus,
 	StreamingPriorityDiagnostics,
+	SwitchInstanceUrlOptions,
 	TextareaContextMenuParams,
 	TrayActionPayload,
 	TrayRuntimeStatePayload,

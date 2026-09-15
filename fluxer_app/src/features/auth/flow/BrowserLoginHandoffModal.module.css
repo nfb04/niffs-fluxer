@@ -4,6 +4,17 @@
 	gap: 1.25rem;
 }
 
+.codeInputSection {
+	padding: 1rem 0;
+}
+
+.inputHelper {
+	font-size: 0.8125rem;
+	color: var(--text-primary-muted);
+	margin: 0.5rem 0 0;
+	line-height: 1.4;
+}
+
 .prefillHint {
 	text-align: center;
 }
