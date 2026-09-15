@@ -2,7 +2,6 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import {BUILD_CHANNEL} from '@electron/common/BuildChannel';
 import {CANARY_APP_URL, DEFAULT_SELF_HOSTED_APP_URL, STABLE_APP_URL} from '@electron/common/Constants';
 import type {
 	DesktopTroubleshootingSettings,
@@ -17,8 +16,12 @@ export type {
 	InstanceTabInfo,
 } from '@electron/common/Types';
 
+// Official's stable deployment (web.fluxer.app) now rejects clients as
+// running a deprecated web version; canary is the currently-served build.
+// This is independent of BUILD_CHANNEL, which only selects niffbot's own
+// update channel, not which official origin is treated as "Official".
 function getOfficialAppUrl(): string {
-	return BUILD_CHANNEL === 'canary' ? CANARY_APP_URL : STABLE_APP_URL;
+	return CANARY_APP_URL;
 }
 
 function getOfficialOrigins(): Set<string> {
