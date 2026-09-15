@@ -6,11 +6,6 @@ import {
 	type RuntimeConfigSnapshot,
 	runtimeConfigSnapshotsAreSameInstance,
 } from '@app/features/app/state/RuntimeConfig';
-import {getProtectedIndexedDB, getProtectedLocalStorage} from '@app/features/platform/state/ProtectedWebStorage';
-import {Logger} from '@app/features/platform/utils/AppLogger';
-import type {CustomStatus} from '@app/features/user/state/CustomStatus';
-import type {StatusType} from '@fluxer/constants/src/StatusConstants';
-import type {LimitConfigSnapshot} from '@fluxer/limits/src/LimitTypes';
 import {
 	canUseDesktopAccountStore,
 	deleteDesktopStoredAccount,
@@ -18,6 +13,11 @@ import {
 	listDesktopStoredAccounts,
 	putDesktopStoredAccount,
 } from '@app/features/auth/state/DesktopAccountStorageBridge';
+import {getProtectedIndexedDB, getProtectedLocalStorage} from '@app/features/platform/state/ProtectedWebStorage';
+import {Logger} from '@app/features/platform/utils/AppLogger';
+import type {CustomStatus} from '@app/features/user/state/CustomStatus';
+import type {StatusType} from '@fluxer/constants/src/StatusConstants';
+import type {LimitConfigSnapshot} from '@fluxer/limits/src/LimitTypes';
 
 function createEmptyLimitConfig(): LimitConfigSnapshot {
 	return {

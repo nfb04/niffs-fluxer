@@ -39,6 +39,7 @@ import {
 	handleSecondInstance,
 	initializeDeepLinks,
 } from '@electron/main/DeepLinks';
+import {initDesktopAccountStore} from '@electron/main/DesktopAccountStore';
 import {
 	formatDesktopDebugInfo,
 	getDesktopDebugInfo,
@@ -68,7 +69,6 @@ import {runNativeModulePreflight} from '@electron/main/NativeModulePreflight';
 import {cleanupNativeScreenCapture, registerNativeScreenCaptureHandlers} from '@electron/main/NativeScreenCapture';
 import {appendOpenH264Switches} from '@electron/main/OpenH264Manager';
 import {cleanupLinuxChromiumSpellcheckDictionaries} from '@electron/main/Spellcheck';
-import {initDesktopAccountStore} from '@electron/main/DesktopAccountStore';
 import {registerUpdater} from '@electron/main/Updater';
 import {
 	clearSavedWindowBounds,

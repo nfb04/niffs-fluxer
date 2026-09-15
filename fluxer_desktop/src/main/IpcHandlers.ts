@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import {CANARY_APP_URL, STABLE_APP_URL} from '@electron/common/Constants';
 import {
 	type DesktopTroubleshootingSettings,
 	type DesktopWindowBehaviorSettings,
@@ -8,7 +9,6 @@ import {
 	getInstanceTabsList,
 	setDesktopWindowBehaviorSettings,
 } from '@electron/common/DesktopConfig';
-import {CANARY_APP_URL, STABLE_APP_URL} from '@electron/common/Constants';
 import type {
 	ClipboardWriteFileResult,
 	DownloadFileResult,
@@ -18,6 +18,13 @@ import type {
 } from '@electron/common/Types';
 import {hasEnabledBlinkFeature, MIDDLE_CLICK_AUTOSCROLL_BLINK_FEATURE} from '@electron/main/ChromiumRuntime';
 import {
+	type DesktopStoredAccount,
+	deleteDesktopAccount,
+	getDesktopAccount,
+	listDesktopAccounts,
+	putDesktopAccount,
+} from '@electron/main/DesktopAccountStore';
+import {
 	applyDesktopWindowBehaviorSettings,
 	desktopTrayChangePendingRestart,
 	hasActiveDesktopTray,
@@ -25,12 +32,14 @@ import {
 } from '@electron/main/DesktopTray';
 import {downloadFile} from '@electron/main/FileDownloads';
 import {
-	deleteDesktopAccount,
-	getDesktopAccount,
-	listDesktopAccounts,
-	putDesktopAccount,
-	type DesktopStoredAccount,
-} from '@electron/main/DesktopAccountStore';
+	closeAddInstancePromptDialog,
+	getInstanceTabsState,
+	notifyInstanceTabsUpdated,
+	promptAddInstanceTabDialog,
+	removeInstanceTabAt,
+	switchActiveTab,
+	switchOrAddInstanceTab,
+} from '@electron/main/InstanceTabs';
 import {
 	type LinuxAppearanceSnapshot,
 	type LinuxAppearanceSubscription,
@@ -41,15 +50,6 @@ import {getTccStatus, registerMacTccIpcHandlers} from '@electron/main/MacTcc';
 import {setNativeStrings} from '@electron/main/MainI18n';
 import {copyRemoteFileToClipboard, parseClipboardWriteFileOptions} from '@electron/main/MediaClipboard';
 import {registerNotificationIpcHandlers} from '@electron/main/NotificationsIpc';
-import {
-	closeAddInstancePromptDialog,
-	getInstanceTabsState,
-	notifyInstanceTabsUpdated,
-	promptAddInstanceTabDialog,
-	removeInstanceTabAt,
-	switchActiveTab,
-	switchOrAddInstanceTab,
-} from '@electron/main/InstanceTabs';
 import {openExternalDeduped} from '@electron/main/OpenExternal';
 import {getStatus as getOpenH264Status, setEnabled as setOpenH264Enabled} from '@electron/main/OpenH264Manager';
 import {registerPasskeyHandlers} from '@electron/main/Passkeys';
@@ -249,7 +249,6 @@ async function assertValidFluxerInstance(instanceOrigin: string): Promise<void> 
 	}
 	throw new Error(`Not a valid Fluxer instance (${errors.join('; ')})`);
 }
-
 
 export function registerIpcHandlers(): void {
 	registerVoiceDebugEventSinkPopoutIpcHandlers();

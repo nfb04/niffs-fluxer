@@ -4,10 +4,18 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {BUILD_CHANNEL} from '@electron/common/BuildChannel';
 import {CANARY_APP_URL, DEFAULT_SELF_HOSTED_APP_URL, STABLE_APP_URL} from '@electron/common/Constants';
-import type {DesktopTroubleshootingSettings, DesktopWindowBehaviorSettings, InstanceTabInfo} from '@electron/common/Types';
+import type {
+	DesktopTroubleshootingSettings,
+	DesktopWindowBehaviorSettings,
+	InstanceTabInfo,
+} from '@electron/common/Types';
 import log from 'electron-log';
 
-export type {DesktopTroubleshootingSettings, DesktopWindowBehaviorSettings, InstanceTabInfo} from '@electron/common/Types';
+export type {
+	DesktopTroubleshootingSettings,
+	DesktopWindowBehaviorSettings,
+	InstanceTabInfo,
+} from '@electron/common/Types';
 
 function getOfficialAppUrl(): string {
 	return BUILD_CHANNEL === 'canary' ? CANARY_APP_URL : STABLE_APP_URL;
@@ -405,7 +413,6 @@ export function getAppUrl(): string {
 	return tabs[idx]?.url ?? getOfficialAppUrl();
 }
 
-
 export function getAllInstanceOrigins(): Array<string> {
 	const origins: Array<string> = [];
 	try {
@@ -425,9 +432,7 @@ export function getAllInstanceOrigins(): Array<string> {
 
 export function getInstanceTabsList(): Array<InstanceTabInfo> {
 	const official = getOfficialAppUrl();
-	const list: Array<InstanceTabInfo> = [
-		{id: 'official', url: official, label: 'Official', isOfficial: true},
-	];
+	const list: Array<InstanceTabInfo> = [{id: 'official', url: official, label: 'Official', isOfficial: true}];
 	for (let i = 0; i < (config.instance_tabs ?? []).length; i++) {
 		const url = config.instance_tabs?.[i];
 		if (!url) continue;

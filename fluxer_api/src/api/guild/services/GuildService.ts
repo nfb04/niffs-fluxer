@@ -25,6 +25,7 @@ import type {AvatarService} from '@app/api/infrastructure/AvatarService';
 import type {EntityAssetService} from '@app/api/infrastructure/EntityAssetService';
 import type {IAssetDeletionQueue} from '@app/api/infrastructure/IAssetDeletionQueue';
 import type {IGatewayService} from '@app/api/infrastructure/IGatewayService';
+import type {IStorageService} from '@app/api/infrastructure/IStorageService';
 import type {UserCacheService} from '@app/api/infrastructure/UserCacheService';
 import type {InviteRepository} from '@app/api/invite/InviteRepository';
 import type {LimitConfigService} from '@app/api/limits/LimitConfigService';
@@ -57,7 +58,6 @@ import type {GuildUpdateRequest} from '@fluxer/schema/src/domains/guild/GuildReq
 import type {GuildResponse} from '@fluxer/schema/src/domains/guild/GuildResponseSchemas';
 import type {ICacheService} from '@pkgs/cache/src/ICacheService';
 import type {IpInfoService} from '@pkgs/geoip/src/IpInfoService';
-import type {IStorageService} from '@app/api/infrastructure/IStorageService';
 
 interface StoredAuditLogWebhookResponse extends Omit<AuditLogWebhookResponse, 'type'> {
 	type: number;

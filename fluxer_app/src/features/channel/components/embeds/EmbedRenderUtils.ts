@@ -16,9 +16,7 @@ export function hasRichEmbedContent(embed: RichEmbedContentFields): boolean {
 			embed.author ||
 			embed.footer ||
 			embed.fields?.length ||
-			(embed.provider &&
-			embed.type !== MessageEmbedTypes.GIFV &&
-			embed.type !== MessageEmbedTypes.IMAGE),
+			(embed.provider && embed.type !== MessageEmbedTypes.GIFV && embed.type !== MessageEmbedTypes.IMAGE),
 	);
 }
 

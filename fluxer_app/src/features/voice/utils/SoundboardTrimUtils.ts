@@ -28,11 +28,7 @@ export function getWaveformData(buffer: AudioBuffer, width: number, startNorm = 
 	return data;
 }
 
-export async function sliceAudioBuffer(
-	buffer: AudioBuffer,
-	startTime: number,
-	endTime: number,
-): Promise<AudioBuffer> {
+export async function sliceAudioBuffer(buffer: AudioBuffer, startTime: number, endTime: number): Promise<AudioBuffer> {
 	const sampleRate = buffer.sampleRate;
 	const startSample = Math.floor(startTime * sampleRate);
 	const endSample = Math.min(Math.ceil(endTime * sampleRate), buffer.length);
@@ -117,7 +113,7 @@ export function audioBufferToWebMBlob(buffer: AudioBuffer): Promise<Blob | null>
 		const stream = dest.stream;
 		const mimeType = WEBM_OPUS_MIME;
 		const recorder = new MediaRecorder(stream, {mimeType, audioBitsPerSecond: 64000});
-		const chunks: Blob[] = [];
+		const chunks: Array<Blob> = [];
 		recorder.ondataavailable = (e) => {
 			if (e.data.size > 0) chunks.push(e.data);
 		};
@@ -131,13 +127,16 @@ export function audioBufferToWebMBlob(buffer: AudioBuffer): Promise<Blob | null>
 		};
 		recorder.start(100);
 		source.start(0, 0, buffer.duration);
-		setTimeout(() => {
-			try {
-				recorder.stop();
-			} catch {
-				resolve(null);
-			}
-		}, buffer.duration * 1000 + 300);
+		setTimeout(
+			() => {
+				try {
+					recorder.stop();
+				} catch {
+					resolve(null);
+				}
+			},
+			buffer.duration * 1000 + 300,
+		);
 	});
 }
 

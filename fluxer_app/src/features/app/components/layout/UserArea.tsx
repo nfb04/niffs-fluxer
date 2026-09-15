@@ -32,9 +32,9 @@ import {USER_SETTINGS_LABEL_DESCRIPTOR} from '@app/features/user/components/sett
 import type {User} from '@app/features/user/models/User';
 import * as NicknameUtils from '@app/features/user/utils/NicknameUtils';
 import {VoiceConnectionStatus} from '@app/features/voice/components/VoiceConnectionStatus';
+import {VoiceAudioSettingsMenu} from '@app/features/voice/components/VoiceSettingsMenus';
 import {VoiceSoundboardGrid} from '@app/features/voice/components/VoiceSoundboardGrid';
 import popoverStyles from '@app/features/voice/components/VoiceSoundboardPopover.module.css';
-import {VoiceAudioSettingsMenu} from '@app/features/voice/components/VoiceSettingsMenus';
 import MediaEngine from '@app/features/voice/engine/MediaEngineFacade';
 import {getEffectiveAudioState} from '@app/features/voice/engine/VoiceEffectiveAudioState';
 import {useMediaDevices} from '@app/features/voice/hooks/useMediaDevices';
@@ -48,7 +48,14 @@ import {
 } from '@app/features/voice/utils/VoiceMessageDescriptors';
 import {msg} from '@lingui/core/macro';
 import {useLingui} from '@lingui/react/macro';
-import {GearIcon, MicrophoneIcon, MicrophoneSlashIcon, MusicNotesIcon, SpeakerHighIcon, SpeakerSlashIcon} from '@phosphor-icons/react';
+import {
+	GearIcon,
+	MicrophoneIcon,
+	MicrophoneSlashIcon,
+	MusicNotesIcon,
+	SpeakerHighIcon,
+	SpeakerSlashIcon,
+} from '@phosphor-icons/react';
 import {clsx} from 'clsx';
 import {observer} from 'mobx-react-lite';
 import {useEffect, useRef} from 'react';

@@ -14,8 +14,8 @@ import {
 	MAX_GUILD_STICKER_TAGS,
 	MAX_TEMP_BAN_DURATION_SECONDS,
 	MIN_TEMP_BAN_DURATION_SECONDS,
-	STICKER_MAX_SIZE,
 	SOUNDBOARD_MAX_SIZE,
+	STICKER_MAX_SIZE,
 } from '@fluxer/constants/src/LimitConstants';
 import {SudoVerificationSchema} from '@fluxer/schema/src/domains/auth/AuthSchemas';
 import {GuildFeatureSchema} from '@fluxer/schema/src/domains/guild/GuildResponseSchemas';

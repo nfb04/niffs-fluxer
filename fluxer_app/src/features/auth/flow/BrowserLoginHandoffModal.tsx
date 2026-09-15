@@ -105,7 +105,10 @@ const BrowserLoginHandoffModal = observer(
 			const timer = setInterval(async () => {
 				if (!pollingRef.current) return;
 				try {
-					const result = await AuthenticationCommands.pollDesktopHandoffStatus(handoffCode, handoffPollSecretRef.current);
+					const result = await AuthenticationCommands.pollDesktopHandoffStatus(
+						handoffCode,
+						handoffPollSecretRef.current,
+					);
 					if (result.status === 'completed' && result.token && result.user_id) {
 						pollingRef.current = false;
 						completedRef.current = true;

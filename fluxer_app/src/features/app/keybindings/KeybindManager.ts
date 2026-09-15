@@ -1745,8 +1745,7 @@ class KeybindManager {
 		const electronApi = getElectronAPI();
 		if (!electronApi?.globalKeyHookRegister) return false;
 		const mouseButton = combo.mouseButton;
-		const keycode =
-			mouseButton == null ? this.resolvePhysicalKeycodeForCombo(combo) : null;
+		const keycode = mouseButton == null ? this.resolvePhysicalKeycodeForCombo(combo) : null;
 		const keyName = mouseButton == null ? keyNameForGlobalHook(combo) : null;
 		const physicalKeyName = mouseButton == null ? physicalKeyNameForGlobalHook(combo) : null;
 		if (mouseButton == null) {

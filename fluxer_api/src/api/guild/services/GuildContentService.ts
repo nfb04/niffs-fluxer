@@ -6,11 +6,13 @@ import type {IGuildRepositoryAggregate} from '@app/api/guild/repositories/IGuild
 import {ContentHelpers} from '@app/api/guild/services/content/ContentHelpers';
 import {EmojiService} from '@app/api/guild/services/content/EmojiService';
 import {ExpressionAssetPurger} from '@app/api/guild/services/content/ExpressionAssetPurger';
+import {SoundboardService} from '@app/api/guild/services/content/SoundboardService';
 import {StickerService} from '@app/api/guild/services/content/StickerService';
 import type {AvatarService} from '@app/api/infrastructure/AvatarService';
 import type {IAssetDeletionQueue} from '@app/api/infrastructure/IAssetDeletionQueue';
 import type {IGatewayService} from '@app/api/infrastructure/IGatewayService';
 import type {ISnowflakeService} from '@app/api/infrastructure/ISnowflakeService';
+import type {IStorageService} from '@app/api/infrastructure/IStorageService';
 import type {UserCacheService} from '@app/api/infrastructure/UserCacheService';
 import type {LimitConfigService} from '@app/api/limits/LimitConfigService';
 import type {RequestCache} from '@app/api/middleware/RequestCacheMiddleware';
@@ -26,8 +28,6 @@ import type {
 	GuildSoundboardSoundResponse,
 } from '@fluxer/schema/src/domains/guild/GuildSoundboardSchemas';
 import type {UserPartialResponse} from '@fluxer/schema/src/domains/user/UserResponseSchemas';
-import type {IStorageService} from '@app/api/infrastructure/IStorageService';
-import {SoundboardService} from '@app/api/guild/services/content/SoundboardService';
 
 export class GuildContentService {
 	private readonly contentHelpers: ContentHelpers;

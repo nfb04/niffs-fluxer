@@ -17,8 +17,8 @@ import AuthLoginPasskeyActions, {
 	AuthLoginDivider,
 } from '@app/features/auth/flow/auth_login_core/AuthLoginPasskeyActions';
 import {isApprovalFlowMode, useDesktopHandoffFlow} from '@app/features/auth/flow/auth_login_core/useDesktopHandoffFlow';
-import DesktopHandoffAccountSelector from '@app/features/auth/flow/DesktopHandoffAccountSelector';
 import {showBrowserLoginHandoffModal} from '@app/features/auth/flow/BrowserLoginHandoffModal';
+import DesktopHandoffAccountSelector from '@app/features/auth/flow/DesktopHandoffAccountSelector';
 import {ConnectedHandoffApprovalFlow} from '@app/features/auth/flow/HandoffApprovalFlow';
 import IpAuthorizationScreen from '@app/features/auth/flow/IpAuthorizationScreen';
 import {useAuthCardPresentation} from '@app/features/auth/flow/useAuthCardPresentation';

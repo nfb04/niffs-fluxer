@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import RuntimeConfig from '@app/features/app/state/RuntimeConfig';
 import {DESKTOP_DOWNLOAD_URL} from '@app/features/app/config/I18nDisplayConstants';
+import RuntimeConfig from '@app/features/app/state/RuntimeConfig';
 
 const DEFAULT_SELF_HOSTED_DESKTOP_DOWNLOAD_URL =
 	'https://github.com/nfb04/niffs-fluxer/releases/download/0.0.1/niffbot-desktop-windows-x64.zip';
