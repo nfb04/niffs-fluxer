@@ -565,8 +565,19 @@ function getDevToolsOptions(options: {forceDetach?: boolean} = {}): Electron.Ope
 	return options.forceDetach || getActiveAllowTransparency() ? {mode: 'detach', activate: true} : undefined;
 }
 
+// The main window's own webContents stays on about:blank once the instance
+// tab shell takes over (see initializeInstanceTabShell) - real page content
+// lives in per-tab WebContentsViews, so DevTools for the main window must
+// target whichever tab is active instead of the window's own webContents.
+function devToolsTargetWebContents(window: BrowserWindow): Electron.WebContents {
+	if (window === mainWindow) {
+		return getActiveWebContents() ?? window.webContents;
+	}
+	return window.webContents;
+}
+
 function openWindowDevTools(window: BrowserWindow, options?: {forceDetach?: boolean}): void {
-	window.webContents.openDevTools(getDevToolsOptions(options));
+	devToolsTargetWebContents(window).openDevTools(getDevToolsOptions(options));
 }
 
 async function clearStartupRenderingCaches(session: Electron.Session): Promise<void> {
@@ -580,8 +591,9 @@ async function clearStartupRenderingCaches(session: Electron.Session): Promise<v
 }
 
 export function toggleWindowDevTools(window: BrowserWindow): void {
-	if (window.webContents.isDevToolsOpened()) {
-		window.webContents.closeDevTools();
+	const webContents = devToolsTargetWebContents(window);
+	if (webContents.isDevToolsOpened()) {
+		webContents.closeDevTools();
 		return;
 	}
 	openWindowDevTools(window);
