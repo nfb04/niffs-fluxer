@@ -21,10 +21,6 @@ import {
 } from '@electron/main/DesktopDebugInfo';
 import {hasActiveDesktopTray, refreshDesktopTrayMenu} from '@electron/main/DesktopTray';
 import {drainPendingDisplayMediaRequests, registerDisplayMediaRequestHandler} from '@electron/main/DisplayMedia';
-import {shouldDisableV8CodeCache} from '@electron/main/LaunchOptions';
-import {openExternalDeduped} from '@electron/main/OpenExternal';
-import {registerSpellcheck} from '@electron/main/Spellcheck';
-import {resetStreamingPriority} from '@electron/main/StreamingPriority';
 import {
 	destroyInstanceTabs,
 	focusActiveTabWebContents,
@@ -32,6 +28,10 @@ import {
 	initializeInstanceTabShell,
 	setTabViewBounds,
 } from '@electron/main/InstanceTabs';
+import {shouldDisableV8CodeCache} from '@electron/main/LaunchOptions';
+import {openExternalDeduped} from '@electron/main/OpenExternal';
+import {registerSpellcheck} from '@electron/main/Spellcheck';
+import {resetStreamingPriority} from '@electron/main/StreamingPriority';
 import {getMainWindowRendererGoneAction} from '@electron/main/WindowRendererLifecycle';
 import {refreshWindowsBadgeOverlay} from '@electron/main/WindowsBadge';
 import {app, BrowserWindow, screen} from 'electron';
@@ -703,6 +703,7 @@ function getTabWebPreferences(
 	return {
 		...getSharedWebPreferences(allowTransparency, useNativeTitleBar, appUrl),
 		transparent: false,
+		backgroundThrottling: false,
 	};
 }
 
