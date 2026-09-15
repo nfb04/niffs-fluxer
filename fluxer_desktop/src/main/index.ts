@@ -73,6 +73,7 @@ import {registerUpdater} from '@electron/main/Updater';
 import {
 	clearSavedWindowBounds,
 	createWindow,
+	getInsecureInstanceOriginsSwitchValue,
 	getMainWindow,
 	hideWindow,
 	setQuitting,
@@ -257,6 +258,10 @@ if (launchConfigurationError) {
 		process.exit(1);
 	}
 	app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+	const insecureInstanceOrigins = getInsecureInstanceOriginsSwitchValue();
+	if (insecureInstanceOrigins) {
+		app.commandLine.appendSwitch('unsafely-treat-insecure-origin-as-secure', insecureInstanceOrigins);
+	}
 	const windowBehaviorSettings = getDesktopWindowBehaviorSettings();
 	app.commandLine.appendSwitch(
 		windowBehaviorSettings.smoothScrolling ? 'enable-smooth-scrolling' : 'disable-smooth-scrolling',

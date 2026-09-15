@@ -11,7 +11,7 @@ import {
 	MIN_WINDOW_WIDTH,
 	STABLE_APP_URL,
 } from '@electron/common/Constants';
-import {getAllInstanceOrigins, getAppUrl, getDesktopWindowBehaviorSettings} from '@electron/common/DesktopConfig';
+import {getAllInstanceOrigins, getDesktopWindowBehaviorSettings} from '@electron/common/DesktopConfig';
 import {createChildLogger} from '@electron/common/Logger';
 import type {DesktopWindowBehaviorSettings} from '@electron/common/Types';
 import {
@@ -46,7 +46,6 @@ const TRANSPARENT_WINDOW_BACKGROUND_COLOR = '#00000000';
 const MEDIA_DEVICE_BLINK_FEATURES = 'EnumerateDevices,AudioOutputDevices';
 const ACTIVE_ALLOW_TRANSPARENCY_RENDERER_ARG = '--fluxer-active-allow-transparency=1';
 const ACTIVE_USE_NATIVE_TITLEBAR_RENDERER_ARG = '--fluxer-active-use-native-titlebar=1';
-const INSECURE_ORIGIN_RENDERER_ARG_PREFIX = '--unsafely-treat-insecure-origin-as-secure=';
 const THEME_STUDIO_POPOUT_WINDOW_NAME = 'fluxer_theme_studio';
 const THEME_STUDIO_POPOUT_PATHNAME = '/theme-studio';
 const THEME_STUDIO_POPOUT_TITLE = 'Fluxer | Theme Studio';
@@ -536,28 +535,29 @@ function isLoopbackHostname(hostname: string): boolean {
 	return normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '::1' || normalized === '[::1]';
 }
 
-function getInsecureOriginRendererArgument(appUrl: string): string | null {
+function isInsecureNonLoopbackOrigin(url: string): boolean {
 	try {
-		const parsed = new URL(appUrl);
-		if (parsed.protocol !== 'http:' || isLoopbackHostname(parsed.hostname)) {
-			return null;
-		}
-		return `${INSECURE_ORIGIN_RENDERER_ARG_PREFIX}${parsed.origin}`;
+		const parsed = new URL(url);
+		return parsed.protocol === 'http:' && !isLoopbackHostname(parsed.hostname);
 	} catch {
-		return null;
+		return false;
 	}
 }
 
-function getRendererAdditionalArguments(
-	allowTransparency: boolean,
-	useNativeTitleBar: boolean,
-	appUrl: string,
-): Array<string> {
+// Chromium only honours `unsafely-treat-insecure-origin-as-secure` as a
+// browser-process command-line switch registered before renderers are
+// created (see index.ts); passing it through webPreferences.additionalArguments
+// merely appends it to the renderer's process.argv and has no effect on the
+// secure-context check that getUserMedia (and thus voice) depends on.
+export function getInsecureInstanceOriginsSwitchValue(): string | null {
+	const insecureOrigins = getAllInstanceOrigins().filter(isInsecureNonLoopbackOrigin);
+	return insecureOrigins.length > 0 ? [...new Set(insecureOrigins)].join(',') : null;
+}
+
+function getRendererAdditionalArguments(allowTransparency: boolean, useNativeTitleBar: boolean): Array<string> {
 	const args: Array<string> = [];
 	if (allowTransparency) args.push(ACTIVE_ALLOW_TRANSPARENCY_RENDERER_ARG);
 	if (useNativeTitleBar) args.push(ACTIVE_USE_NATIVE_TITLEBAR_RENDERER_ARG);
-	const insecureOriginArg = getInsecureOriginRendererArgument(appUrl);
-	if (insecureOriginArg) args.push(insecureOriginArg);
 	return args;
 }
 
@@ -675,11 +675,7 @@ function getTitleBarWindowOptions(
 	};
 }
 
-function getSharedWebPreferences(
-	allowTransparency: boolean,
-	useNativeTitleBar: boolean,
-	appUrl: string,
-): Electron.WebPreferences {
+function getSharedWebPreferences(allowTransparency: boolean, useNativeTitleBar: boolean): Electron.WebPreferences {
 	return {
 		preload: path.join(__dirname, '../preload/index.cjs'),
 		enableBlinkFeatures: MEDIA_DEVICE_BLINK_FEATURES,
@@ -690,18 +686,14 @@ function getSharedWebPreferences(
 		allowRunningInsecureContent: false,
 		spellcheck: process.platform !== 'linux',
 		transparent: allowTransparency,
-		additionalArguments: getRendererAdditionalArguments(allowTransparency, useNativeTitleBar, appUrl),
+		additionalArguments: getRendererAdditionalArguments(allowTransparency, useNativeTitleBar),
 		v8CacheOptions: shouldDisableV8CodeCache(process.argv) ? 'none' : 'code',
 	};
 }
 
-function getTabWebPreferences(
-	allowTransparency: boolean,
-	useNativeTitleBar: boolean,
-	appUrl: string,
-): Electron.WebPreferences {
+function getTabWebPreferences(allowTransparency: boolean, useNativeTitleBar: boolean): Electron.WebPreferences {
 	return {
-		...getSharedWebPreferences(allowTransparency, useNativeTitleBar, appUrl),
+		...getSharedWebPreferences(allowTransparency, useNativeTitleBar),
 		transparent: false,
 		backgroundThrottling: false,
 	};
@@ -727,7 +719,6 @@ export function createWindow(options: CreateWindowOptions = {}): BrowserWindow {
 	const acceptFirstMouseOnFocus = isMac;
 	initialUseNativeTitleBar = useNativeTitleBar;
 	initialAllowTransparency = allowTransparency;
-	const appUrl = getAppUrl();
 	const windowOptions: Electron.BrowserWindowConstructorOptions = {
 		width: windowWidth,
 		height: windowHeight,
@@ -740,7 +731,7 @@ export function createWindow(options: CreateWindowOptions = {}): BrowserWindow {
 		...getTitleBarWindowOptions(useNativeTitleBar),
 		trafficLightPosition: isMac ? CUSTOM_TITLEBAR_TRAFFIC_LIGHT_POSITION : undefined,
 		acceptFirstMouse: acceptFirstMouseOnFocus,
-		webPreferences: getSharedWebPreferences(allowTransparency, useNativeTitleBar, appUrl),
+		webPreferences: getSharedWebPreferences(allowTransparency, useNativeTitleBar),
 	};
 	if (isLinux) {
 		const iconPath = getLinuxWindowIconPath();
@@ -980,8 +971,7 @@ export function createWindow(options: CreateWindowOptions = {}): BrowserWindow {
 	const instanceTabOptions = {
 		isTrustedOrigin,
 		getSanitizedPath,
-		getTabWebPreferences: (tabAppUrl: string) =>
-			getTabWebPreferences(allowTransparency, getActiveUseNativeTitleBar(), tabAppUrl),
+		getTabWebPreferences: () => getTabWebPreferences(allowTransparency, getActiveUseNativeTitleBar()),
 		getVoicePopoutWindowOptions,
 		isVoicePopoutWindowName,
 	};
@@ -1031,7 +1021,7 @@ export function createWindow(options: CreateWindowOptions = {}): BrowserWindow {
 				transparent: allowPopoutTransparency,
 				hasShadow: getWindowHasShadow(allowPopoutTransparency),
 				show: true,
-				webPreferences: getSharedWebPreferences(allowPopoutTransparency, getActiveUseNativeTitleBar(), appUrl),
+				webPreferences: getSharedWebPreferences(allowPopoutTransparency, getActiveUseNativeTitleBar()),
 			};
 			return {action: 'allow', overrideBrowserWindowOptions};
 		}
