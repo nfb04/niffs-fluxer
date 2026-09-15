@@ -5,6 +5,7 @@ import type {WorkerJobOptions, WorkerJobPayload} from '@pkgs/worker/src/contract
 
 export interface WorkerTaskAttempt {
 	readonly isLastAttempt: boolean;
+	readonly isRedelivery: boolean;
 }
 
 export interface WorkerTaskHelpers {

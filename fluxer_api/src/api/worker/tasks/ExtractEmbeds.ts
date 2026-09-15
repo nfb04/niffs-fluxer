@@ -451,7 +451,8 @@ const extractEmbeds: WorkerTaskHandler = async (payload, helpers) => {
 			{messageId: messageId.toString(), urlCount: urls.length, skippedUrlCount: extractedUrls.length - urls.length},
 			'Unfurling URLs',
 		);
-		const unfurledEmbedsByUrl = await unfurlUrls(urls, embedService, nsfwMode, validated.bypassUnfurlCache);
+		const bypassUnfurlCache = validated.bypassUnfurlCache || helpers.attempt?.isRedelivery === true;
+		const unfurledEmbedsByUrl = await unfurlUrls(urls, embedService, nsfwMode, bypassUnfurlCache);
 		if (unfurledEmbedsByUrl.size === 0) {
 			Logger.info({messageId: messageId.toString(), urlsAttempted: urls.length}, 'No URLs were successfully unfurled');
 			return;

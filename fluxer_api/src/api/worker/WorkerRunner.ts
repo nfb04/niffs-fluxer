@@ -403,7 +403,7 @@ export class WorkerRunner {
 		const helpers = {
 			logger: Logger.child({taskType, seq: msg.seq, jobId: capturedJobId?.toString()}),
 			jobId: capturedJobId ?? 0n,
-			attempt: {isLastAttempt: msg.info.deliveryCount >= this.maxDeliver},
+			attempt: {isLastAttempt: msg.info.deliveryCount >= this.maxDeliver, isRedelivery: msg.info.deliveryCount > 1},
 			addJob: this.workerService.addJob.bind(this.workerService),
 			reportProgress: async (current: number, total: number | null, message?: string | null) => {
 				if (capturedJobId === null) return;
