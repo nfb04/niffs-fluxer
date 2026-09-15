@@ -185,6 +185,16 @@ function dispatchKeyEvent(event: {
 }): void {
 	const eventWithBackend = {...event, backend: activeBackend};
 	sendToKeybindRenderer('global-key-event', eventWithBackend);
+	// TEMPORARY diagnostic for the ^ (Backquote-position) mute keybind investigation; remove once root-caused.
+	if (event.type === 'keydown') {
+		logger.info('[DIAG] global keydown', {
+			keyName: event.keyName,
+			keycode: event.keycode,
+			scanCode: event.scanCode,
+			backend: activeBackend,
+			shiftKey: event.shiftKey,
+		});
+	}
 	for (const [id, keybind] of registeredKeybinds) {
 		if (!keyEventMatchesRegistration(keybind, eventWithBackend)) continue;
 		if (event.type === 'keyup') {
