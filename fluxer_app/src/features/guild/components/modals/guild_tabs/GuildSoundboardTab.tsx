@@ -67,8 +67,8 @@ const GuildSoundboardTab: React.FC<{guildId: string}> = observer(function GuildS
 	}, [guildId, fetchSounds]);
 
 	const handlePlay = useCallback(
-		(soundId: string) => {
-			const url = mediaUrl(`soundboard/${guildId}/${soundId}`);
+		(sound: GuildSoundboardSoundResponse) => {
+			const url = mediaUrl(`soundboard/${guildId}/${sound.id}.${sound.ext}`);
 			const audio = new Audio(url);
 			audio.play().catch(() => {});
 		},
@@ -87,7 +87,7 @@ const GuildSoundboardTab: React.FC<{guildId: string}> = observer(function GuildS
 			if (!trimmed) return;
 			try {
 				await GuildSoundboardCommands.update(guildId, soundId, trimmed);
-				setSounds((prev) => prev.map((s) => (s.id === soundId ? {id: s.id, name: trimmed} : s)));
+				setSounds((prev) => prev.map((s) => (s.id === soundId ? {...s, name: trimmed} : s)));
 			} catch (error) {
 				logger.error('Failed to rename sound', error);
 				void fetchSounds();
@@ -175,7 +175,7 @@ const GuildSoundboardTab: React.FC<{guildId: string}> = observer(function GuildS
 							<button
 								type="button"
 								className={styles.playButton}
-								onClick={() => handlePlay(sound.id)}
+								onClick={() => handlePlay(sound)}
 								title={t`Play`}
 								aria-label={t`Play ${sound.name}`}
 							>

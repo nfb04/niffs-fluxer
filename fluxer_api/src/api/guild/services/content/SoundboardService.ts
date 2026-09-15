@@ -75,6 +75,7 @@ export class SoundboardService {
 		const sounds: Array<GuildSoundboardSoundResponse> = manifest.map((entry) => ({
 			id: entry.id,
 			name: entry.name,
+			ext: entry.ext ?? 'mp3',
 			...(entry.emoji != null && entry.emoji !== '' ? {emoji: entry.emoji} : {}),
 		}));
 		return {sounds};
@@ -151,6 +152,7 @@ export class SoundboardService {
 		return {
 			id: soundId,
 			name,
+			ext,
 			...(entry.emoji != null ? {emoji: entry.emoji} : {}),
 		};
 	}
@@ -218,6 +220,11 @@ export class SoundboardService {
 			body: new Uint8Array(Buffer.from(JSON.stringify(manifest), 'utf8')),
 			contentType: 'application/json',
 		});
-		return {id: soundIdStr, name};
+		return {
+			id: soundIdStr,
+			name,
+			ext: entry.ext ?? 'mp3',
+			...(entry.emoji != null && entry.emoji !== '' ? {emoji: entry.emoji} : {}),
+		};
 	}
 }

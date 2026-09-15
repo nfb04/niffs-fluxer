@@ -7,6 +7,7 @@ export const GuildSoundboardSoundResponse = z.object({
 	id: SnowflakeStringType.describe('The unique identifier for this sound'),
 	name: z.string().describe('The display name of the sound'),
 	emoji: z.string().optional().describe('Related emoji shortcode (e.g. smiley)'),
+	ext: z.enum(['mp3', 'wav']).describe('The audio file extension used to serve this sound'),
 });
 
 export type GuildSoundboardSoundResponse = z.infer<typeof GuildSoundboardSoundResponse>;

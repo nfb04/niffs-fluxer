@@ -7,6 +7,7 @@ import {mediaUrl} from '@app/features/messaging/utils/MessagingUrlUtils';
 import {SOUNDBOARD_SOUNDS} from '@app/features/voice/components/VoiceSoundboardConstants';
 import styles from '@app/features/voice/components/VoiceSoundboardPopover.module.css';
 import {canPlaySoundboardSound, playSoundboardSound} from '@app/features/voice/utils/VoiceSoundboardUtils';
+import type {GuildSoundboardSoundResponse} from '@fluxer/schema/src/domains/guild/GuildSoundboardSchemas';
 import {useLingui} from '@lingui/react/macro';
 import {MagnifyingGlassIcon} from '@phosphor-icons/react';
 import type {Room} from 'livekit-client';
@@ -72,7 +73,7 @@ interface VoiceSoundboardGridProps {
 export function VoiceSoundboardGrid({room, guildId}: VoiceSoundboardGridProps) {
 	const {t} = useLingui();
 	const [loadingId, setLoadingId] = useState<string | null>(null);
-	const [customSounds, setCustomSounds] = useState<Array<{id: string; name: string}>>([]);
+	const [customSounds, setCustomSounds] = useState<Array<GuildSoundboardSoundResponse>>([]);
 	const [searchQuery, setSearchQuery] = useState('');
 
 	const builtIns: Array<GridSound> = SOUNDBOARD_SOUNDS.map((s) => ({
@@ -87,7 +88,7 @@ export function VoiceSoundboardGrid({room, guildId}: VoiceSoundboardGridProps) {
 			? customSounds.map((s) => ({
 					id: s.id,
 					name: s.name,
-					url: mediaUrl(`soundboard/${guildId}/${s.id}`),
+					url: mediaUrl(`soundboard/${guildId}/${s.id}.${s.ext}`),
 					isCustom: true as const,
 				}))
 			: [];
