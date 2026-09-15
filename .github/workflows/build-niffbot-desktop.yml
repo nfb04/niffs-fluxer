@@ -45,6 +45,14 @@ jobs:
           cache: pnpm
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.93.0"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            tools/ci
+            fluxer_desktop/native
 
       - name: Build Windows portable client
         shell: bash
@@ -58,11 +66,6 @@ jobs:
         with:
           name: niffbot-desktop-windows-x64
           path: artifacts/niffs-fluxer-windows-x64-portable.zip
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: niffbot-desktop-windows-unpacked
-          path: fluxer_desktop/dist-electron/win-unpacked/
 
   build-linux:
     if: inputs.target == 'linux'
@@ -83,6 +86,14 @@ jobs:
           cache: pnpm
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.93.0"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            tools/ci
+            fluxer_desktop/native
 
       - name: Install Linux native build deps
         run: sudo apt-get update && sudo apt-get install -y libpipewire-0.3-dev zip
